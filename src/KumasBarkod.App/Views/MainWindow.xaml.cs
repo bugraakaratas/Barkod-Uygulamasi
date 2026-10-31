@@ -24,9 +24,9 @@ public partial class MainWindow : FluentWindow
         RootNavigation.SetServiceProvider(services);
         Loaded += (_, _) => RootNavigation.Navigate(typeof(CutEntryPage));
 
-        // Hangi ekranda okutulursa okutulsun: okutma ekranına geç ve kaydı aç.
+        // Hangi ekranda okutulursa okutulsun (veya geçmişten açılırsa): okutma ekranına geç ve kaydı aç.
         _scanCapture = new ScanCapture(this);
-        WeakReferenceMessenger.Default.Register<ScanDetectedMessage>(this, (_, m) =>
+        WeakReferenceMessenger.Default.Register<OpenCutMessage>(this, (_, m) =>
         {
             RootNavigation.Navigate(typeof(ScanPage));
             scanViewModel.Open(m.CutId);

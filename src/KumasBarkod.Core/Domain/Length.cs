@@ -70,8 +70,11 @@ public static class Length
         return true;
     }
 
-    /// <summary>2550 → "25,50"</summary>
+    /// <summary>2550 → "25,50" (etiket ve giriş: binlik ayırıcı yok, girişle aynı biçim)</summary>
     public static string Format(long cm) => (cm / 100m).ToString("0.00", Turkish);
+
+    /// <summary>445904735 → "4.459.047,35" (büyük toplamlar için, binlik ayırıcılı)</summary>
+    public static string FormatGrouped(long cm) => (cm / 100m).ToString("N2", Turkish);
 
     private static bool IsDigits(string s)
     {

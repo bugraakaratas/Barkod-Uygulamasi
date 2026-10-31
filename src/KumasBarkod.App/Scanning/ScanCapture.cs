@@ -47,7 +47,7 @@ public sealed class ScanCapture
 
         e.Handled = true;   // Enter odaktaki kutuya (lot → metre, metre → kaydet) ulaşmasın
         Restore();
-        WeakReferenceMessenger.Default.Send(new ScanDetectedMessage(cutId));
+        WeakReferenceMessenger.Default.Send(new OpenCutMessage(cutId));
     }
 
     private void Snapshot(TextBox? box)

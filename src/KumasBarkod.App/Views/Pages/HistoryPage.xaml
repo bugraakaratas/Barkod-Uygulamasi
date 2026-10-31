@@ -2,16 +2,186 @@
       xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
       xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
       xmlns:ui="http://schemas.lepo.co/wpfui/2022/xaml"
-      Title="Geçmiş">
-    <StackPanel Margin="{StaticResource PageMargin}">
-        <TextBlock Style="{StaticResource PageTitleStyle}" Text="Geçmiş" />
-        <ui:Card>
-            <StackPanel>
-                <TextBlock Style="{StaticResource PageSubtitleStyle}"
-                           Text="Kesimler tarih, lot ve duruma göre filtrelenecek; etiket tekrar basılabilecek." />
-                <TextBlock Style="{StaticResource PageSubtitleStyle}" Margin="0,8,0,0"
-                           Text="7. adımda yapılacak." />
-            </StackPanel>
-        </ui:Card>
-    </StackPanel>
+      Title="Geçmiş"
+      ScrollViewer.CanContentScroll="False">
+    <Grid Margin="{StaticResource PageMargin}">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+            <RowDefinition Height="Auto" />
+        </Grid.RowDefinitions>
+
+        <TextBlock Style="{StaticResource PageTitleStyle}" Margin="0,0,0,12" Text="Geçmiş" />
+
+        <!-- ========== Filtreler ========== -->
+        <WrapPanel Grid.Row="1" VerticalAlignment="Center">
+            <DatePicker Width="135" Margin="0,0,6,8" FontSize="15" SelectedDateFormat="Short"
+                        SelectedDate="{Binding FromDate}" ToolTip="Başlangıç" />
+            <TextBlock Margin="0,0,6,8" VerticalAlignment="Center" Text="–" FontSize="16" />
+            <DatePicker Width="135" Margin="0,0,12,8" FontSize="15" SelectedDateFormat="Short"
+                        SelectedDate="{Binding ToDate}" ToolTip="Bitiş" />
+
+            <ui:Button Margin="0,0,6,8" Content="Bugün" Command="{Binding RangeTodayCommand}" Focusable="False" />
+            <ui:Button Margin="0,0,6,8" Content="Son 7 gün" Command="{Binding RangeLast7DaysCommand}" Focusable="False" />
+            <ui:Button Margin="0,0,6,8" Content="Bu ay" Command="{Binding RangeThisMonthCommand}" Focusable="False" />
+            <ui:Button Margin="0,0,16,8" Content="Tümü" Command="{Binding RangeAllCommand}" Focusable="False" />
+
+            <ui:TextBox x:Name="SearchBox" Width="260" Margin="0,0,10,8" FontSize="15"
+                        Text="{Binding SearchText, UpdateSourceTrigger=PropertyChanged}"
+                        PlaceholderText="Lot veya ID ara  (Ctrl+F)"
+                        Icon="{ui:SymbolIcon Search24}"
+                        ClearButtonEnabled="True"
+                        PreviewKeyDown="SearchBox_PreviewKeyDown" />
+
+            <ComboBox Width="150" Margin="0,0,0,8" FontSize="15" SelectedIndex="{Binding StatusIndex}">
+                <ComboBoxItem Content="Tüm durumlar" />
+                <ComboBoxItem Content="Aktif" />
+                <ComboBoxItem Content="İptal" />
+            </ComboBox>
+        </WrapPanel>
+
+        <!-- ========== Özet ========== -->
+        <UniformGrid Grid.Row="2" Rows="1" Margin="0,4,0,12">
+            <ui:Card Margin="0,0,8,0" Padding="16,10">
+                <StackPanel>
+                    <TextBlock Style="{StaticResource DetailLabelStyle}" Text="Kayıt" />
+                    <TextBlock FontSize="24" FontWeight="SemiBold" Text="{Binding TotalText}" />
+                </StackPanel>
+            </ui:Card>
+            <ui:Card Margin="4,0,4,0" Padding="16,10">
+                <StackPanel>
+                    <TextBlock Style="{StaticResource DetailLabelStyle}" Text="Aktif kesimlerin toplamı" />
+                    <TextBlock FontSize="24" FontWeight="SemiBold" Text="{Binding ActiveMetersText}" />
+                </StackPanel>
+            </ui:Card>
+            <ui:Card Margin="8,0,0,0" Padding="16,10">
+                <StackPanel>
+                    <TextBlock Style="{StaticResource DetailLabelStyle}" Text="İptal" />
+                    <TextBlock FontSize="24" FontWeight="SemiBold" Text="{Binding VoidedText}" />
+                </StackPanel>
+            </ui:Card>
+        </UniformGrid>
+
+        <ui:InfoBar Grid.Row="3" Margin="0,0,0,10"
+                    IsOpen="{Binding MessageIsOpen, Mode=TwoWay}"
+                    Severity="{Binding MessageSeverity}"
+                    Title="{Binding MessageTitle}"
+                    Message="{Binding MessageText}"
+                    IsClosable="True" />
+
+        <!-- ========== Liste ========== -->
+        <DataGrid x:Name="Grid" Grid.Row="4"
+                  ItemsSource="{Binding Rows}"
+                  SelectedItem="{Binding SelectedRow}"
+                  AutoGenerateColumns="False"
+                  IsReadOnly="True"
+                  SelectionMode="Single"
+                  SelectionUnit="FullRow"
+                  HeadersVisibility="Column"
+                  GridLinesVisibility="Horizontal"
+                  CanUserReorderColumns="False"
+                  CanUserResizeRows="False"
+                  CanUserSortColumns="False"
+                  EnableRowVirtualization="True"
+                  VirtualizingPanel.VirtualizationMode="Recycling"
+                  FontSize="15"
+                  RowHeight="36"
+                  PreviewKeyDown="Grid_PreviewKeyDown"
+                  MouseDoubleClick="Grid_MouseDoubleClick">
+            <DataGrid.RowStyle>
+                <Style TargetType="DataGridRow" BasedOn="{StaticResource {x:Type DataGridRow}}">
+                    <Setter Property="ToolTip" Value="{x:Null}" />
+                    <Setter Property="BorderThickness" Value="3,0,0,0" />
+                    <Setter Property="BorderBrush" Value="Transparent" />
+                    <Style.Triggers>
+                        <DataTrigger Binding="{Binding IsVoided}" Value="True">
+                            <Setter Property="Foreground" Value="{DynamicResource TextFillColorSecondaryBrush}" />
+                            <Setter Property="ToolTip" Value="{Binding VoidReason, StringFormat='İptal sebebi: {0}'}" />
+                        </DataTrigger>
+                        <Trigger Property="IsSelected" Value="True">
+                            <Setter Property="Background" Value="{StaticResource SelectedRowBrush}" />
+                            <Setter Property="BorderBrush" Value="{StaticResource SelectedRowBorderBrush}" />
+                        </Trigger>
+                    </Style.Triggers>
+                </Style>
+            </DataGrid.RowStyle>
+            <DataGrid.Columns>
+                <DataGridTemplateColumn Header="ID" Width="130">
+                    <DataGridTemplateColumn.CellTemplate>
+                        <DataTemplate>
+                            <TextBlock VerticalAlignment="Center" FontFamily="Consolas" FontWeight="SemiBold" Text="{Binding CutId}">
+                                <TextBlock.Style>
+                                    <Style TargetType="TextBlock">
+                                        <Style.Triggers>
+                                            <DataTrigger Binding="{Binding IsVoided}" Value="True">
+                                                <Setter Property="TextDecorations" Value="Strikethrough" />
+                                            </DataTrigger>
+                                        </Style.Triggers>
+                                    </Style>
+                                </TextBlock.Style>
+                            </TextBlock>
+                        </DataTemplate>
+                    </DataGridTemplateColumn.CellTemplate>
+                </DataGridTemplateColumn>
+                <DataGridTextColumn Header="Lot" Width="*" Binding="{Binding LotCode}" />
+                <DataGridTextColumn Header="Metre" Width="110" Binding="{Binding Meters}">
+                    <DataGridTextColumn.ElementStyle>
+                        <Style TargetType="TextBlock">
+                            <Setter Property="HorizontalAlignment" Value="Right" />
+                            <Setter Property="VerticalAlignment" Value="Center" />
+                        </Style>
+                    </DataGridTextColumn.ElementStyle>
+                </DataGridTextColumn>
+                <DataGridTextColumn Header="Kesim zamanı" Width="160" Binding="{Binding CreatedAt}" />
+                <DataGridTemplateColumn Header="Durum" Width="90">
+                    <DataGridTemplateColumn.CellTemplate>
+                        <DataTemplate>
+                            <TextBlock VerticalAlignment="Center" Text="{Binding StatusText}">
+                                <TextBlock.Style>
+                                    <Style TargetType="TextBlock">
+                                        <Setter Property="Foreground" Value="{DynamicResource SystemFillColorSuccessBrush}" />
+                                        <Style.Triggers>
+                                            <DataTrigger Binding="{Binding IsVoided}" Value="True">
+                                                <Setter Property="Foreground" Value="{DynamicResource SystemFillColorCriticalBrush}" />
+                                                <Setter Property="FontWeight" Value="SemiBold" />
+                                            </DataTrigger>
+                                        </Style.Triggers>
+                                    </Style>
+                                </TextBlock.Style>
+                            </TextBlock>
+                        </DataTemplate>
+                    </DataGridTemplateColumn.CellTemplate>
+                </DataGridTemplateColumn>
+                <DataGridTextColumn Header="Baskı" Width="70" Binding="{Binding PrintCount}" />
+            </DataGrid.Columns>
+        </DataGrid>
+
+        <TextBlock Grid.Row="4" Margin="0,60,0,0" HorizontalAlignment="Center" VerticalAlignment="Top"
+                   Style="{StaticResource PageSubtitleStyle}"
+                   Visibility="{Binding IsEmpty, Converter={StaticResource BoolToVisibility}}"
+                   Text="Bu filtreye uyan kayıt yok." IsHitTestVisible="False" />
+
+        <!-- ========== Alt çubuk: sayfa ve işlemler ========== -->
+        <DockPanel Grid.Row="5" Margin="0,10,0,0" LastChildFill="False">
+            <ui:Button DockPanel.Dock="Left" Margin="0,0,6,0" Focusable="False"
+                       Icon="{ui:SymbolIcon ChevronLeft24}" Command="{Binding PreviousPageCommand}"
+                       ToolTip="Önceki sayfa (Ctrl+PageUp)" />
+            <ui:Button DockPanel.Dock="Left" Margin="0,0,12,0" Focusable="False"
+                       Icon="{ui:SymbolIcon ChevronRight24}" Command="{Binding NextPageCommand}"
+                       ToolTip="Sonraki sayfa (Ctrl+PageDown)" />
+            <TextBlock DockPanel.Dock="Left" VerticalAlignment="Center" FontSize="14" Text="{Binding PageText}" />
+            <TextBlock DockPanel.Dock="Left" Margin="12,0,0,0" VerticalAlignment="Center" FontSize="12"
+                       Foreground="{DynamicResource TextFillColorTertiaryBrush}" Text="{Binding ElapsedText}" />
+
+            <ui:Button DockPanel.Dock="Right" Margin="8,0,0,0" MinHeight="40" Focusable="False" Appearance="Secondary"
+                       Icon="{ui:SymbolIcon Print24}" Content="Etiketi tekrar bas  (F5)"
+                       Command="{Binding ReprintCommand}" />
+            <ui:Button DockPanel.Dock="Right" MinHeight="40" Focusable="False" Appearance="Primary"
+                       Icon="{ui:SymbolIcon Open24}" Content="Kaydı aç  (Enter)"
+                       Command="{Binding OpenSelectedCommand}" />
+        </DockPanel>
+    </Grid>
 </Page>

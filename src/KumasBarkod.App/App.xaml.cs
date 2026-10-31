@@ -1,4 +1,6 @@
-﻿using System.Windows;
+﻿using System.Globalization;
+using System.Windows;
+using System.Windows.Markup;
 using KumasBarkod.App.ViewModels;
 using KumasBarkod.App.Views;
 using KumasBarkod.App.Views.Pages;
@@ -16,6 +18,15 @@ public partial class App : Application
     protected override void OnStartup(StartupEventArgs e)
     {
         base.OnStartup(e);
+
+        // Tarih ve sayı biçimleri Windows ayarından bağımsız olarak Türkçe (01.11.2026, 25,50).
+        var turkish = CultureInfo.GetCultureInfo("tr-TR");
+        CultureInfo.DefaultThreadCurrentCulture = turkish;
+        CultureInfo.DefaultThreadCurrentUICulture = turkish;
+        Thread.CurrentThread.CurrentCulture = turkish;
+        Thread.CurrentThread.CurrentUICulture = turkish;
+        FrameworkElement.LanguageProperty.OverrideMetadata(typeof(FrameworkElement),
+            new FrameworkPropertyMetadata(XmlLanguage.GetLanguage(turkish.IetfLanguageTag)));
 
         _services = ConfigureServices().BuildServiceProvider();
 

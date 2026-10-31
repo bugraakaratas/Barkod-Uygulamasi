@@ -57,4 +57,13 @@ public class LengthTests
     {
         Assert.Equal(expected, Length.Format(cm));
     }
+
+    [Theory]
+    [InlineData(445904735, "4.459.047,35")]
+    [InlineData(2550, "25,50")]
+    [InlineData(0, "0,00")]
+    public void FormatGrouped_uses_thousand_separators(long cm, string expected)
+    {
+        Assert.Equal(expected, Length.FormatGrouped(cm));
+    }
 }

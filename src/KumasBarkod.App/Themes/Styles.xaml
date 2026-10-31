@@ -7,6 +7,10 @@
     <Thickness x:Key="PageMargin">32,24,32,24</Thickness>
     <system:Double x:Key="PageTitleFontSize">28</system:Double>
 
+    <!-- Seçili liste satırı: klavyeyle gezerken nerede olunduğu açıkça görünsün (açık tema sabit) -->
+    <SolidColorBrush x:Key="SelectedRowBrush" Color="#D3EEF1" />
+    <SolidColorBrush x:Key="SelectedRowBorderBrush" Color="#1B9AAA" />
+
     <local:ZeroToVisibleConverter x:Key="ZeroToVisibleConverter" />
     <local:BoolToVisibilityConverter x:Key="BoolToVisibility" />
 

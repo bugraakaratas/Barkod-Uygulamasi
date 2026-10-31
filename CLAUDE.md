@@ -64,6 +64,8 @@ tests/KumasBarkod.Tests  (xUnit) Data/, Domain/, Services/, Printing/
 - **Kısayollar:** sayfa kısayolları code-behind'da `AddHandler(PreviewKeyDownEvent, ..., handledEventsToo: true)` ile; KeyBinding kullanma (F5 üst denetimde yutuluyor). Giriş ekranı: Enter, F2 (lot), ↑↓ (son lotlar), F5 (son etiketi tekrar bas), Esc (metreyi temizle).
 - **Odak:** Tuşa bağlı odak değişimi anında yapılır (`FocusNow`); ertelenirse hızlı yazılan karakter yanlış kutuya düşer.
 - **Ekran kısayolları (MainWindow):** Ctrl+1 Kesim Girişi, Ctrl+2 Okutma, Ctrl+3 Geçmiş. Okutma her ekranda yakalanır (bkz. Adım 6 notları).
+- **Sayfalar:** her `Page`'de `ScrollViewer.CanContentScroll="False"` (WPF-UI'nin dış kaydırma alanını kapatır; yoksa sanallaştırma bozulur). Kaydırma sayfanın içinde yönetilir.
+- **Arayüz testi düğmeleri:** odaklanamayan düğmeler (Focusable=False) testte UI Automation `InvokePattern` ile, ComboBox `ExpandCollapsePattern`/`SelectionItemPattern` ile kullanılır.
 - **Baskı:** Kayıt önce yazılır, sonra basılır. Başarılı baskı `print_count+1`, `last_printed_at` yazar ve kuyruğa `upsert` ekler. Baskı hatası kaydı bozmaz; F5 aynı ID ile tekrar basar. İptal edilmiş kesim basılmaz.
 - **Etiket (ZPL):** 50×30 mm, 203 dpi, `^CI28` (UTF-8), Code128 `^BCN,80,N,N,N,A` (otomatik mod), lot `^FH_` ile kaçışlı (`^ ~ _`). Şimdilik `FileLabelPrinter` → `<veri klasörü>\labels\*.zpl`. Durum çubuğunda "Test yazıcısı" turuncu görünür.
 - **Bekleyen kayıt sayısı:** `count(DISTINCT cut_id)` gönderilmemiş kuyruk satırları.
@@ -99,10 +101,27 @@ tests/KumasBarkod.Tests  (xUnit) Data/, Domain/, Services/, Printing/
 - Arayüz testi (2 kez üst üste aynı sonuç): metre kutusunda ve lot kutusunda okutma (lot korunuyor), elle yavaş ID, iptal, F5 iptal edilmişte basmıyor, F9 yerine yeni kayıt, bulunamayan ve geçersiz barkod.
 - **AÇIK:** Gerçek USB okuyucu ile Türkçe klavyede test (plan "Bitti" ölçütü). Kullanıcıya okuyucu olup olmadığı soruldu, yanıt gelmedi.
 
+| 7 | ✅ | (bu commit) | Geçmiş: tarih aralığı + hızlı aralıklar, lot/ID arama, durum filtresi, özet kartları, 200'lük sayfalama, kaydı aç, tekrar baskı. 100.000 kayıtla < 200 ms. 176 test |
+
+### Adım 7 notları
+- `CutRepository.Search(CutQuery, TimeZoneInfo)`: yerel gün → UTC aralık (bitiş dahil), arama ID biçimindeyse tam `cut_id`, değilse `lot_code LIKE %x% ESCAPE '\'` (% _ \ kaçışlı), durum filtresi, özet (toplam / aktif / iptal / aktif metre — iptaller metreye dahil değil), `ORDER BY created_at DESC, sequence_no DESC LIMIT/OFFSET`. Özet ve sayfa aynı okuma işleminde.
+- **Hız (birim testi, 100.000 kayıt):** son 7 gün 2,5 ms · tümü ilk sayfa 44 ms · son sayfa 172 ms · lot içerir 46 ms · ID 0,6 ms. Testte sınır 1000 ms.
+- **~1 milyon kayıt ölçümü** (`KUMASBARKOD_BENCH=1` ile çalışan test): son 7 gün 5 ms · ID 0,6 ms · son 30 gün+lot 14 ms · tümü ilk sayfa 465 ms · tümü lot 317 ms · tümü SON sayfa 1,86 sn (derin OFFSET; pratikte kullanılmaz). Dosya ~161 MB.
+- Gerçek uygulama testi 100.000 kayıtla (geçici veri, `seed.cs` betiği: `#:project` ile Core'u kullanır): açılış 37 ms, sayfa 3/500 61 ms, LOT-0042 + İptal 85 ms.
+- Arayüz: arama 300 ms bekleme ile otomatik; eski sorgunun geç sonucu yok sayılır (`_requestId`); ekran görünür değilken `CutChangedMessage` sorgu tetiklemez. Kısayollar: Ctrl+F arama, aramada ↓/Enter listeye, Enter/çift tık kaydı aç (okutma ekranında), F5 tekrar bas, Ctrl+PageUp/PageDown sayfa, aramada Esc temizle. Uygulama kültürü tr-TR (App.OnStartup).
+- **Bulunan ve düzeltilen hatalar:**
+  1. WPF-UI sayfayı kendi kaydırma alanına koyuyor → sonsuz yükseklik, DataGrid sanallaştırması bozuluyor, alt çubuk ekran dışına itiliyor, ilk açılış boş görünüyordu. Çözüm: sayfalarda `ScrollViewer.CanContentScroll="False"` (üç sayfaya da eklendi; sayfalar kendi kaydırmasını yönetir). **Yeni sayfalarda da kullan.**
+  2. Aramadan ↓ ile listeye geçerken `MoveFocus(Next)` odağı sol menüye kaçırıyordu → `FocusGridRow`: ilk hücreye doğrudan odak.
+  3. Seçili satır görünmüyordu (WPF-UI DataGrid stili) → `SelectedRowBrush` arka plan + sol kenar çizgisi.
+  4. Liste yenilenince (tekrar baskı sonrası) odak kayboluyordu → `RowsReloading/RowsReloaded` olayları ile seçili satıra geri odak.
+- `Length.FormatGrouped` (binlik ayırıcılı, özetlerde); etiket ve giriş `Length.Format` (ayırıcısız) kullanmaya devam eder.
+- Mesaj adı değişti: `ScanDetectedMessage` → `OpenCutMessage` (okutma ve geçmişten açma).
+
 ## Şu anki durum
 
-- **Adım 6 tamamlandı** (gerçek okuyucu testi hariç). Kullanıcı onayı bekleniyor.
-- **Sıradaki:** Adım 7 — Geçmiş ve filtreleme: tarih, lot, durum; tekrar baskı; 100.000 kayıtla hız (filtre < 1 sn). Öneri: varsayılan son 7 gün, sayfalama (200 satır), üstte toplam kayıt ve metre özeti.
+- **Adım 7 tamamlandı.** Kullanıcı onayı bekleniyor.
+- **Kullanıcıya soruldu (karar bekliyor):** ID kapasitesi — bir istasyon en fazla 999.999 ID üretebilir; günde 500 kesimle ~6,7 yıl. Seçenekler: (a) böyle kalsın, dolunca istasyon kodu değişir (uygulama uyarıyor); (b) 7 haneye çıkar (barkod 9 karakter, şema göçü gerekir; ilk kurulumdan ÖNCE yapmak kolay).
+- **Sıradaki:** Adım 8 — Apps Script, arka plan gönderici, durum göstergesi; entegrasyon testi (aynı paketi iki kez gönderme, kesinti). Dış gereksinim: Google hesabı + Sheets dosyası.
 
 ## Açık konular / riskler
 
