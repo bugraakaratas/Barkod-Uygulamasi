@@ -1,0 +1,17 @@
+<Page x:Class="KumasBarkod.App.Views.Pages.HistoryPage"
+      xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+      xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+      xmlns:ui="http://schemas.lepo.co/wpfui/2022/xaml"
+      Title="Geçmiş">
+    <StackPanel Margin="{StaticResource PageMargin}">
+        <TextBlock Style="{StaticResource PageTitleStyle}" Text="Geçmiş" />
+        <ui:Card>
+            <StackPanel>
+                <TextBlock Style="{StaticResource PageSubtitleStyle}"
+                           Text="Kesimler tarih, lot ve duruma göre filtrelenecek; etiket tekrar basılabilecek." />
+                <TextBlock Style="{StaticResource PageSubtitleStyle}" Margin="0,8,0,0"
+                           Text="7. adımda yapılacak." />
+            </StackPanel>
+        </ui:Card>
+    </StackPanel>
+</Page>

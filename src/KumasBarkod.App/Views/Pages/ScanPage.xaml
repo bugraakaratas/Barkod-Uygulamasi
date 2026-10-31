@@ -1,0 +1,17 @@
+<Page x:Class="KumasBarkod.App.Views.Pages.ScanPage"
+      xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+      xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+      xmlns:ui="http://schemas.lepo.co/wpfui/2022/xaml"
+      Title="Okutma">
+    <StackPanel Margin="{StaticResource PageMargin}">
+        <TextBlock Style="{StaticResource PageTitleStyle}" Text="Okutma" />
+        <ui:Card>
+            <StackPanel>
+                <TextBlock Style="{StaticResource PageSubtitleStyle}"
+                           Text="Barkod okutulunca kesim kaydı burada açılacak; iptal buradan yapılacak." />
+                <TextBlock Style="{StaticResource PageSubtitleStyle}" Margin="0,8,0,0"
+                           Text="6. adımda yapılacak." />
+            </StackPanel>
+        </ui:Card>
+    </StackPanel>
+</Page>

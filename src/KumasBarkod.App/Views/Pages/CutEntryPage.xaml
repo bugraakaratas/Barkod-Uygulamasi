@@ -1,0 +1,17 @@
+<Page x:Class="KumasBarkod.App.Views.Pages.CutEntryPage"
+      xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+      xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+      xmlns:ui="http://schemas.lepo.co/wpfui/2022/xaml"
+      Title="Kesim Girişi">
+    <StackPanel Margin="{StaticResource PageMargin}">
+        <TextBlock Style="{StaticResource PageTitleStyle}" Text="Kesim Girişi" />
+        <ui:Card>
+            <StackPanel>
+                <TextBlock Style="{StaticResource PageSubtitleStyle}"
+                           Text="Lot ve metre girilip kayıt oluşturulacak, etiket basılacak." />
+                <TextBlock Style="{StaticResource PageSubtitleStyle}" Margin="0,8,0,0"
+                           Text="4. adımda yapılacak." />
+            </StackPanel>
+        </ui:Card>
+    </StackPanel>
+</Page>

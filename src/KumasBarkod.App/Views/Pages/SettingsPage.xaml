@@ -1,0 +1,17 @@
+<Page x:Class="KumasBarkod.App.Views.Pages.SettingsPage"
+      xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+      xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+      xmlns:ui="http://schemas.lepo.co/wpfui/2022/xaml"
+      Title="Ayarlar">
+    <StackPanel Margin="{StaticResource PageMargin}">
+        <TextBlock Style="{StaticResource PageTitleStyle}" Text="Ayarlar" />
+        <ui:Card>
+            <StackPanel>
+                <TextBlock Style="{StaticResource PageSubtitleStyle}"
+                           Text="İstasyon kodu, yazıcı, metre üst sınırı ve Google Sheets bağlantısı burada ayarlanacak." />
+                <TextBlock Style="{StaticResource PageSubtitleStyle}" Margin="0,8,0,0"
+                           Text="İlgili adımlarda doldurulacak." />
+            </StackPanel>
+        </ui:Card>
+    </StackPanel>
+</Page>
