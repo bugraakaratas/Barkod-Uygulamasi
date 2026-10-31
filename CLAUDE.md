@@ -119,9 +119,10 @@ tests/KumasBarkod.Tests  (xUnit) Data/, Domain/, Services/, Printing/
 
 ## Şu anki durum
 
-- **Adım 7 tamamlandı.** Kullanıcı onayı bekleniyor.
-- **Kullanıcıya soruldu (karar bekliyor):** ID kapasitesi — bir istasyon en fazla 999.999 ID üretebilir; günde 500 kesimle ~6,7 yıl. Seçenekler: (a) böyle kalsın, dolunca istasyon kodu değişir (uygulama uyarıyor); (b) 7 haneye çıkar (barkod 9 karakter, şema göçü gerekir; ilk kurulumdan ÖNCE yapmak kolay).
-- **Sıradaki:** Adım 8 — Apps Script, arka plan gönderici, durum göstergesi; entegrasyon testi (aynı paketi iki kez gönderme, kesinti). Dış gereksinim: Google hesabı + Sheets dosyası.
+- **Adım 7 tamamlandı.** Oturum burada durdu; kullanıcı "devam" deyince Adım 8'e geçilecek.
+- **Karar (2026-11-01): ID 6 hane kalır** (seçenek a). Bir istasyon en fazla 999.999 ID üretir (günde 500 kesimle ~6,7 yıl); dolunca uygulama uyarır, Ayarlar'dan yeni istasyon kodu verilir. 7 haneye çıkarma önerilmişti, kullanıcı istemedi — tekrar önerme.
+- **Sıradaki:** Adım 8 — Apps Script, arka plan gönderici, durum göstergesi; entegrasyon testi (aynı paketi iki kez gönderme, kesinti). Dış gereksinim: Google hesabı + Sheets dosyası — **kullanıcıya test için Google hesabı/Sheets olup olmadığı soruldu, yanıt bekleniyor.**
+- Gerçek USB okuyucu testi hâlâ açık (Adım 6).
 
 ## Açık konular / riskler
 
