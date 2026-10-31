@@ -166,6 +166,80 @@ public class CutServiceTests : IDisposable
         Assert.Equal("K1-000001", _service.CreateCut("LOT-A", 100).CutId);
     }
 
+    // ---------- İptal ----------
+
+    [Fact]
+    public void Void_sets_status_reason_time_and_queues_sync()
+    {
+        var cut = _service.CreateCut("LOT-A", 2550);
+
+        var voided = _service.VoidCut(cut.CutId, "  Yanlış metre  ");
+
+        Assert.Equal(CutStatus.Voided, voided.Status);
+        Assert.Equal("Yanlış metre", voided.VoidReason);
+        Assert.Equal("2026-11-01T06:30:15.250Z", voided.VoidedAt);
+        Assert.True(voided.IsVoided);
+
+        using var c = _db.Factory.Open();
+        Assert.Equal(2L, c.ExecuteScalar<long>("SELECT count(*) FROM sync_outbox WHERE cut_id = @id", new { id = cut.CutId }));
+    }
+
+    [Fact]
+    public void Void_keeps_original_data()
+    {
+        var cut = _service.CreateCut("LOT-A", 2550);
+        var voided = _service.VoidCut(cut.CutId, "Hatalı lot");
+
+        Assert.Equal("LOT-A", voided.LotCode);
+        Assert.Equal(2550, voided.LengthCm);
+        Assert.Equal(cut.CreatedAt, voided.CreatedAt);
+    }
+
+    [Theory]
+    [InlineData(null)]
+    [InlineData("")]
+    [InlineData("   ")]
+    [InlineData("satır\nsonu")]
+    public void Void_requires_a_valid_reason(string? reason)
+    {
+        var cut = _service.CreateCut("LOT-A", 2550);
+
+        Assert.Throws<CutValidationException>(() => _service.VoidCut(cut.CutId, reason));
+        Assert.Equal(CutStatus.Active, _service.FindById(cut.CutId)!.Status);
+    }
+
+    [Fact]
+    public void Void_reason_length_is_limited()
+    {
+        var cut = _service.CreateCut("LOT-A", 2550);
+        Assert.Throws<CutValidationException>(() => _service.VoidCut(cut.CutId, new string('x', 201)));
+    }
+
+    [Fact]
+    public void Void_twice_is_rejected()
+    {
+        var cut = _service.CreateCut("LOT-A", 2550);
+        _service.VoidCut(cut.CutId, "Birinci");
+
+        var ex = Assert.Throws<CutValidationException>(() => _service.VoidCut(cut.CutId, "İkinci"));
+        Assert.Contains("zaten", ex.Message);
+        Assert.Equal("Birinci", _service.FindById(cut.CutId)!.VoidReason);
+    }
+
+    [Fact]
+    public void Void_unknown_cut_is_rejected()
+    {
+        Assert.Throws<CutValidationException>(() => _service.VoidCut("K1-999999", "sebep"));
+    }
+
+    [Fact]
+    public void Voiding_does_not_affect_next_sequence()
+    {
+        var cut = _service.CreateCut("LOT-A", 100);
+        _service.VoidCut(cut.CutId, "Hata");
+        Assert.Equal("K1-000002", _service.CreateCut("LOT-A", 100).CutId);
+    }
+
     // ---------- Bütünlük ----------
 
     [Fact]

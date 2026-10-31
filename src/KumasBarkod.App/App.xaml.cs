@@ -55,6 +55,7 @@ public partial class App : Application
 
         // Yazıcı: gerçek yazıcı 10. adımda eklenecek; o zamana kadar etiketler dosyaya yazılır.
         services.AddSingleton<ILabelTemplate, ZplLabelTemplate>();
+        // (ScanViewModel ve CutEntryViewModel MainWindow'a da enjekte edilir; tekil oldukları için aynı örnek.)
         services.AddSingleton<ILabelPrinter>(sp => new FileLabelPrinter(
             sp.GetRequiredService<ILabelTemplate>(), AppPaths.LabelOutputDirectory, sp.GetRequiredService<TimeProvider>()));
         services.AddSingleton(sp => new PrintService(

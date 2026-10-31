@@ -8,6 +8,21 @@
     <system:Double x:Key="PageTitleFontSize">28</system:Double>
 
     <local:ZeroToVisibleConverter x:Key="ZeroToVisibleConverter" />
+    <local:BoolToVisibilityConverter x:Key="BoolToVisibility" />
+
+    <Style x:Key="DetailLabelStyle" TargetType="TextBlock">
+        <Setter Property="FontSize" Value="14" />
+        <Setter Property="Foreground" Value="{DynamicResource TextFillColorSecondaryBrush}" />
+        <Setter Property="Margin" Value="0,0,0,2" />
+    </Style>
+
+    <Style x:Key="DetailValueStyle" TargetType="TextBlock">
+        <Setter Property="FontSize" Value="20" />
+        <Setter Property="FontWeight" Value="SemiBold" />
+        <Setter Property="TextWrapping" Value="Wrap" />
+        <Setter Property="Foreground" Value="{DynamicResource TextFillColorPrimaryBrush}" />
+        <Setter Property="Margin" Value="0,0,0,16" />
+    </Style>
 
     <Style x:Key="PageTitleStyle" TargetType="TextBlock">
         <Setter Property="FontSize" Value="{StaticResource PageTitleFontSize}" />

@@ -22,6 +22,45 @@ public static partial class CutIds
     }
 
     public static string ToBarcode(string cutId) => cutId.Replace("-", "", StringComparison.Ordinal);
+
+    /// <summary>
+    /// Okutulan veya elle yazılan girdiyi kesim ID'sine çevirir. Kabul edilenler:
+    /// <c>K1000123</c> (barkod), <c>K1-000123</c>, küçük harf, baştaki/sondaki boşluk.
+    /// Türkçe klavye toleransı: <c>ı/i/İ</c> → <c>I</c>; ABD düzenindeki okuyucunun tiresi
+    /// Türkçe Q'da <c>*</c> çıkar, o da ayırıcı sayılır.
+    /// </summary>
+    public static bool TryParseScan(string? input, out string cutId)
+    {
+        cutId = "";
+        if (input is null) return false;
+
+        Span<char> buffer = stackalloc char[16];
+        var length = 0;
+        foreach (var raw in input.Trim())
+        {
+            if (raw is '-' or '*' or '_' or ' ') continue;
+            if (length == buffer.Length) return false;
+            buffer[length++] = raw switch
+            {
+                'ı' or 'i' or 'İ' => 'I',
+                _ => char.ToUpperInvariant(raw),
+            };
+        }
+
+        if (length != 2 + SequenceDigits) return false;
+
+        var station = new string(buffer[..2]);
+        var digits = buffer[2..length];
+        if (!Stations.IsValidCode(station)) return false;
+        foreach (var ch in digits)
+            if (ch is < '0' or > '9') return false;
+
+        var sequence = long.Parse(digits);
+        if (sequence < 1) return false;
+
+        cutId = Format(station, sequence);
+        return true;
+    }
 }
 
 public static partial class Stations

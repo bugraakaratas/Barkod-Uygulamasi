@@ -18,7 +18,7 @@ public partial class MainWindowViewModel : ObservableObject
         PrinterName = printer.DisplayName;
         PrinterIsPhysical = printer.IsPhysical;
 
-        WeakReferenceMessenger.Default.Register<MainWindowViewModel, CutCreatedMessage>(
+        WeakReferenceMessenger.Default.Register<MainWindowViewModel, CutChangedMessage>(
             this, static (vm, _) => vm.Refresh());
     }
 

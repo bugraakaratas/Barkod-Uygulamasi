@@ -178,7 +178,18 @@
                                             <ColumnDefinition Width="72" />
                                             <ColumnDefinition Width="44" />
                                         </Grid.ColumnDefinitions>
-                                        <TextBlock FontFamily="Consolas" FontSize="15" FontWeight="SemiBold" Text="{Binding CutId}" />
+                                        <TextBlock FontFamily="Consolas" FontSize="15" FontWeight="SemiBold" Text="{Binding CutId}">
+                                            <TextBlock.Style>
+                                                <Style TargetType="TextBlock">
+                                                    <Style.Triggers>
+                                                        <DataTrigger Binding="{Binding IsVoided}" Value="True">
+                                                            <Setter Property="TextDecorations" Value="Strikethrough" />
+                                                            <Setter Property="Foreground" Value="{DynamicResource TextFillColorSecondaryBrush}" />
+                                                        </DataTrigger>
+                                                    </Style.Triggers>
+                                                </Style>
+                                            </TextBlock.Style>
+                                        </TextBlock>
                                         <TextBlock Grid.Column="1" FontSize="15" Text="{Binding LotCode}" TextTrimming="CharacterEllipsis" />
                                         <TextBlock Grid.Column="2" FontSize="15" Text="{Binding Meters}" TextAlignment="Right" />
                                         <TextBlock Grid.Column="3" FontSize="15" Text="{Binding Time}" TextAlignment="Right"
@@ -195,6 +206,12 @@
                                                             <Setter Property="Symbol" Value="Warning16" />
                                                             <Setter Property="Foreground" Value="{DynamicResource SystemFillColorCautionBrush}" />
                                                             <Setter Property="ToolTip" Value="Etiket basılmadı" />
+                                                        </DataTrigger>
+                                                        <!-- İptal, baskı durumundan önce gelir (sonraki tetikleyici kazanır) -->
+                                                        <DataTrigger Binding="{Binding IsVoided}" Value="True">
+                                                            <Setter Property="Symbol" Value="DismissCircle16" />
+                                                            <Setter Property="Foreground" Value="{DynamicResource SystemFillColorCriticalBrush}" />
+                                                            <Setter Property="ToolTip" Value="İptal edildi" />
                                                         </DataTrigger>
                                                     </Style.Triggers>
                                                 </Style>

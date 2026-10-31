@@ -27,6 +27,20 @@ public partial class CutEntryViewModel : ObservableObject
         _cuts = cuts;
         _settings = settings;
         _printService = printService;
+
+        // Başka ekranda iptal/baskı olunca son kayıtlar listesi güncel kalsın.
+        WeakReferenceMessenger.Default.Register<CutEntryViewModel, CutChangedMessage>(
+            this, static (vm, _) => vm.ReloadLists());
+    }
+
+    /// <summary>İptal edilen kaydın yerine yeni kayıt: lot dolu, metre boş, odak metrede.</summary>
+    public void PrepareNewCut(string lotCode)
+    {
+        LotText = lotCode;
+        LengthText = "";
+        ShowResult(InfoBarSeverity.Informational, "Yerine yeni kayıt",
+            $"Lot {lotCode} hazır. Doğru metreyi girip Enter'a basın.");
+        FocusRequested?.Invoke(EntryField.Length);
     }
 
     /// <summary>Bu oturumda en son kaydedilen kesim; F5 bunun etiketini tekrar basar.</summary>
@@ -159,7 +173,7 @@ public partial class CutEntryViewModel : ObservableObject
         LengthText = "";
         LotText = cut.LotCode;      // Son lot seçili kalır
         ReloadLists();
-        WeakReferenceMessenger.Default.Send(new CutCreatedMessage(cut));
+        WeakReferenceMessenger.Default.Send(new CutChangedMessage(cut));
 
         var summary = $"Lot {cut.LotCode} · {Length.Format(cut.LengthCm)} m";
         var printError = await PrintAsync(cut.CutId);
@@ -193,8 +207,8 @@ public partial class CutEntryViewModel : ObservableObject
     {
         try
         {
-            await Task.Run(() => _printService.Print(cutId));
-            ReloadLists();
+            var printed = await Task.Run(() => _printService.Print(cutId));
+            WeakReferenceMessenger.Default.Send(new CutChangedMessage(printed));
             return null;
         }
         catch (Exception ex) when (ex is PrinterException or CutValidationException)

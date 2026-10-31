@@ -13,3 +13,17 @@ public sealed class ZeroToVisibleConverter : IValueConverter
     public object ConvertBack(object value, Type targetType, object parameter, CultureInfo culture) =>
         throw new NotSupportedException();
 }
+
+/// <summary>true → Visible. "Invert" parametresiyle tersi.</summary>
+public sealed class BoolToVisibilityConverter : IValueConverter
+{
+    public object Convert(object value, Type targetType, object parameter, CultureInfo culture)
+    {
+        var flag = value is true;
+        if (parameter is "Invert") flag = !flag;
+        return flag ? Visibility.Visible : Visibility.Collapsed;
+    }
+
+    public object ConvertBack(object value, Type targetType, object parameter, CultureInfo culture) =>
+        throw new NotSupportedException();
+}

@@ -4,10 +4,6 @@ namespace KumasBarkod.App.ViewModels;
 
 // Henüz yapılmamış ekranların ViewModel'leri; ilgili adımlarda kendi dosyalarına taşınacak.
 
-public partial class ScanViewModel : ObservableObject
-{
-}
-
 public partial class HistoryViewModel : ObservableObject
 {
 }

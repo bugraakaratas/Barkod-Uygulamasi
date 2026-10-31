@@ -3,15 +3,185 @@
       xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
       xmlns:ui="http://schemas.lepo.co/wpfui/2022/xaml"
       Title="Okutma">
-    <StackPanel Margin="{StaticResource PageMargin}">
-        <TextBlock Style="{StaticResource PageTitleStyle}" Text="Okutma" />
-        <ui:Card>
-            <StackPanel>
-                <TextBlock Style="{StaticResource PageSubtitleStyle}"
-                           Text="Barkod okutulunca kesim kaydı burada açılacak; iptal buradan yapılacak." />
-                <TextBlock Style="{StaticResource PageSubtitleStyle}" Margin="0,8,0,0"
-                           Text="6. adımda yapılacak." />
-            </StackPanel>
-        </ui:Card>
-    </StackPanel>
+    <ScrollViewer VerticalScrollBarVisibility="Auto" Focusable="False">
+        <StackPanel Margin="{StaticResource PageMargin}">
+            <TextBlock Style="{StaticResource PageTitleStyle}" Text="Okutma" />
+
+            <!-- ========== Okutma kutusu: odak hep burada ========== -->
+            <ui:TextBox x:Name="ScanBox"
+                        Text="{Binding InputText, UpdateSourceTrigger=PropertyChanged}"
+                        PlaceholderText="Barkodu okutun veya ID yazıp Enter'a basın (ör. K1-000123)"
+                        FontSize="26"
+                        MinHeight="60"
+                        ClearButtonEnabled="False"
+                        Icon="{ui:SymbolIcon BarcodeScanner24}"
+                        PreviewKeyDown="ScanBox_PreviewKeyDown"
+                        AutomationProperties.Name="Okutma" />
+
+            <ui:InfoBar Margin="0,16,0,0"
+                        IsOpen="{Binding MessageIsOpen, Mode=TwoWay}"
+                        Severity="{Binding MessageSeverity}"
+                        Title="{Binding MessageTitle}"
+                        Message="{Binding MessageText}"
+                        IsClosable="False"
+                        FontSize="17" />
+
+            <!-- ========== Boş durum ========== -->
+            <TextBlock Margin="4,24,0,0" Style="{StaticResource PageSubtitleStyle}"
+                       Visibility="{Binding HasCurrent, Converter={StaticResource BoolToVisibility}, ConverterParameter=Invert}"
+                       Text="Etiketteki barkodu okutun; kayıt burada açılır. Okutma hangi ekrandayken yapılırsa yapılsın bu ekran açılır." />
+
+            <!-- ========== Kayıt ayrıntısı ========== -->
+            <ui:Card Margin="0,16,0,0" Padding="28,24"
+                     Visibility="{Binding HasCurrent, Converter={StaticResource BoolToVisibility}}">
+                <StackPanel DataContext="{Binding Current}">
+                    <DockPanel Margin="0,0,0,20">
+                        <Border DockPanel.Dock="Right" VerticalAlignment="Center" Padding="16,6" CornerRadius="16">
+                            <Border.Style>
+                                <Style TargetType="Border">
+                                    <Setter Property="Background" Value="{DynamicResource SystemFillColorSuccessBrush}" />
+                                    <Style.Triggers>
+                                        <DataTrigger Binding="{Binding IsVoided}" Value="True">
+                                            <Setter Property="Background" Value="{DynamicResource SystemFillColorCriticalBrush}" />
+                                        </DataTrigger>
+                                    </Style.Triggers>
+                                </Style>
+                            </Border.Style>
+                            <TextBlock FontSize="18" FontWeight="SemiBold" Foreground="White">
+                                <TextBlock.Style>
+                                    <Style TargetType="TextBlock">
+                                        <Setter Property="Text" Value="AKTİF" />
+                                        <Style.Triggers>
+                                            <DataTrigger Binding="{Binding IsVoided}" Value="True">
+                                                <Setter Property="Text" Value="İPTAL EDİLDİ" />
+                                            </DataTrigger>
+                                        </Style.Triggers>
+                                    </Style>
+                                </TextBlock.Style>
+                            </TextBlock>
+                        </Border>
+                        <TextBlock FontFamily="Consolas" FontSize="40" FontWeight="Bold" Text="{Binding CutId}">
+                            <TextBlock.Style>
+                                <Style TargetType="TextBlock">
+                                    <Setter Property="Foreground" Value="{DynamicResource TextFillColorPrimaryBrush}" />
+                                    <Style.Triggers>
+                                        <DataTrigger Binding="{Binding IsVoided}" Value="True">
+                                            <Setter Property="TextDecorations" Value="Strikethrough" />
+                                            <Setter Property="Foreground" Value="{DynamicResource TextFillColorSecondaryBrush}" />
+                                        </DataTrigger>
+                                    </Style.Triggers>
+                                </Style>
+                            </TextBlock.Style>
+                        </TextBlock>
+                    </DockPanel>
+
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="*" />
+                        </Grid.ColumnDefinitions>
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto" />
+                            <RowDefinition Height="Auto" />
+                        </Grid.RowDefinitions>
+
+                        <StackPanel Grid.Row="0" Grid.Column="0">
+                            <TextBlock Style="{StaticResource DetailLabelStyle}" Text="Lot" />
+                            <TextBlock Style="{StaticResource DetailValueStyle}" FontSize="26" Text="{Binding LotCode}" />
+                        </StackPanel>
+                        <StackPanel Grid.Row="0" Grid.Column="1">
+                            <TextBlock Style="{StaticResource DetailLabelStyle}" Text="Metre" />
+                            <TextBlock Style="{StaticResource DetailValueStyle}" FontSize="26" Text="{Binding Meters}" />
+                        </StackPanel>
+                        <StackPanel Grid.Row="0" Grid.Column="2">
+                            <TextBlock Style="{StaticResource DetailLabelStyle}" Text="Kesim zamanı" />
+                            <TextBlock Style="{StaticResource DetailValueStyle}" Text="{Binding CreatedAt}" />
+                        </StackPanel>
+                        <StackPanel Grid.Row="1" Grid.Column="0">
+                            <TextBlock Style="{StaticResource DetailLabelStyle}" Text="İstasyon" />
+                            <TextBlock Style="{StaticResource DetailValueStyle}" Text="{Binding StationCode}" />
+                        </StackPanel>
+                        <StackPanel Grid.Row="1" Grid.Column="1" Grid.ColumnSpan="2">
+                            <TextBlock Style="{StaticResource DetailLabelStyle}" Text="Etiket" />
+                            <TextBlock Text="{Binding PrintInfo}">
+                                <TextBlock.Style>
+                                    <Style TargetType="TextBlock" BasedOn="{StaticResource DetailValueStyle}">
+                                        <Style.Triggers>
+                                            <DataTrigger Binding="{Binding IsPrinted}" Value="False">
+                                                <Setter Property="Foreground" Value="{DynamicResource SystemFillColorCautionBrush}" />
+                                            </DataTrigger>
+                                        </Style.Triggers>
+                                    </Style>
+                                </TextBlock.Style>
+                            </TextBlock>
+                        </StackPanel>
+                    </Grid>
+
+                    <!-- İptal bilgisi -->
+                    <Border Padding="16,12" CornerRadius="6" BorderThickness="1"
+                            BorderBrush="{DynamicResource SystemFillColorCriticalBrush}"
+                            Visibility="{Binding IsVoided, Converter={StaticResource BoolToVisibility}}">
+                        <StackPanel>
+                            <TextBlock FontSize="15" FontWeight="SemiBold" Foreground="{DynamicResource SystemFillColorCriticalBrush}">
+                                <Run Text="İptal:" />
+                                <Run Text="{Binding VoidedAt, Mode=OneWay}" />
+                            </TextBlock>
+                            <TextBlock Margin="0,4,0,0" FontSize="17" TextWrapping="Wrap" Text="{Binding VoidReason}" />
+                        </StackPanel>
+                    </Border>
+                </StackPanel>
+            </ui:Card>
+
+            <!-- ========== İşlemler ========== -->
+            <WrapPanel Margin="0,16,0,0"
+                       Visibility="{Binding HasCurrent, Converter={StaticResource BoolToVisibility}}">
+                <ui:Button Margin="0,0,10,10" MinHeight="48" Padding="18,0" FontSize="16"
+                           Focusable="False" Appearance="Secondary"
+                           Command="{Binding ReprintCommand}"
+                           Icon="{ui:SymbolIcon Print24}" Content="Etiketi tekrar bas  (F5)" />
+                <ui:Button Margin="0,0,10,10" MinHeight="48" Padding="18,0" FontSize="16"
+                           Focusable="False" Appearance="Danger"
+                           Command="{Binding BeginVoidCommand}"
+                           Icon="{ui:SymbolIcon DismissCircle24}" Content="İptal et  (F8)" />
+                <ui:Button Margin="0,0,10,10" MinHeight="48" Padding="18,0" FontSize="16"
+                           Focusable="False" Appearance="Primary"
+                           Command="{Binding StartReplacementCommand}"
+                           Visibility="{Binding Current.IsVoided, Converter={StaticResource BoolToVisibility}}"
+                           Icon="{ui:SymbolIcon AddCircle24}" Content="Yerine yeni kayıt  (F9)" />
+            </WrapPanel>
+
+            <!-- ========== İptal onayı ========== -->
+            <ui:Card Margin="0,6,0,0" Padding="24"
+                     Visibility="{Binding IsVoidPanelOpen, Converter={StaticResource BoolToVisibility}}">
+                <StackPanel>
+                    <TextBlock Style="{StaticResource FieldLabelStyle}">
+                        <Run Text="İptal sebebi —" />
+                        <Run Text="{Binding Current.CutId, Mode=OneWay}" FontFamily="Consolas" />
+                    </TextBlock>
+                    <ui:TextBox x:Name="VoidReasonBox"
+                                Text="{Binding VoidReason, UpdateSourceTrigger=PropertyChanged}"
+                                PlaceholderText="ör. Yanlış metre girildi"
+                                FontSize="20" MinHeight="50"
+                                MaxLength="200"
+                                PreviewKeyDown="VoidReasonBox_PreviewKeyDown" />
+                    <TextBlock Margin="2,8,0,12" Style="{StaticResource FieldHintStyle}" TextWrapping="Wrap"
+                               Text="İptal geri alınamaz. Etiket geçersiz olur ve kumaştan sökülmelidir." />
+                    <StackPanel Orientation="Horizontal">
+                        <ui:Button MinHeight="44" Padding="18,0" FontSize="16" Focusable="False"
+                                   Appearance="Danger" Command="{Binding ConfirmVoidCommand}"
+                                   Content="İptali onayla  (Enter)" />
+                        <ui:Button Margin="10,0,0,0" MinHeight="44" Padding="18,0" FontSize="16" Focusable="False"
+                                   Appearance="Secondary" Command="{Binding CancelVoidCommand}"
+                                   Content="Vazgeç  (Esc)" />
+                    </StackPanel>
+                </StackPanel>
+            </ui:Card>
+
+            <TextBlock Margin="4,16,0,0" Style="{StaticResource FieldHintStyle}" TextWrapping="Wrap">
+                <Run FontWeight="SemiBold" Text="Kısayollar:" />
+                <Run Text="F5 → etiketi tekrar bas   ·   F8 → iptal et   ·   F9 → yerine yeni kayıt   ·   Esc → vazgeç / temizle" />
+            </TextBlock>
+        </StackPanel>
+    </ScrollViewer>
 </Page>

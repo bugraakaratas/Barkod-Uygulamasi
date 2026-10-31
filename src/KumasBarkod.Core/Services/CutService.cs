@@ -68,6 +68,48 @@ public sealed class CutService(SqliteConnectionFactory db, SettingsRepository se
         return cut;
     }
 
+    public const int MaxVoidReasonLength = 200;
+
+    /// <summary>
+    /// Kaydı iptal eder. Yanlış kayıt düzeltilmez: iptal edilir, yerine yeni kayıt açılır
+    /// (basılı etiket ile kayıt hiçbir zaman farklı olmasın diye).
+    /// </summary>
+    public Cut VoidCut(string cutId, string? reason)
+    {
+        var text = reason?.Trim() ?? "";
+        if (text.Length == 0)
+            throw new CutValidationException("İptal sebebini yazın.");
+        if (text.Length > MaxVoidReasonLength)
+            throw new CutValidationException($"İptal sebebi en fazla {MaxVoidReasonLength} karakter olabilir.");
+        if (text.Any(char.IsControl))
+            throw new CutValidationException("İptal sebebi görünmeyen karakter içeremez.");
+
+        var now = Timestamps.Format(clock.GetUtcNow());
+
+        using (var c = db.Open())
+        using (var tx = c.BeginTransaction(deferred: false))
+        {
+            var status = c.ExecuteScalar<string?>(
+                "SELECT status FROM cuts WHERE cut_id = @cutId", new { cutId }, tx)
+                ?? throw new CutValidationException($"{cutId} kaydı bulunamadı.");
+
+            if (status == CutStatus.Voided)
+                throw new CutValidationException($"{cutId} zaten iptal edilmiş.");
+
+            c.Execute("""
+                UPDATE cuts SET status = 'voided', void_reason = @text, voided_at = @now
+                WHERE cut_id = @cutId
+                """, new { cutId, text, now }, tx);
+
+            c.Execute("INSERT INTO sync_outbox (cut_id, operation, created_at) VALUES (@cutId, 'upsert', @now)",
+                new { cutId, now }, tx);
+
+            tx.Commit();
+        }
+
+        return FindById(cutId)!;
+    }
+
     public Cut? FindById(string cutId)
     {
         using var c = db.Open();
