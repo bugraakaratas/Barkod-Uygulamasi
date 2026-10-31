@@ -10,6 +10,7 @@ public partial class MainWindow : FluentWindow
     {
         DataContext = viewModel;
         InitializeComponent();
+        viewModel.Refresh();
 
         // Sayfalar DI kapsayıcısından alınır; böylece ViewModel'ler enjekte edilir.
         RootNavigation.SetServiceProvider(services);

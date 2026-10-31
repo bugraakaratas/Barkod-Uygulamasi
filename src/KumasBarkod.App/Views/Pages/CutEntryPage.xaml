@@ -3,15 +3,180 @@
       xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
       xmlns:ui="http://schemas.lepo.co/wpfui/2022/xaml"
       Title="Kesim Girişi">
-    <StackPanel Margin="{StaticResource PageMargin}">
-        <TextBlock Style="{StaticResource PageTitleStyle}" Text="Kesim Girişi" />
-        <ui:Card>
+    <Page.InputBindings>
+        <KeyBinding Key="Esc" Command="{Binding ClearLengthCommand}" />
+    </Page.InputBindings>
+
+    <Grid Margin="{StaticResource PageMargin}">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+        </Grid.RowDefinitions>
+        <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="5*" MinWidth="380" />
+            <ColumnDefinition Width="24" />
+            <ColumnDefinition Width="4*" MinWidth="300" />
+        </Grid.ColumnDefinitions>
+
+        <TextBlock Grid.ColumnSpan="3" Style="{StaticResource PageTitleStyle}" Text="Kesim Girişi" />
+
+        <!-- ========== Giriş ========== -->
+        <ScrollViewer Grid.Row="1" Grid.Column="0" VerticalScrollBarVisibility="Auto">
             <StackPanel>
-                <TextBlock Style="{StaticResource PageSubtitleStyle}"
-                           Text="Lot ve metre girilip kayıt oluşturulacak, etiket basılacak." />
-                <TextBlock Style="{StaticResource PageSubtitleStyle}" Margin="0,8,0,0"
-                           Text="4. adımda yapılacak." />
+                <ui:Card Padding="24">
+                    <StackPanel>
+                        <TextBlock Style="{StaticResource FieldLabelStyle}" Text="Lot" />
+                        <ui:TextBox x:Name="LotBox"
+                                    Text="{Binding LotText, UpdateSourceTrigger=PropertyChanged}"
+                                    PlaceholderText="Lot yazın veya ↑ ↓ ile son lotlardan seçin"
+                                    FontSize="24"
+                                    MinHeight="56"
+                                    ClearButtonEnabled="False"
+                                    PreviewKeyDown="LotBox_PreviewKeyDown"
+                                    AutomationProperties.Name="Lot" />
+
+                        <!-- Son lotlar: her zaman görünür; ↑ ↓ ile lot kutusundan gezilir, tıklanabilir. -->
+                        <ListBox x:Name="RecentLotsList"
+                                 Margin="0,8,0,0"
+                                 ItemsSource="{Binding RecentLots}"
+                                 SelectedIndex="{Binding RecentLotIndex, Mode=TwoWay}"
+                                 Focusable="False"
+                                 BorderThickness="0"
+                                 Background="Transparent"
+                                 ScrollViewer.HorizontalScrollBarVisibility="Disabled"
+                                 PreviewMouseLeftButtonUp="RecentLotsList_PreviewMouseLeftButtonUp">
+                            <ListBox.ItemsPanel>
+                                <ItemsPanelTemplate>
+                                    <WrapPanel />
+                                </ItemsPanelTemplate>
+                            </ListBox.ItemsPanel>
+                            <ListBox.ItemContainerStyle>
+                                <Style TargetType="ListBoxItem">
+                                    <Setter Property="Focusable" Value="False" />
+                                    <Setter Property="Margin" Value="0,0,6,6" />
+                                    <Setter Property="Cursor" Value="Hand" />
+                                    <Setter Property="Template">
+                                        <Setter.Value>
+                                            <ControlTemplate TargetType="ListBoxItem">
+                                                <Border x:Name="Chip" Padding="12,5" CornerRadius="14" BorderThickness="1"
+                                                        Background="{DynamicResource ControlFillColorDefaultBrush}"
+                                                        BorderBrush="{DynamicResource ControlStrokeColorDefaultBrush}">
+                                                    <TextBlock x:Name="ChipText" FontSize="15" Text="{Binding}"
+                                                               Foreground="{DynamicResource TextFillColorPrimaryBrush}" />
+                                                </Border>
+                                                <ControlTemplate.Triggers>
+                                                    <Trigger Property="IsMouseOver" Value="True">
+                                                        <Setter TargetName="Chip" Property="Background" Value="{DynamicResource ControlFillColorSecondaryBrush}" />
+                                                    </Trigger>
+                                                    <Trigger Property="IsSelected" Value="True">
+                                                        <Setter TargetName="Chip" Property="Background" Value="{DynamicResource AccentFillColorDefaultBrush}" />
+                                                        <Setter TargetName="Chip" Property="BorderBrush" Value="{DynamicResource AccentFillColorDefaultBrush}" />
+                                                        <Setter TargetName="ChipText" Property="Foreground" Value="{DynamicResource TextOnAccentFillColorPrimaryBrush}" />
+                                                    </Trigger>
+                                                </ControlTemplate.Triggers>
+                                            </ControlTemplate>
+                                        </Setter.Value>
+                                    </Setter>
+                                </Style>
+                            </ListBox.ItemContainerStyle>
+                        </ListBox>
+
+                        <TextBlock Style="{StaticResource FieldLabelStyle}" Margin="0,14,0,6" Text="Metre" />
+                        <ui:TextBox x:Name="LengthBox"
+                                    Text="{Binding LengthText, UpdateSourceTrigger=PropertyChanged}"
+                                    PlaceholderText="ör. 25,50"
+                                    FontSize="32"
+                                    MinHeight="64"
+                                    ClearButtonEnabled="False"
+                                    AutomationProperties.Name="Metre">
+                            <ui:TextBox.InputBindings>
+                                <KeyBinding Key="Enter" Command="{Binding SaveCommand}" />
+                            </ui:TextBox.InputBindings>
+                        </ui:TextBox>
+                        <TextBlock Text="{Binding LengthHint}" FontSize="16" Margin="2,6,0,0" MinHeight="22">
+                            <TextBlock.Style>
+                                <Style TargetType="TextBlock" BasedOn="{StaticResource FieldHintStyle}">
+                                    <Style.Triggers>
+                                        <DataTrigger Binding="{Binding LengthHintIsError}" Value="True">
+                                            <Setter Property="Foreground" Value="{DynamicResource SystemFillColorCriticalBrush}" />
+                                        </DataTrigger>
+                                    </Style.Triggers>
+                                </Style>
+                            </TextBlock.Style>
+                        </TextBlock>
+
+                        <ui:Button Margin="0,20,0,0"
+                                   HorizontalAlignment="Stretch"
+                                   MinHeight="56"
+                                   FontSize="20"
+                                   Appearance="Primary"
+                                   Command="{Binding SaveCommand}"
+                                   Content="Kaydet  (Enter)"
+                                   Icon="{ui:SymbolIcon Save24}" />
+                    </StackPanel>
+                </ui:Card>
+
+                <ui:InfoBar Margin="0,16,0,0"
+                            IsOpen="{Binding ResultIsOpen, Mode=TwoWay}"
+                            Severity="{Binding ResultSeverity}"
+                            Title="{Binding ResultTitle}"
+                            Message="{Binding ResultMessage}"
+                            IsClosable="False"
+                            FontSize="18" />
+
+                <TextBlock Margin="4,16,0,0" Style="{StaticResource FieldHintStyle}" TextWrapping="Wrap">
+                    <Run FontWeight="SemiBold" Text="Kısayollar:" />
+                    <Run Text="Enter → sonraki alan / kaydet   ·   F2 → lot   ·   ↑ ↓ (lotta) → son lotlar   ·   Esc → metreyi temizle" />
+                </TextBlock>
             </StackPanel>
+        </ScrollViewer>
+
+        <!-- ========== Son kayıtlar ========== -->
+        <ui:Card Grid.Row="1" Grid.Column="2" Padding="0" VerticalAlignment="Stretch" VerticalContentAlignment="Stretch">
+            <DockPanel>
+                <TextBlock DockPanel.Dock="Top" Margin="20,16,20,8" FontSize="18" FontWeight="SemiBold" Text="Son kayıtlar" />
+                <Grid DockPanel.Dock="Top" Margin="20,0,20,6">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="110" />
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="90" />
+                        <ColumnDefinition Width="72" />
+                    </Grid.ColumnDefinitions>
+                    <TextBlock Style="{StaticResource ColumnHeaderStyle}" Text="ID" />
+                    <TextBlock Grid.Column="1" Style="{StaticResource ColumnHeaderStyle}" Text="Lot" />
+                    <TextBlock Grid.Column="2" Style="{StaticResource ColumnHeaderStyle}" Text="Metre" TextAlignment="Right" />
+                    <TextBlock Grid.Column="3" Style="{StaticResource ColumnHeaderStyle}" Text="Saat" TextAlignment="Right" />
+                </Grid>
+                <TextBlock DockPanel.Dock="Top" Margin="20,8" Style="{StaticResource FieldHintStyle}" Text="Henüz kayıt yok.">
+                    <TextBlock.Visibility>
+                        <Binding Path="RecentCuts.Count" Converter="{StaticResource ZeroToVisibleConverter}" />
+                    </TextBlock.Visibility>
+                </TextBlock>
+                <ScrollViewer VerticalScrollBarVisibility="Auto" Focusable="False">
+                    <ItemsControl ItemsSource="{Binding RecentCuts}" Focusable="False">
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate>
+                                <Border Padding="20,8" BorderThickness="0,1,0,0"
+                                        BorderBrush="{DynamicResource DividerStrokeColorDefaultBrush}">
+                                    <Grid>
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="110" />
+                                            <ColumnDefinition Width="*" />
+                                            <ColumnDefinition Width="90" />
+                                            <ColumnDefinition Width="72" />
+                                        </Grid.ColumnDefinitions>
+                                        <TextBlock FontFamily="Consolas" FontSize="15" FontWeight="SemiBold" Text="{Binding CutId}" />
+                                        <TextBlock Grid.Column="1" FontSize="15" Text="{Binding LotCode}" TextTrimming="CharacterEllipsis" />
+                                        <TextBlock Grid.Column="2" FontSize="15" Text="{Binding Meters}" TextAlignment="Right" />
+                                        <TextBlock Grid.Column="3" FontSize="15" Text="{Binding Time}" TextAlignment="Right"
+                                                   Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
+                                    </Grid>
+                                </Border>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                </ScrollViewer>
+            </DockPanel>
         </ui:Card>
-    </StackPanel>
+    </Grid>
 </Page>

@@ -50,6 +50,7 @@ public partial class App : Application
         services.AddSingleton(TimeProvider.System);
         services.AddSingleton<SettingsRepository>();
         services.AddSingleton<CutService>();
+        services.AddSingleton<CutRepository>();
 
         services.AddSingleton<MainWindowViewModel>();
         services.AddSingleton<MainWindow>();
