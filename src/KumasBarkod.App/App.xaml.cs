@@ -7,6 +7,8 @@ using KumasBarkod.App.Views.Pages;
 using KumasBarkod.Core.Data;
 using KumasBarkod.Core.Printing;
 using KumasBarkod.Core.Services;
+using KumasBarkod.Core.Sync;
+using System.Net.Http;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace KumasBarkod.App;
@@ -46,11 +48,19 @@ public partial class App : Application
         var window = _services.GetRequiredService<MainWindow>();
         MainWindow = window;
         window.Show();
+
+        // Sheets göndericisi arka planda; kayıt/baskı/okutma ona hiç bağlı değil.
+        _services.GetRequiredService<SyncWorker>().Start();
     }
 
     protected override void OnExit(ExitEventArgs e)
     {
-        _services?.Dispose();
+        if (_services is not null)
+        {
+            // Gönderici en fazla birkaç saniye beklenir; yarım kalan paket bir sonraki açılışta tekrar gider.
+            _services.GetRequiredService<SyncWorker>().DisposeAsync().AsTask().Wait(TimeSpan.FromSeconds(3));
+            _services.Dispose();
+        }
         base.OnExit(e);
     }
 
@@ -73,6 +83,13 @@ public partial class App : Application
             sp.GetRequiredService<SqliteConnectionFactory>(),
             sp.GetRequiredService<ILabelPrinter>(),
             sp.GetRequiredService<TimeProvider>()));
+
+        // Google Sheets kopyası (tek yönlü)
+        services.AddSingleton(new HttpClient { Timeout = TimeSpan.FromSeconds(60) });
+        services.AddSingleton<ISyncTransport, AppsScriptTransport>();
+        services.AddSingleton<OutboxRepository>();
+        services.AddSingleton<SyncService>();
+        services.AddSingleton<SyncWorker>();
 
         services.AddSingleton<MainWindowViewModel>();
         services.AddSingleton<MainWindow>();

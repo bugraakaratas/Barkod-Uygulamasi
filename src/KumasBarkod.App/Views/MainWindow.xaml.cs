@@ -32,7 +32,7 @@ public partial class MainWindow : FluentWindow
             scanViewModel.Open(m.CutId);
         });
 
-        // Ekran kısayolları: Ctrl+1 Kesim Girişi, Ctrl+2 Okutma, Ctrl+3 Geçmiş
+        // Ekran kısayolları: Ctrl+1 Kesim Girişi, Ctrl+2 Okutma, Ctrl+3 Geçmiş, Ctrl+4 Ayarlar
         AddHandler(PreviewKeyDownEvent, new System.Windows.Input.KeyEventHandler((_, e) =>
         {
             if (System.Windows.Input.Keyboard.Modifiers != System.Windows.Input.ModifierKeys.Control) return;
@@ -41,6 +41,7 @@ public partial class MainWindow : FluentWindow
                 System.Windows.Input.Key.D1 or System.Windows.Input.Key.NumPad1 => typeof(CutEntryPage),
                 System.Windows.Input.Key.D2 or System.Windows.Input.Key.NumPad2 => typeof(ScanPage),
                 System.Windows.Input.Key.D3 or System.Windows.Input.Key.NumPad3 => typeof(HistoryPage),
+                System.Windows.Input.Key.D4 or System.Windows.Input.Key.NumPad4 => typeof(SettingsPage),
                 _ => null,
             };
             if (page is null) return;

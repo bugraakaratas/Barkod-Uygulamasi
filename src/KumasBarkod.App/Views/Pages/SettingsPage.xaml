@@ -2,16 +2,117 @@
       xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
       xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
       xmlns:ui="http://schemas.lepo.co/wpfui/2022/xaml"
-      Title="Ayarlar">
-    <StackPanel Margin="{StaticResource PageMargin}">
-        <TextBlock Style="{StaticResource PageTitleStyle}" Text="Ayarlar" />
-        <ui:Card>
-            <StackPanel>
-                <TextBlock Style="{StaticResource PageSubtitleStyle}"
-                           Text="İstasyon kodu, yazıcı, metre üst sınırı ve Google Sheets bağlantısı burada ayarlanacak." />
-                <TextBlock Style="{StaticResource PageSubtitleStyle}" Margin="0,8,0,0"
-                           Text="İlgili adımlarda doldurulacak." />
-            </StackPanel>
-        </ui:Card>
-    </StackPanel>
+      Title="Ayarlar"
+      ScrollViewer.CanContentScroll="False">
+    <ScrollViewer VerticalScrollBarVisibility="Auto">
+        <StackPanel Margin="{StaticResource PageMargin}">
+            <TextBlock Style="{StaticResource PageTitleStyle}" Text="Ayarlar" />
+
+            <ui:InfoBar Margin="0,0,0,12"
+                        IsOpen="{Binding MessageIsOpen, Mode=TwoWay}"
+                        Severity="{Binding MessageSeverity}"
+                        Title="{Binding MessageTitle}"
+                        Message="{Binding MessageText}"
+                        IsClosable="True" />
+
+            <!-- ========== Google Sheets ========== -->
+            <ui:Card Padding="24" Margin="0,0,0,16">
+                <StackPanel>
+                    <DockPanel Margin="0,0,0,4">
+                        <ui:SymbolIcon DockPanel.Dock="Left" Symbol="CloudArrowUp24" FontSize="22" Margin="0,0,10,0" />
+                        <TextBlock FontSize="20" FontWeight="SemiBold" Text="Google Sheets kopyası" />
+                    </DockPanel>
+                    <TextBlock Style="{StaticResource PageSubtitleStyle}" Margin="0,0,0,14"
+                               Text="Kayıtlar internet olunca Google Sheets'e kopyalanır (tek yönlü). İnternet olmadan uygulama aynen çalışır; kayıtlar birikir ve bağlantı gelince gönderilir." />
+
+                    <Border Padding="14,10" Margin="0,0,0,16" CornerRadius="6"
+                            Background="{DynamicResource ControlFillColorSecondaryBrush}">
+                        <TextBlock FontSize="15" TextWrapping="Wrap">
+                            <Run Text="Durum:" />
+                            <Run Text="{Binding SyncStatusText, Mode=OneWay}">
+                                <Run.Style>
+                                    <Style TargetType="Run">
+                                        <Setter Property="FontWeight" Value="SemiBold" />
+                                        <Style.Triggers>
+                                            <DataTrigger Binding="{Binding SyncNeedsAttention}" Value="True">
+                                                <Setter Property="Foreground" Value="{DynamicResource SystemFillColorCautionBrush}" />
+                                            </DataTrigger>
+                                        </Style.Triggers>
+                                    </Style>
+                                </Run.Style>
+                            </Run>
+                            <Run Text="   ·   Bekleyen kayıt:" />
+                            <Run Text="{Binding PendingCount, Mode=OneWay}" FontWeight="SemiBold" />
+                        </TextBlock>
+                    </Border>
+
+                    <TextBlock Style="{StaticResource FieldLabelStyle}" Text="Apps Script web uygulaması adresi" />
+                    <ui:TextBox x:Name="UrlBox" Text="{Binding SheetsUrl, UpdateSourceTrigger=PropertyChanged}"
+                                PlaceholderText="https://script.google.com/macros/s/…/exec"
+                                Icon="{ui:SymbolIcon Link24}" FontSize="15"
+                                AutomationProperties.Name="Sheets adresi" />
+
+                    <TextBlock Style="{StaticResource FieldLabelStyle}" Margin="0,14,0,6" Text="Anahtar (API_KEY)" />
+                    <ui:PasswordBox Password="{Binding SheetsKey, UpdateSourceTrigger=PropertyChanged, Mode=TwoWay}"
+                                    PlaceholderText="Apps Script'te tanımladığınız gizli anahtar"
+                                    Icon="{ui:SymbolIcon Key24}" FontSize="15" RevealButtonEnabled="True"
+                                    AutomationProperties.Name="Sheets anahtarı" />
+
+                    <WrapPanel Margin="0,16,0,0">
+                        <ui:Button Margin="0,0,8,8" MinHeight="40" Appearance="Secondary"
+                                   Icon="{ui:SymbolIcon PlugConnected24}" Content="Bağlantıyı test et"
+                                   Command="{Binding TestConnectionCommand}" />
+                        <ui:Button Margin="0,0,8,8" MinHeight="40" Appearance="Primary"
+                                   Icon="{ui:SymbolIcon Save24}" Content="Kaydet"
+                                   Command="{Binding SaveSheetsCommand}" />
+                        <ui:Button Margin="0,0,8,8" MinHeight="40" Appearance="Secondary"
+                                   Icon="{ui:SymbolIcon ArrowSync24}" Content="Şimdi gönder"
+                                   Command="{Binding SendNowCommand}" />
+                    </WrapPanel>
+                    <TextBlock Style="{StaticResource FieldHintStyle}" TextWrapping="Wrap"
+                               Text="Kurulum adımları: proje klasöründe tools\sheets\KURULUM.md. Adres ve anahtar yalnızca bu bilgisayarda saklanır." />
+                </StackPanel>
+            </ui:Card>
+
+            <!-- ========== Kesim ========== -->
+            <ui:Card Padding="24" Margin="0,0,0,16">
+                <StackPanel>
+                    <DockPanel Margin="0,0,0,14">
+                        <ui:SymbolIcon DockPanel.Dock="Left" Symbol="Ruler24" FontSize="22" Margin="0,0,10,0" />
+                        <TextBlock FontSize="20" FontWeight="SemiBold" Text="Kesim" />
+                    </DockPanel>
+
+                    <TextBlock Style="{StaticResource FieldLabelStyle}" Text="Metre üst sınırı" />
+                    <StackPanel Orientation="Horizontal">
+                        <ui:TextBox Width="160" FontSize="15" Text="{Binding MaxLengthText, UpdateSourceTrigger=PropertyChanged}" />
+                        <TextBlock Margin="8,0,16,0" VerticalAlignment="Center" FontSize="15" Text="m" />
+                        <ui:Button MinHeight="36" Appearance="Secondary" Content="Kaydet" Command="{Binding SaveMaxLengthCommand}" />
+                    </StackPanel>
+                    <TextBlock Style="{StaticResource FieldHintStyle}" TextWrapping="Wrap"
+                               Text="Bundan uzun kesim girilemez. Yanlış yazımı (25,50 yerine 2550) yakalamak için gerçekçi bir değer seçin." />
+
+                    <TextBlock Style="{StaticResource FieldLabelStyle}" Margin="0,16,0,4" Text="İstasyon kodu" />
+                    <TextBlock FontSize="18" FontWeight="SemiBold" FontFamily="Consolas" Text="{Binding StationCode}" />
+                    <TextBlock Style="{StaticResource FieldHintStyle}" TextWrapping="Wrap"
+                               Text="Kesim ID'lerinin başındaki kod. İkinci istasyon kurulurken farklı kod verilir; kurulumda ayarlanır." />
+                </StackPanel>
+            </ui:Card>
+
+            <!-- ========== Bilgi ========== -->
+            <ui:Card Padding="24">
+                <StackPanel>
+                    <DockPanel Margin="0,0,0,14">
+                        <ui:SymbolIcon DockPanel.Dock="Left" Symbol="Folder24" FontSize="22" Margin="0,0,10,0" />
+                        <TextBlock FontSize="20" FontWeight="SemiBold" Text="Dosyalar" />
+                    </DockPanel>
+                    <TextBlock Style="{StaticResource DetailLabelStyle}" Text="Veritabanı" />
+                    <TextBox IsReadOnly="True" BorderThickness="0" Background="Transparent" FontFamily="Consolas"
+                             Text="{Binding DatabasePath, Mode=OneWay}" Margin="0,0,0,10" />
+                    <TextBlock Style="{StaticResource DetailLabelStyle}" Text="Test yazıcısı etiket klasörü" />
+                    <TextBox IsReadOnly="True" BorderThickness="0" Background="Transparent" FontFamily="Consolas"
+                             Text="{Binding LabelDirectory, Mode=OneWay}" />
+                </StackPanel>
+            </ui:Card>
+        </StackPanel>
+    </ScrollViewer>
 </Page>

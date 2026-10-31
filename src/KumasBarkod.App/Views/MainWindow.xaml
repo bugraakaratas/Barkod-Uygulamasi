@@ -44,7 +44,7 @@
                 </ui:NavigationViewItem>
             </ui:NavigationView.MenuItems>
             <ui:NavigationView.FooterMenuItems>
-                <ui:NavigationViewItem Content="Ayarlar" TargetPageType="{x:Type pages:SettingsPage}">
+                <ui:NavigationViewItem Content="Ayarlar" TargetPageType="{x:Type pages:SettingsPage}" ToolTip="Ctrl+4">
                     <ui:NavigationViewItem.Icon>
                         <ui:SymbolIcon Symbol="Settings24" />
                     </ui:NavigationViewItem.Icon>
@@ -69,9 +69,21 @@
                     <Run Text="Bekleyen kayıt:" />
                     <Run Text="{Binding PendingSyncCount, Mode=OneWay}" FontWeight="SemiBold" />
                 </TextBlock>
-                <TextBlock Margin="24,0,0,0" VerticalAlignment="Center"
-                           Foreground="{DynamicResource TextFillColorSecondaryBrush}"
-                           Text="{Binding SyncStatusText}" />
+                <TextBlock Margin="24,0,0,0" VerticalAlignment="Center" MaxWidth="560"
+                           TextTrimming="CharacterEllipsis"
+                           Text="{Binding SyncStatusText}" ToolTip="{Binding SyncStatusText}">
+                    <TextBlock.Style>
+                        <Style TargetType="TextBlock">
+                            <Setter Property="Foreground" Value="{DynamicResource TextFillColorSecondaryBrush}" />
+                            <Style.Triggers>
+                                <DataTrigger Binding="{Binding SyncNeedsAttention}" Value="True">
+                                    <Setter Property="Foreground" Value="{DynamicResource SystemFillColorCautionBrush}" />
+                                    <Setter Property="FontWeight" Value="SemiBold" />
+                                </DataTrigger>
+                            </Style.Triggers>
+                        </Style>
+                    </TextBlock.Style>
+                </TextBlock>
                 <ui:SymbolIcon Symbol="Print24" Margin="24,0,6,0" />
                 <TextBlock VerticalAlignment="Center">
                     <Run Text="Yazıcı:" />

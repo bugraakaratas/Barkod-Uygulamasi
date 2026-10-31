@@ -1,6 +1,7 @@
 using System.Globalization;
 using Dapper;
 using KumasBarkod.Core.Domain;
+using KumasBarkod.Core.Sync;
 
 namespace KumasBarkod.Core.Data;
 
@@ -8,6 +9,8 @@ public static class SettingKeys
 {
     public const string StationCode = "station_code";
     public const string MaxLengthCm = "max_length_cm";
+    public const string SheetsUrl = "sheets_url";
+    public const string SheetsKey = "sheets_key";
 }
 
 /// <summary><c>settings</c> tablosu: anahtar/değer. Kayıt yoksa varsayılan döner.</summary>
@@ -56,5 +59,36 @@ public sealed class SettingsRepository(SqliteConnectionFactory db)
     {
         if (cm <= 0) throw new CutValidationException("Üst sınır 0'dan büyük olmalı.");
         Set(SettingKeys.MaxLengthCm, cm.ToString(CultureInfo.InvariantCulture));
+    }
+
+    /// <summary>Sheets gönderim adresi ve anahtarı; ikisi de girilmemişse null (gönderim kapalı).</summary>
+    public SyncTarget? GetSyncTarget()
+    {
+        var url = Get(SettingKeys.SheetsUrl);
+        var key = Get(SettingKeys.SheetsKey);
+        return string.IsNullOrWhiteSpace(url) || string.IsNullOrWhiteSpace(key) ? null : new SyncTarget(url, key);
+    }
+
+    /// <summary>Boş adres/anahtar gönderimi kapatır.</summary>
+    public void SetSyncTarget(string? url, string? key)
+    {
+        url = url?.Trim() ?? "";
+        key = key?.Trim() ?? "";
+        if (url.Length > 0 && (!Uri.TryCreate(url, UriKind.Absolute, out var uri) || uri.Scheme != Uri.UriSchemeHttps))
+            throw new CutValidationException("Sheets adresi https:// ile başlayan geçerli bir adres olmalı.");
+
+        using var c = db.Open();
+        using var tx = c.BeginTransaction(deferred: false);
+        foreach (var (k, v) in new[] { (SettingKeys.SheetsUrl, url), (SettingKeys.SheetsKey, key) })
+        {
+            if (v.Length == 0)
+                c.Execute("DELETE FROM settings WHERE key = @k", new { k }, tx);
+            else
+                c.Execute("""
+                    INSERT INTO settings (key, value) VALUES (@k, @v)
+                    ON CONFLICT (key) DO UPDATE SET value = excluded.value
+                    """, new { k, v }, tx);
+        }
+        tx.Commit();
     }
 }

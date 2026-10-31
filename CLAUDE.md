@@ -63,7 +63,7 @@ tests/KumasBarkod.Tests  (xUnit) Data/, Domain/, Services/, Printing/
 - **Giriş ekranı:** açılır liste (ComboBox) KULLANILMAZ — odak sorunları çıkardı. Lot = TextBox; ↑↓ son lotlarda gezer; son lotlar altta düğme (chip) olarak görünür.
 - **Kısayollar:** sayfa kısayolları code-behind'da `AddHandler(PreviewKeyDownEvent, ..., handledEventsToo: true)` ile; KeyBinding kullanma (F5 üst denetimde yutuluyor). Giriş ekranı: Enter, F2 (lot), ↑↓ (son lotlar), F5 (son etiketi tekrar bas), Esc (metreyi temizle).
 - **Odak:** Tuşa bağlı odak değişimi anında yapılır (`FocusNow`); ertelenirse hızlı yazılan karakter yanlış kutuya düşer.
-- **Ekran kısayolları (MainWindow):** Ctrl+1 Kesim Girişi, Ctrl+2 Okutma, Ctrl+3 Geçmiş. Okutma her ekranda yakalanır (bkz. Adım 6 notları).
+- **Ekran kısayolları (MainWindow):** Ctrl+1 Kesim Girişi, Ctrl+2 Okutma, Ctrl+3 Geçmiş, Ctrl+4 Ayarlar. Okutma her ekranda yakalanır (bkz. Adım 6 notları).
 - **Sayfalar:** her `Page`'de `ScrollViewer.CanContentScroll="False"` (WPF-UI'nin dış kaydırma alanını kapatır; yoksa sanallaştırma bozulur). Kaydırma sayfanın içinde yönetilir.
 - **Arayüz testi düğmeleri:** odaklanamayan düğmeler (Focusable=False) testte UI Automation `InvokePattern` ile, ComboBox `ExpandCollapsePattern`/`SelectionItemPattern` ile kullanılır.
 - **Baskı:** Kayıt önce yazılır, sonra basılır. Başarılı baskı `print_count+1`, `last_printed_at` yazar ve kuyruğa `upsert` ekler. Baskı hatası kaydı bozmaz; F5 aynı ID ile tekrar basar. İptal edilmiş kesim basılmaz.
@@ -117,11 +117,25 @@ tests/KumasBarkod.Tests  (xUnit) Data/, Domain/, Services/, Printing/
 - `Length.FormatGrouped` (binlik ayırıcılı, özetlerde); etiket ve giriş `Length.Format` (ayırıcısız) kullanmaya devam eder.
 - Mesaj adı değişti: `ScanDetectedMessage` → `OpenCutMessage` (okutma ve geçmişten açma).
 
+| 8 | 🔄 kod ✅, gerçek Google testi bekliyor | (bu commit) | Sheets kopyası: Apps Script (`tools/sheets/Code.gs`, kurulum `KURULUM.md`), kuyruk göndericisi, arka plan çalışanı + bekleme, durum çubuğu, Ayarlar ekranı (adres/anahtar/test/kaydet/şimdi gönder, metre üst sınırı). 203 test |
+
+### Adım 8 notları
+- **Apps Script (`Code.gs`):** `doPost` → anahtar (`Script Properties: API_KEY`) → `LockService` kilidi → `cut_id`'ye göre upsert (varsa satırı güncelle, yoksa sona ekle; aynı pakette iki kez gelen tek satır). Sayfa `Kesimler`, ilk gönderimde başlık satırıyla oluşur. Metin sütunları `@` biçimli (Sheets tarihe/sayıya çevirmesin). Son sütun `metre` = length_cm/100 (rapor için; geri kurmada kullanılmaz). `doGet` sağlık kontrolü, veri döndürmez. Yanıt `{ok, upserted, version}` / `{ok:false, error}`. Yayın: Web uygulaması, "Ben" olarak yürüt, erişim "Herkes" (yazmak için anahtar şart).
+- **Uygulama (Core/Sync):** `AppsScriptTransport` (HTTPS POST JSON, snake_case; ağ hatası/zaman aşımı/5xx → `Offline`; `ok:false`, HTML giriş sayfası → `Rejected` ve anlaşılır Türkçe mesaj), `OutboxRepository` (bekleyen kesimler: `GROUP BY cut_id`, kesimin GÜNCEL hâli gönderilir; `MarkSent` yalnızca okunan en büyük kuyruk numarasına kadar kapatır → gönderim sırasında gelen değişiklik kaybolmaz ve aynı turun sonraki paketinde gider), `SyncService` (200'lük paket, turda en fazla 25 paket, hata olunca durur; gönderilmiş 30 günden eski kuyruk satırlarını siler), `SyncWorker` (açılışta hemen, sonra 2 dk; kayıttan 5 sn sonra dürtme; hata beklemesi 30 sn→1→2→5→10 dk, beklemede dürtme yok sayılır; "Şimdi gönder" beklemeyi atlar).
+- Ayarlar: `sheets_url`, `sheets_key` (`settings` tablosu, düz metin; depoya girmez). Boş adres/anahtar = gönderim kapalı. Adres https olmalı.
+- Durum çubuğu metinleri: "Sheets gönderimi ayarlanmadı (Ayarlar)" (turuncu), "Sheets'e gönderiliyor…", "Sheets güncel · son gönderim HH:mm", "İnternet yok · HH:mm'de tekrar denenecek" (turuncu), "Sheets hatası: …" (turuncu).
+- **Testler (FakeAppsScript HTTP işleyicisi, Code.gs mantığını taklit eder):** yanıt kaybolup aynı paket tekrar gidince tek satır, kesinti sonrası kurtarma ve deneme sayacı, paket ortasında kopma + sıra korunması, baskı+iptal aynı satırı günceller, gönderim sırasında değişiklik, yanlış anahtar, HTML giriş sayfası, 5xx, 450 kayıt → 200/200/50, 30 gün temizliği, bekleme süreleri, çalışan durumu.
+- Arayüz testi (gerçek uygulama, geçici veri): ayarlanmamış → kayıtlar birikiyor; ulaşılamayan adres (`https://kumas-test.invalid`) → bağlantı testi anlaşılır hata, durum çubuğu "İnternet yok · …'de tekrar denenecek", internetsiz kayıt ve etiket çalışıyor, deneme sayacı ve hata kuyruğa yazılıyor.
+- Yeni kısayol: **Ctrl+4 Ayarlar**. Ayarlar açılınca odak adres kutusunda (yoksa içerik çerçevesinde siyah odak kenarı görünüyordu).
+- Arayüz testi betiği: bulunamayan öğede DURMALI (bir kez bulunamayan öğe yüzünden metin yanlış kutuya yazıldı; zararsızdı, geçici veritabanıydı).
+- **AÇIK:** Gerçek Google hesabı ile test: KURULUM.md adımları → Ayarlar'a gir → bağlantı testi → kayıt aç → tabloda tek satır; interneti kesip kayıt aç, bağlayınca satırların bir kez geldiğini doğrula.
+
 ## Şu anki durum
 
-- **Adım 7 tamamlandı.** Oturum burada durdu; kullanıcı "devam" deyince Adım 8'e geçilecek.
+- **Adım 8 kodu tamamlandı;** gerçek Google bağlantısı testi kullanıcının kurulumunu bekliyor (Google hesabı soruldu, yanıt bekleniyor). Kullanıcı isterse Claude in Chrome ile kuruluma yardım önerildi.
 - **Karar (2026-11-01): ID 6 hane kalır** (seçenek a). Bir istasyon en fazla 999.999 ID üretir (günde 500 kesimle ~6,7 yıl); dolunca uygulama uyarır, Ayarlar'dan yeni istasyon kodu verilir. 7 haneye çıkarma önerilmişti, kullanıcı istemedi — tekrar önerme.
-- **Sıradaki:** Adım 8 — Apps Script, arka plan gönderici, durum göstergesi; entegrasyon testi (aynı paketi iki kez gönderme, kesinti). Dış gereksinim: Google hesabı + Sheets dosyası — **kullanıcıya test için Google hesabı/Sheets olup olmadığı soruldu, yanıt bekleniyor.**
+- **Kalan adımlar (2026-11-01 itibarıyla 4):** 8 (gerçek Google testi), 9 günlük yedek + Sheets'ten geri kurma + hata günlüğü, 10 gerçek yazıcı, 11 kurulum paketi + pilot.
+- **Sıradaki:** Adım 9 (Google testi beklenirken yapılabilir; geri kurma testi Sheets verisini sahte işleyiciyle simüle eder).
 - Gerçek USB okuyucu testi hâlâ açık (Adım 6).
 
 ## Açık konular / riskler
