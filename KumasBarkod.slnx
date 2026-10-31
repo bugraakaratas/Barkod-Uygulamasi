@@ -1,0 +1,9 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/KumasBarkod.App/KumasBarkod.App.csproj" />
+    <Project Path="src/KumasBarkod.Core/KumasBarkod.Core.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/KumasBarkod.Tests/KumasBarkod.Tests.csproj" />
+  </Folder>
+</Solution>

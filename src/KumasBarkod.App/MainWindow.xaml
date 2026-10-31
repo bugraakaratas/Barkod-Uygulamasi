@@ -1,0 +1,15 @@
+﻿<Window x:Class="KumasBarkod.App.MainWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        xmlns:local="clr-namespace:KumasBarkod.App"
+        mc:Ignorable="d"
+        Title="Kumaş Barkod" Height="600" Width="900"
+        WindowStartupLocation="CenterScreen">
+    <Grid>
+        <TextBlock Text="Kumaş Kalite Kontrol ve Barkod Takip"
+                   HorizontalAlignment="Center" VerticalAlignment="Center"
+                   FontSize="24" />
+    </Grid>
+</Window>
