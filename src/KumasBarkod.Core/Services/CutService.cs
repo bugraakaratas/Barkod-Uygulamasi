@@ -1,0 +1,90 @@
+using Dapper;
+using KumasBarkod.Core.Data;
+using KumasBarkod.Core.Domain;
+
+namespace KumasBarkod.Core.Services;
+
+/// <summary>
+/// Yeni kesim kaydı oluşturur. Sayaç artışı, kesim satırı ve gönderim kuyruğu
+/// TEK işlemde (transaction) yazılır: ya hepsi kalır ya hiçbiri.
+/// </summary>
+public sealed class CutService(SqliteConnectionFactory db, SettingsRepository settings, TimeProvider clock)
+{
+    public const int MaxLotLength = 50;
+
+    public Cut CreateCut(string lotCode, long lengthCm, string? @operator = null)
+    {
+        var lot = NormalizeLot(lotCode);
+        var maxCm = settings.GetMaxLengthCm();
+        if (lengthCm <= 0)
+            throw new CutValidationException("Metre 0'dan büyük olmalı.");
+        if (lengthCm > maxCm)
+            throw new CutValidationException($"Metre en fazla {Length.Format(maxCm)} olabilir.");
+
+        var station = settings.GetStationCode();
+        var now = Timestamps.Format(clock.GetUtcNow());
+        var op = string.IsNullOrWhiteSpace(@operator) ? null : @operator.Trim();
+
+        using var c = db.Open();
+        // BEGIN IMMEDIATE: yazma kilidi baştan alınır, iki kayıt aynı sayıyı okuyamaz.
+        using var tx = c.BeginTransaction(deferred: false);
+
+        var last = c.ExecuteScalar<long?>(
+            "SELECT last_sequence FROM station_counter WHERE station_code = @station",
+            new { station }, tx) ?? 0;
+
+        var sequence = last + 1;
+        if (sequence > CutIds.MaxSequence)
+            throw new CutValidationException(
+                $"{station} istasyonunun sıra numaraları doldu (999999). Ayarlar'dan yeni istasyon kodu verin.");
+
+        c.Execute("""
+            INSERT INTO station_counter (station_code, last_sequence) VALUES (@station, @sequence)
+            ON CONFLICT (station_code) DO UPDATE SET last_sequence = excluded.last_sequence
+            """, new { station, sequence }, tx);
+
+        var cut = new Cut
+        {
+            CutId = CutIds.Format(station, sequence),
+            StationCode = station,
+            SequenceNo = sequence,
+            LotCode = lot,
+            LengthCm = lengthCm,
+            Operator = op,
+            Status = CutStatus.Active,
+            CreatedAt = now,
+        };
+
+        c.Execute("""
+            INSERT INTO cuts (cut_id, station_code, sequence_no, lot_code, length_cm, operator, status, created_at)
+            VALUES (@CutId, @StationCode, @SequenceNo, @LotCode, @LengthCm, @Operator, @Status, @CreatedAt)
+            """, cut, tx);
+
+        c.Execute("""
+            INSERT INTO sync_outbox (cut_id, operation, created_at) VALUES (@cutId, 'upsert', @now)
+            """, new { cutId = cut.CutId, now }, tx);
+
+        tx.Commit();
+        return cut;
+    }
+
+    public Cut? FindById(string cutId)
+    {
+        using var c = db.Open();
+        return c.QuerySingleOrDefault<Cut>(
+            $"SELECT {Cut.SelectColumns} FROM cuts WHERE cut_id = @cutId", new { cutId });
+    }
+
+    /// <summary>Baştaki/sondaki boşluk kırpılır; harf büyüklüğü değiştirilmez (Türkçe i/İ sorunu).</summary>
+    public static string NormalizeLot(string? lotCode)
+    {
+        var lot = lotCode?.Trim() ?? "";
+        if (lot.Length == 0)
+            throw new CutValidationException("Lot girin.");
+        if (lot.Length > MaxLotLength)
+            throw new CutValidationException($"Lot en fazla {MaxLotLength} karakter olabilir.");
+        if (lot.Any(char.IsControl))
+            throw new CutValidationException("Lot görünmeyen karakter içeremez.");
+        return lot;
+    }
+}

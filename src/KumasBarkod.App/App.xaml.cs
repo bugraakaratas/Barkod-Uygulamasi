@@ -3,6 +3,7 @@ using KumasBarkod.App.ViewModels;
 using KumasBarkod.App.Views;
 using KumasBarkod.App.Views.Pages;
 using KumasBarkod.Core.Data;
+using KumasBarkod.Core.Services;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace KumasBarkod.App;
@@ -46,6 +47,9 @@ public partial class App : Application
         var services = new ServiceCollection();
 
         services.AddSingleton(new SqliteConnectionFactory(AppPaths.DatabasePath));
+        services.AddSingleton(TimeProvider.System);
+        services.AddSingleton<SettingsRepository>();
+        services.AddSingleton<CutService>();
 
         services.AddSingleton<MainWindowViewModel>();
         services.AddSingleton<MainWindow>();
