@@ -3,7 +3,10 @@
 Bu dosya projenin hafızasıdır. Yeni oturumda önce bunu oku. **Her iş bitince "İlerleme günlüğü" ve "Şu anki durum" bölümlerini güncelle.**
 
 - **Plan:** `C:\Users\User\Desktop\plan.txt` (Aşama 1–7; geliştirme adımları tablosu Aşama 7'de). Kaynak plan: `Desktop\plan.md`.
-- **Proje:** `D:\dev\kumas-barkod` — yerel git, `main` dalı. **Push yok** (açıkça istenmedikçe).
+- **Proje:** `D:\dev\kumas-barkod` — git, `main` dalı.
+- **GitHub:** <https://github.com/bugraakaratas/Barkod-Uygulamasi> (`origin`). İlk gönderim 2026-11-01 (adım 8 dahil). **Push yalnızca kullanıcı isteyince.**
+  - Kimlik doğrulama Git Credential Manager'da kayıtlı. Claude'un kendi komutu ilk seferde giriş penceresi açamadı; kullanıcı `! git -C D:/dev/kumas-barkod push -u origin main` ile gönderdi (`!` Git Bash'te çalışır: yolda `/` kullan, `\` bozulur).
+  - Commit yazarı e-postası: depo herkese açıksa görünür — kullanıcıya bildirildi.
 - **Dil:** Kullanıcıyla Türkçe konuşulur. Arayüz metinleri, hata mesajları, kod yorumları Türkçe; kod tanımlayıcıları İngilizce.
 
 ## Çalışma kuralları (kullanıcı tercihleri)
