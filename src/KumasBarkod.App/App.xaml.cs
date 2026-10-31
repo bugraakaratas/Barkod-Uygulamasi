@@ -2,6 +2,7 @@
 using KumasBarkod.App.ViewModels;
 using KumasBarkod.App.Views;
 using KumasBarkod.App.Views.Pages;
+using KumasBarkod.Core.Data;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace KumasBarkod.App;
@@ -15,6 +16,19 @@ public partial class App : Application
         base.OnStartup(e);
 
         _services = ConfigureServices().BuildServiceProvider();
+
+        try
+        {
+            DatabaseMigrator.Migrate(_services.GetRequiredService<SqliteConnectionFactory>());
+        }
+        catch (Exception ex)
+        {
+            MessageBox.Show(
+                $"Veritabanı açılamadı:\n\n{ex.Message}\n\nDosya: {AppPaths.DatabasePath}",
+                "Kumaş Barkod", MessageBoxButton.OK, MessageBoxImage.Error);
+            Shutdown(1);
+            return;
+        }
 
         var window = _services.GetRequiredService<MainWindow>();
         MainWindow = window;
@@ -30,6 +44,8 @@ public partial class App : Application
     private static ServiceCollection ConfigureServices()
     {
         var services = new ServiceCollection();
+
+        services.AddSingleton(new SqliteConnectionFactory(AppPaths.DatabasePath));
 
         services.AddSingleton<MainWindowViewModel>();
         services.AddSingleton<MainWindow>();
