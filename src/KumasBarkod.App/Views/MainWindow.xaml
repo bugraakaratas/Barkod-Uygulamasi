@@ -72,6 +72,22 @@
                 <TextBlock Margin="24,0,0,0" VerticalAlignment="Center"
                            Foreground="{DynamicResource TextFillColorSecondaryBrush}"
                            Text="{Binding SyncStatusText}" />
+                <ui:SymbolIcon Symbol="Print24" Margin="24,0,6,0" />
+                <TextBlock VerticalAlignment="Center">
+                    <Run Text="Yazıcı:" />
+                    <Run Text="{Binding PrinterName, Mode=OneWay}">
+                        <Run.Style>
+                            <Style TargetType="Run">
+                                <Setter Property="FontWeight" Value="SemiBold" />
+                                <Style.Triggers>
+                                    <DataTrigger Binding="{Binding PrinterIsPhysical}" Value="False">
+                                        <Setter Property="Foreground" Value="{DynamicResource SystemFillColorCautionBrush}" />
+                                    </DataTrigger>
+                                </Style.Triggers>
+                            </Style>
+                        </Run.Style>
+                    </Run>
+                </TextBlock>
             </StackPanel>
         </Border>
     </Grid>

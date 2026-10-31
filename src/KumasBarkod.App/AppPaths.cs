@@ -16,4 +16,7 @@ public static class AppPaths
             : Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "KumasBarkod");
 
     public static string DatabasePath { get; } = Path.Combine(DataDirectory, "kumas.db");
+
+    /// <summary>Test yazıcısının etiket dosyalarını yazdığı klasör.</summary>
+    public static string LabelOutputDirectory { get; } = Path.Combine(DataDirectory, "labels");
 }

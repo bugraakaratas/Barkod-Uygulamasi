@@ -4,6 +4,7 @@ using CommunityToolkit.Mvvm.Input;
 using CommunityToolkit.Mvvm.Messaging;
 using KumasBarkod.Core.Data;
 using KumasBarkod.Core.Domain;
+using KumasBarkod.Core.Printing;
 using KumasBarkod.Core.Services;
 using Wpf.Ui.Controls;
 
@@ -11,20 +12,27 @@ namespace KumasBarkod.App.ViewModels;
 
 public enum EntryField { Lot, Length }
 
-public sealed record RecentCutItem(string CutId, string LotCode, string Meters, string Time, bool IsVoided);
+public sealed record RecentCutItem(string CutId, string LotCode, string Meters, string Time, bool IsVoided, long PrintCount);
 
 public partial class CutEntryViewModel : ObservableObject
 {
     private readonly CutService _cutService;
     private readonly CutRepository _cuts;
     private readonly SettingsRepository _settings;
+    private readonly PrintService _printService;
 
-    public CutEntryViewModel(CutService cutService, CutRepository cuts, SettingsRepository settings)
+    public CutEntryViewModel(CutService cutService, CutRepository cuts, SettingsRepository settings, PrintService printService)
     {
         _cutService = cutService;
         _cuts = cuts;
         _settings = settings;
+        _printService = printService;
     }
+
+    /// <summary>Bu oturumda en son kaydedilen kesim; F5 bunun etiketini tekrar basar.</summary>
+    [ObservableProperty]
+    [NotifyCanExecuteChangedFor(nameof(ReprintLastCommand))]
+    public partial string? LastCutId { get; set; }
 
     /// <summary>Görünüme hangi alana odaklanacağını söyler (odak bir görünüm işidir).</summary>
     public event Action<EntryField>? FocusRequested;
@@ -146,17 +154,68 @@ public partial class CutEntryViewModel : ObservableObject
             return;
         }
 
-        ResultSeverity = InfoBarSeverity.Success;
-        ResultTitle = $"{cut.CutId} kaydedildi";
-        ResultMessage = $"Lot {cut.LotCode} · {Length.Format(cut.LengthCm)} m";
-        ResultIsOpen = true;
-
+        // Kayıt tamam: ekranı hemen hazırla, sonra etiketi bas.
+        LastCutId = cut.CutId;
         LengthText = "";
         LotText = cut.LotCode;      // Son lot seçili kalır
         ReloadLists();
-
         WeakReferenceMessenger.Default.Send(new CutCreatedMessage(cut));
+
+        var summary = $"Lot {cut.LotCode} · {Length.Format(cut.LengthCm)} m";
+        var printError = await PrintAsync(cut.CutId);
+        if (printError is null)
+            ShowResult(InfoBarSeverity.Success, $"{cut.CutId} kaydedildi", $"{summary} · {PrintedText()}");
+        else
+            ShowResult(InfoBarSeverity.Warning, $"{cut.CutId} kaydedildi, etiket basılamadı",
+                $"{printError}  F5 ile tekrar deneyin.");
+
         FocusRequested?.Invoke(EntryField.Length);
+    }
+
+    /// <summary>Son kaydın etiketini aynı ID ile tekrar basar (baskı hatası veya yıpranmış etiket).</summary>
+    [RelayCommand(CanExecute = nameof(CanReprintLast))]
+    private async Task ReprintLastAsync()
+    {
+        var cutId = LastCutId!;
+        var error = await PrintAsync(cutId);
+        if (error is null)
+            ShowResult(InfoBarSeverity.Success, $"{cutId} etiketi tekrar basıldı", PrintedText());
+        else
+            ShowResult(InfoBarSeverity.Warning, $"{cutId} etiketi basılamadı", $"{error}  F5 ile tekrar deneyin.");
+
+        FocusRequested?.Invoke(EntryField.Length);
+    }
+
+    private bool CanReprintLast() => LastCutId is not null;
+
+    /// <returns>Hata mesajı; başarılıysa null.</returns>
+    private async Task<string?> PrintAsync(string cutId)
+    {
+        try
+        {
+            await Task.Run(() => _printService.Print(cutId));
+            ReloadLists();
+            return null;
+        }
+        catch (Exception ex) when (ex is PrinterException or CutValidationException)
+        {
+            return ex.Message;
+        }
+        catch (Exception ex)
+        {
+            return $"Beklenmeyen yazıcı hatası: {ex.Message}";
+        }
+    }
+
+    private string PrintedText() =>
+        _printService.Printer.IsPhysical ? "etiket basıldı" : "etiket dosyaya yazıldı (test yazıcısı)";
+
+    private void ShowResult(InfoBarSeverity severity, string title, string message)
+    {
+        ResultSeverity = severity;
+        ResultTitle = title;
+        ResultMessage = message;
+        ResultIsOpen = true;
     }
 
     [RelayCommand]
@@ -168,10 +227,7 @@ public partial class CutEntryViewModel : ObservableObject
 
     private void ShowError(string message, EntryField field)
     {
-        ResultSeverity = InfoBarSeverity.Error;
-        ResultTitle = "Kaydedilmedi";
-        ResultMessage = message;
-        ResultIsOpen = true;
+        ShowResult(InfoBarSeverity.Error, "Kaydedilmedi", message);
         FocusRequested?.Invoke(field);
     }
 
@@ -188,7 +244,8 @@ public partial class CutEntryViewModel : ObservableObject
             RecentCuts.Add(new RecentCutItem(
                 c.CutId, c.LotCode, Length.Format(c.LengthCm) + " m",
                 Timestamps.Parse(c.CreatedAt).ToLocalTime().ToString("HH:mm:ss"),
-                c.IsVoided));
+                c.IsVoided,
+                c.PrintCount));
         }
 
         // Liste yenilenince seçim sıfırlanır; mevcut lota göre vurguyu geri kur.

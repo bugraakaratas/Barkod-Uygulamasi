@@ -1,6 +1,7 @@
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Messaging;
 using KumasBarkod.Core.Data;
+using KumasBarkod.Core.Printing;
 
 namespace KumasBarkod.App.ViewModels;
 
@@ -10,10 +11,12 @@ public partial class MainWindowViewModel : ObservableObject
     private readonly SettingsRepository _settings;
     private readonly CutRepository _cuts;
 
-    public MainWindowViewModel(SettingsRepository settings, CutRepository cuts)
+    public MainWindowViewModel(SettingsRepository settings, CutRepository cuts, ILabelPrinter printer)
     {
         _settings = settings;
         _cuts = cuts;
+        PrinterName = printer.DisplayName;
+        PrinterIsPhysical = printer.IsPhysical;
 
         WeakReferenceMessenger.Default.Register<MainWindowViewModel, CutCreatedMessage>(
             this, static (vm, _) => vm.Refresh());
@@ -28,6 +31,11 @@ public partial class MainWindowViewModel : ObservableObject
 
     [ObservableProperty]
     public partial string SyncStatusText { get; set; } = "Gönderim henüz yapılandırılmadı";
+
+    public string PrinterName { get; }
+
+    /// <summary>Test yazıcısında durum çubuğu uyarı rengiyle gösterir: etiket gerçekte basılmıyor.</summary>
+    public bool PrinterIsPhysical { get; }
 
     public void Refresh()
     {

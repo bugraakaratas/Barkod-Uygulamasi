@@ -26,26 +26,49 @@ public partial class CutEntryPage : Page
             _viewModel.Load();
             Focus(string.IsNullOrWhiteSpace(_viewModel.LotText) ? EntryField.Lot : EntryField.Length);
         };
-        PreviewKeyDown += Page_PreviewKeyDown;
+        // handledEventsToo: üstteki pencere/gezinme denetimi F5'i bize ulaşmadan "işlendi" olarak
+        // işaretliyor; normal kayıtlı işleyici bu olayı hiç görmez.
+        AddHandler(PreviewKeyDownEvent, new KeyEventHandler(Page_PreviewKeyDown), handledEventsToo: true);
     }
 
-    private void Focus(EntryField field)
+    /// <summary>
+    /// Tuşa basılınca odak HEMEN taşınır: ertelenirse hızlı yazılan (veya okuyucunun gönderdiği)
+    /// sonraki karakter eski kutuya düşer. (Bir kez yaşandı: "LOT-A" + Enter + "25,5" → lot "LOT-A2".)
+    /// </summary>
+    private void FocusNow(EntryField field)
     {
-        // Input önceliği: düzen ve bağlama güncellemeleri bittikten sonra odakla.
-        Dispatcher.BeginInvoke(DispatcherPriority.Input, () =>
-        {
-            var box = field == EntryField.Lot ? LotBox : LengthBox;
-            box.Focus();
-            box.SelectAll();
-        });
+        var box = field == EntryField.Lot ? LotBox : LengthBox;
+        box.Focus();
+        box.SelectAll();
     }
 
+    /// <summary>
+    /// ViewModel isteği (kayıt sonrası, sayfa açılışı): bağlama ve düzen güncellemeleri bitsin diye ertelenir.
+    /// Bu anda odak zaten doğru kutuda olduğu için ara karakter kaybı olmaz.
+    /// </summary>
+    private void Focus(EntryField field) =>
+        Dispatcher.BeginInvoke(DispatcherPriority.Input, () => FocusNow(field));
+
+    /// <summary>
+    /// Sayfa kısayolları burada ele alınır, KeyBinding ile değil: F5 üst denetimlerde yutuluyor.
+    /// </summary>
     private void Page_PreviewKeyDown(object sender, KeyEventArgs e)
     {
-        if (e.Key == Key.F2)
+        switch (e.Key)
         {
-            Focus(EntryField.Lot);
-            e.Handled = true;
+            case Key.F2:
+                FocusNow(EntryField.Lot);
+                e.Handled = true;
+                break;
+            case Key.F5:
+                if (_viewModel.ReprintLastCommand.CanExecute(null))
+                    _viewModel.ReprintLastCommand.Execute(null);
+                e.Handled = true;
+                break;
+            case Key.Escape:
+                _viewModel.ClearLengthCommand.Execute(null);
+                e.Handled = true;
+                break;
         }
     }
 
@@ -64,7 +87,7 @@ public partial class CutEntryPage : Page
                 e.Handled = true;
                 break;
             case Key.Enter:
-                Focus(EntryField.Length);
+                FocusNow(EntryField.Length);
                 e.Handled = true;
                 break;
         }
@@ -73,6 +96,6 @@ public partial class CutEntryPage : Page
     private void RecentLotsList_PreviewMouseLeftButtonUp(object sender, MouseButtonEventArgs e)
     {
         // Seçim bağlama ile LotText'e yazılır; ardından metreye geç.
-        Focus(EntryField.Length);
+        FocusNow(EntryField.Length);
     }
 }

@@ -3,6 +3,7 @@ using KumasBarkod.App.ViewModels;
 using KumasBarkod.App.Views;
 using KumasBarkod.App.Views.Pages;
 using KumasBarkod.Core.Data;
+using KumasBarkod.Core.Printing;
 using KumasBarkod.Core.Services;
 using Microsoft.Extensions.DependencyInjection;
 
@@ -51,6 +52,15 @@ public partial class App : Application
         services.AddSingleton<SettingsRepository>();
         services.AddSingleton<CutService>();
         services.AddSingleton<CutRepository>();
+
+        // Yazıcı: gerçek yazıcı 10. adımda eklenecek; o zamana kadar etiketler dosyaya yazılır.
+        services.AddSingleton<ILabelTemplate, ZplLabelTemplate>();
+        services.AddSingleton<ILabelPrinter>(sp => new FileLabelPrinter(
+            sp.GetRequiredService<ILabelTemplate>(), AppPaths.LabelOutputDirectory, sp.GetRequiredService<TimeProvider>()));
+        services.AddSingleton(sp => new PrintService(
+            sp.GetRequiredService<SqliteConnectionFactory>(),
+            sp.GetRequiredService<ILabelPrinter>(),
+            sp.GetRequiredService<TimeProvider>()));
 
         services.AddSingleton<MainWindowViewModel>();
         services.AddSingleton<MainWindow>();

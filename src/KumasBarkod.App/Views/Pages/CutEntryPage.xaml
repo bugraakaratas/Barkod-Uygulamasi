@@ -3,10 +3,6 @@
       xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
       xmlns:ui="http://schemas.lepo.co/wpfui/2022/xaml"
       Title="Kesim Girişi">
-    <Page.InputBindings>
-        <KeyBinding Key="Esc" Command="{Binding ClearLengthCommand}" />
-    </Page.InputBindings>
-
     <Grid Margin="{StaticResource PageMargin}">
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto" />
@@ -111,8 +107,22 @@
                                    FontSize="20"
                                    Appearance="Primary"
                                    Command="{Binding SaveCommand}"
-                                   Content="Kaydet  (Enter)"
+                                   Content="Kaydet ve etiket bas  (Enter)"
                                    Icon="{ui:SymbolIcon Save24}" />
+
+                        <ui:Button Margin="0,10,0,0"
+                                   HorizontalAlignment="Stretch"
+                                   MinHeight="44"
+                                   FontSize="16"
+                                   Appearance="Secondary"
+                                   Focusable="False"
+                                   Command="{Binding ReprintLastCommand}"
+                                   Icon="{ui:SymbolIcon Print24}">
+                            <TextBlock>
+                                <Run Text="Son etiketi tekrar bas  (F5)" />
+                                <Run Text="{Binding LastCutId, Mode=OneWay}" FontFamily="Consolas" />
+                            </TextBlock>
+                        </ui:Button>
                     </StackPanel>
                 </ui:Card>
 
@@ -126,7 +136,7 @@
 
                 <TextBlock Margin="4,16,0,0" Style="{StaticResource FieldHintStyle}" TextWrapping="Wrap">
                     <Run FontWeight="SemiBold" Text="Kısayollar:" />
-                    <Run Text="Enter → sonraki alan / kaydet   ·   F2 → lot   ·   ↑ ↓ (lotta) → son lotlar   ·   Esc → metreyi temizle" />
+                    <Run Text="Enter → sonraki alan / kaydet   ·   F2 → lot   ·   ↑ ↓ (lotta) → son lotlar   ·   F5 → son etiketi tekrar bas   ·   Esc → metreyi temizle" />
                 </TextBlock>
             </StackPanel>
         </ScrollViewer>
@@ -141,11 +151,13 @@
                         <ColumnDefinition Width="*" />
                         <ColumnDefinition Width="90" />
                         <ColumnDefinition Width="72" />
+                        <ColumnDefinition Width="44" />
                     </Grid.ColumnDefinitions>
                     <TextBlock Style="{StaticResource ColumnHeaderStyle}" Text="ID" />
                     <TextBlock Grid.Column="1" Style="{StaticResource ColumnHeaderStyle}" Text="Lot" />
                     <TextBlock Grid.Column="2" Style="{StaticResource ColumnHeaderStyle}" Text="Metre" TextAlignment="Right" />
                     <TextBlock Grid.Column="3" Style="{StaticResource ColumnHeaderStyle}" Text="Saat" TextAlignment="Right" />
+                    <TextBlock Grid.Column="4" Style="{StaticResource ColumnHeaderStyle}" Text="Etiket" TextAlignment="Right" />
                 </Grid>
                 <TextBlock DockPanel.Dock="Top" Margin="20,8" Style="{StaticResource FieldHintStyle}" Text="Henüz kayıt yok.">
                     <TextBlock.Visibility>
@@ -164,12 +176,30 @@
                                             <ColumnDefinition Width="*" />
                                             <ColumnDefinition Width="90" />
                                             <ColumnDefinition Width="72" />
+                                            <ColumnDefinition Width="44" />
                                         </Grid.ColumnDefinitions>
                                         <TextBlock FontFamily="Consolas" FontSize="15" FontWeight="SemiBold" Text="{Binding CutId}" />
                                         <TextBlock Grid.Column="1" FontSize="15" Text="{Binding LotCode}" TextTrimming="CharacterEllipsis" />
                                         <TextBlock Grid.Column="2" FontSize="15" Text="{Binding Meters}" TextAlignment="Right" />
                                         <TextBlock Grid.Column="3" FontSize="15" Text="{Binding Time}" TextAlignment="Right"
                                                    Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
+                                        <!-- Basılmamış etiket uyarı simgesiyle öne çıkar -->
+                                        <ui:SymbolIcon Grid.Column="4" HorizontalAlignment="Right" FontSize="16">
+                                            <ui:SymbolIcon.Style>
+                                                <Style TargetType="ui:SymbolIcon">
+                                                    <Setter Property="Symbol" Value="Checkmark16" />
+                                                    <Setter Property="Foreground" Value="{DynamicResource SystemFillColorSuccessBrush}" />
+                                                    <Setter Property="ToolTip" Value="{Binding PrintCount, StringFormat='{}{0} kez basıldı'}" />
+                                                    <Style.Triggers>
+                                                        <DataTrigger Binding="{Binding PrintCount}" Value="0">
+                                                            <Setter Property="Symbol" Value="Warning16" />
+                                                            <Setter Property="Foreground" Value="{DynamicResource SystemFillColorCautionBrush}" />
+                                                            <Setter Property="ToolTip" Value="Etiket basılmadı" />
+                                                        </DataTrigger>
+                                                    </Style.Triggers>
+                                                </Style>
+                                            </ui:SymbolIcon.Style>
+                                        </ui:SymbolIcon>
                                     </Grid>
                                 </Border>
                             </DataTemplate>
