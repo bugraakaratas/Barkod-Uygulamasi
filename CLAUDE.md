@@ -120,7 +120,7 @@ tests/KumasBarkod.Tests  (xUnit) Data/, Domain/, Services/, Printing/
 - `Length.FormatGrouped` (binlik ayırıcılı, özetlerde); etiket ve giriş `Length.Format` (ayırıcısız) kullanmaya devam eder.
 - Mesaj adı değişti: `ScanDetectedMessage` → `OpenCutMessage` (okutma ve geçmişten açma).
 
-| 8 | 🔄 kod ✅, gerçek Google testi bekliyor | `0aa90af` | Sheets kopyası: Apps Script (`tools/sheets/Code.gs`, kurulum `KURULUM.md`), kuyruk göndericisi, arka plan çalışanı + bekleme, durum çubuğu, Ayarlar ekranı (adres/anahtar/test/kaydet/şimdi gönder, metre üst sınırı). 203 test |
+| 8 | ✅ | `0aa90af` + (bu commit) | Sheets kopyası: Apps Script (`tools/sheets/Code.gs`, kurulum `KURULUM.md`), kuyruk göndericisi, arka plan çalışanı + bekleme, durum çubuğu, Ayarlar ekranı (adres/anahtar/test/kaydet/şimdi gönder, metre üst sınırı). 203 test |
 
 ### Adım 8 notları
 - **Apps Script (`Code.gs`):** `doPost` → anahtar (`Script Properties: API_KEY`) → `LockService` kilidi → `cut_id`'ye göre upsert (varsa satırı güncelle, yoksa sona ekle; aynı pakette iki kez gelen tek satır). Sayfa `Kesimler`, ilk gönderimde başlık satırıyla oluşur. Metin sütunları `@` biçimli (Sheets tarihe/sayıya çevirmesin). Son sütun `metre` = length_cm/100 (rapor için; geri kurmada kullanılmaz). `doGet` sağlık kontrolü, veri döndürmez. Yanıt `{ok, upserted, version}` / `{ok:false, error}`. Yayın: Web uygulaması, "Ben" olarak yürüt, erişim "Herkes" (yazmak için anahtar şart).
@@ -131,14 +131,20 @@ tests/KumasBarkod.Tests  (xUnit) Data/, Domain/, Services/, Printing/
 - Arayüz testi (gerçek uygulama, geçici veri): ayarlanmamış → kayıtlar birikiyor; ulaşılamayan adres (`https://kumas-test.invalid`) → bağlantı testi anlaşılır hata, durum çubuğu "İnternet yok · …'de tekrar denenecek", internetsiz kayıt ve etiket çalışıyor, deneme sayacı ve hata kuyruğa yazılıyor.
 - Yeni kısayol: **Ctrl+4 Ayarlar**. Ayarlar açılınca odak adres kutusunda (yoksa içerik çerçevesinde siyah odak kenarı görünüyordu).
 - Arayüz testi betiği: bulunamayan öğede DURMALI (bir kez bulunamayan öğe yüzünden metin yanlış kutuya yazıldı; zararsızdı, geçici veritabanıydı).
-- **AÇIK:** Gerçek Google hesabı ile test: KURULUM.md adımları → Ayarlar'a gir → bağlantı testi → kayıt aç → tabloda tek satır; interneti kesip kayıt aç, bağlayınca satırların bir kez geldiğini doğrula.
+- **Gerçek Google testi (2026-11-01) ✅** — kullanıcıyla birlikte, Claude in Chrome ile:
+  - Test tablosu: **"Kumaş Kesimleri - TEST"** (kullanıcının Google Drive'ı), Apps Script projesi **"Kumaş Barkod"**, dağıtım "Kumaş Barkod v1 (TEST)", erişim Herkes, "Ben" olarak yürütülür. Adres ve anahtar YALNIZCA uygulamanın gerçek veritabanı ayarlarında (`%LOCALAPPDATA%\KumasBarkod\kumas.db` → `settings`) ve Script Properties'te; depoya/CLAUDE.md'ye yazılmaz.
+  - Uçtan uca test (geçici veritabanı, `dotnet run gtest.cs` — Core'u `#:project` ile kullanır; dosya tabanlı betiklerde **`#:property PublishAot=false`** gerekli, yoksa reflection JSON kapalı): sağlık kontrolü veri döndürmüyor; yanlış anahtar reddedildi; 3 kesim gitti; aynı paket tekrar gönderildi → tekrar satır YOK; iptal + tekrar baskı aynı satırları güncelledi; kesinti (ulaşılamaz adres) sırasında 2 kesim birikti, bağlantı gelince bir kez gitti. Tabloda 5 satır, Türkçe karakter doğru, `metre` doğru.
+  - Gerçek uygulama (boş gerçek veritabanı) ayarlandı: durum çubuğu "Sheets güncel · son gönderim 14:53".
+  - Tarayıcı notları: Google izin ekranı açılır pencerede (Chrome eklentisi göremez → kullanıcı onayladı). Apps Script "Kopyala" düğmeleri panoyu değiştirir (bir kez anahtar yerine proje kimliği kaydedildi). Ajan sızdırma kuralı: gizli anahtarı web formuna ajan yazmaz → kullanıcı yapıştırdı.
+  - **Fabrika kurulumunda (Adım 11):** yeni, temiz tablo + yeni anahtar; `Kesimler` sayfası korunmalı (KURULUM.md 6. adım) — test tablosunda yapılmadı.
+- Uygulama ekran görüntüsü, uygulama arka plandayken `PrintWindow` (PW_RENDERFULLCONTENT=2) ile alınabilir; odak değişmez, tuş gönderilmez.
 
 ## Şu anki durum
 
-- **Adım 8 kodu tamamlandı;** gerçek Google bağlantısı testi kullanıcının kurulumunu bekliyor (Google hesabı soruldu, yanıt bekleniyor). Kullanıcı isterse Claude in Chrome ile kuruluma yardım önerildi.
+- **Adım 8 tamamlandı** (gerçek Google testi dahil, 2026-11-01).
 - **Karar (2026-11-01): ID 6 hane kalır** (seçenek a). Bir istasyon en fazla 999.999 ID üretir (günde 500 kesimle ~6,7 yıl); dolunca uygulama uyarır, Ayarlar'dan yeni istasyon kodu verilir. 7 haneye çıkarma önerilmişti, kullanıcı istemedi — tekrar önerme.
-- **Kalan adımlar (2026-11-01 itibarıyla 4):** 8 (gerçek Google testi), 9 günlük yedek + Sheets'ten geri kurma + hata günlüğü, 10 gerçek yazıcı, 11 kurulum paketi + pilot.
-- **Sıradaki:** Adım 9 (Google testi beklenirken yapılabilir; geri kurma testi Sheets verisini sahte işleyiciyle simüle eder).
+- **Kalan adımlar (3):** 9 günlük yedek + Sheets'ten geri kurma + hata günlüğü, 10 gerçek yazıcı, 11 kurulum paketi + pilot.
+- **Sıradaki:** Adım 9. Geri kurma için Apps Script'e anahtarlı bir "tüm satırları oku" uç noktası gerekecek (şu an `doGet` veri döndürmüyor) → Code.gs v2 + test tablosuna yeniden dağıtım (Dağıtımları yönet → yeni sürüm; adres aynı kalır).
 - Gerçek USB okuyucu testi hâlâ açık (Adım 6).
 
 ## Açık konular / riskler

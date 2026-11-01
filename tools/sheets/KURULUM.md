@@ -81,6 +81,12 @@ Script sizin adınıza çalıştığı için korumalı sayfaya yazmaya devam ede
 - **Script'i güncellemek:** `Code.gs` değişirse editöre yapıştırıp kaydedin, sonra **Dağıt → Dağıtımları yönet → (kalem) → Sürüm: Yeni sürüm → Dağıt**. URL aynı kalır, uygulamada değişiklik gerekmez.
 - **Anahtarı değiştirmek:** Proje Ayarları'nda `API_KEY` değerini değiştirin, sonra uygulamada da aynısını girip kaydedin.
 
+## İlk kurulumda karşılaşılanlar (2026-11-01, test tablosu)
+
+- **Pano değişebiliyor:** Apps Script sayfasındaki "Kopyala" düğmeleri (proje kimliği, dağıtım kimliği) panoyu değiştirir. Anahtarı yapıştırmadan hemen önce panoya tekrar alın; kaydettikten sonra değerin anahtarla başladığını kontrol edin. (Bir kez anahtar yerine proje kimliği kaydedildi.)
+- **İzin ekranı ayrı pencerede açılır:** "Erişim yetkisi ver"e basınca Google hesap seçimi **açılır pencerede** gelir. Görünmüyorsa adres çubuğundaki "açılır pencere engellendi" simgesine bakın.
+- **Proje adı:** Yeniden adlandırdıktan sonra başlık bir süre "Adsız proje" görünebilir; sayfa yenilenince doğru ad gelir.
+
 ## Sorun giderme
 
 | Uygulamadaki mesaj | Sebep / çözüm |
