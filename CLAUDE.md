@@ -169,7 +169,7 @@ tests/KumasBarkod.Tests  (xUnit) Data/, Domain/, Services/, Printing/
 ### Claude kullanım ayarı (2026-11-01, kullanıcı isteği)
 - `/usage`: claude-in-chrome %18 + beceri %12. `~/.claude.json` → `claudeInChromeDefaultEnabled: false` (Chrome yalnızca `/chrome` ile açılır). Hafıza notu `browser-usage`: tarayıcıyı az kullan, ekran görüntüsü yerine `find`/`get_page_text`, ölçek ≤0,5, 2 başarısız denemede dur.
 
-| 11 | ✅ paket (pilot fabrikada) | `2900e52` + (bu commit) | Uygulama adı/sürümü (1.0.0) + simge, istasyon kodu Ayarlar'dan değiştirilebilir, self-contained yayın, Inno Setup betiği + derleme betiği, pilot kontrol listesi |
+| 11 | ✅ paket (pilot fabrikada) | `2900e52` + `1e144bd` | Uygulama adı/sürümü (1.0.0) + simge, istasyon kodu Ayarlar'dan değiştirilebilir, self-contained yayın, Inno Setup betiği + derleme betiği, pilot kontrol listesi |
 
 ### Adım 11 notları
 - **Simge:** `tools/installer/generate-icon.ps1` → `src/KumasBarkod.App/Assets/app.ico` (`tools/icon/` klasörü KULLANILMAZ: `.gitignore`'daki macOS `Icon` satırı Windows'ta "icon" klasörünü de yok sayıyor) (turkuaz kare + beyaz barkod, 16–256 px PNG'li ICO). Exe simgesi (`ApplicationIcon`) + pencere `Icon` (pack URI).
