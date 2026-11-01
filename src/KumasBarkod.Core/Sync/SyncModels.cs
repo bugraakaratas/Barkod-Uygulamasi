@@ -44,7 +44,13 @@ public interface ISyncTransport
 {
     /// <summary>Boş liste: yalnızca bağlantı ve anahtar testi.</summary>
     Task SendAsync(SyncTarget target, IReadOnlyList<CutSyncRow> rows, CancellationToken cancellationToken);
+
+    /// <summary>Geri kurma: tablodaki satırları [offset, offset+limit) aralığında okur.</summary>
+    Task<ExportPage> ExportAsync(SyncTarget target, int offset, int limit, CancellationToken cancellationToken);
 }
+
+/// <summary>Tablodan okunan bir sayfa; <see cref="Total"/> tablodaki toplam veri satırı.</summary>
+public sealed record ExportPage(int Total, IReadOnlyList<CutSyncRow> Rows);
 
 public enum SyncState
 {

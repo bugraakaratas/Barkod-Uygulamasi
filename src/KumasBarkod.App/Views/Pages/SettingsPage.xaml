@@ -98,6 +98,64 @@
                 </StackPanel>
             </ui:Card>
 
+            <!-- ========== Yedekler ========== -->
+            <ui:Card Padding="24" Margin="0,0,0,16">
+                <StackPanel>
+                    <DockPanel Margin="0,0,0,4">
+                        <ui:SymbolIcon DockPanel.Dock="Left" Symbol="DatabaseArrowDown20" FontSize="22" Margin="0,0,10,0" />
+                        <TextBlock FontSize="20" FontWeight="SemiBold" Text="Yerel yedekler" />
+                    </DockPanel>
+                    <TextBlock Style="{StaticResource PageSubtitleStyle}" Margin="0,0,0,12"
+                               Text="Her gün otomatik yedek alınır, son 30 gün saklanır. Yedek aynı diskte durur: bozulan dosyaya ve yanlış işleme karşıdır. Disk arızasına karşı koruma Google Sheets kopyasıdır." />
+                    <TextBlock FontSize="15" FontWeight="SemiBold" Text="{Binding LastBackupText}" Margin="0,0,0,12" />
+                    <WrapPanel>
+                        <ui:Button Margin="0,0,8,8" MinHeight="40" Appearance="Secondary"
+                                   Icon="{ui:SymbolIcon Save24}" Content="Şimdi yedekle"
+                                   Command="{Binding BackupNowCommand}" />
+                        <ui:Button Margin="0,0,8,8" MinHeight="40" Appearance="Secondary"
+                                   Icon="{ui:SymbolIcon FolderOpen24}" Content="Yedek klasörünü aç"
+                                   Command="{Binding OpenBackupFolderCommand}" />
+                    </WrapPanel>
+                </StackPanel>
+            </ui:Card>
+
+            <!-- ========== Geri kurma ========== -->
+            <ui:Card Padding="24" Margin="0,0,0,16">
+                <StackPanel>
+                    <DockPanel Margin="0,0,0,4">
+                        <ui:SymbolIcon DockPanel.Dock="Left" Symbol="ArrowDownload24" FontSize="22" Margin="0,0,10,0" />
+                        <TextBlock FontSize="20" FontWeight="SemiBold" Text="Sheets'ten geri kur" />
+                    </DockPanel>
+                    <TextBlock Style="{StaticResource PageSubtitleStyle}" Margin="0,0,0,12"
+                               Text="Disk arızası veya yeni bilgisayar: veritabanını Google Sheets kopyasından kurar. İptal ve baskı bilgisi korunur. Gönderilmemiş son kayıtların ID'leri tekrar kullanılmasın diye sıra numarası 1000 ileri atlatılır." />
+                    <TextBlock FontSize="15" Text="{Binding RestoreHint}" TextWrapping="Wrap" Margin="0,0,0,12" />
+                    <ui:Button HorizontalAlignment="Left" MinHeight="40" Appearance="Secondary"
+                               Icon="{ui:SymbolIcon ArrowDownload24}" Content="Sheets'ten geri kur…"
+                               Command="{Binding BeginRestoreCommand}" />
+
+                    <Border Margin="0,12,0,0" Padding="16" CornerRadius="6" BorderThickness="1"
+                            BorderBrush="{DynamicResource SystemFillColorCautionBrush}"
+                            Visibility="{Binding IsRestoreConfirmOpen, Converter={StaticResource BoolToVisibility}}">
+                        <StackPanel>
+                            <TextBlock FontSize="15" TextWrapping="Wrap"
+                                       Text="Sheets'teki tüm kayıtlar bu bilgisayara kurulacak. Bu sırada uygulamada kayıt açmayın. Devam edilsin mi?" />
+                            <StackPanel Orientation="Horizontal" Margin="0,12,0,0">
+                                <ui:Button MinHeight="40" Appearance="Primary" Content="Evet, geri kur"
+                                           Command="{Binding ConfirmRestoreCommand}" />
+                                <ui:Button Margin="8,0,0,0" MinHeight="40" Appearance="Secondary" Content="Vazgeç"
+                                           Command="{Binding CancelRestoreCommand}" />
+                            </StackPanel>
+                        </StackPanel>
+                    </Border>
+
+                    <StackPanel Orientation="Horizontal" Margin="0,12,0,0"
+                                Visibility="{Binding IsRestoring, Converter={StaticResource BoolToVisibility}}">
+                        <ui:ProgressRing IsIndeterminate="True" Width="20" Height="20" Margin="0,0,10,0" />
+                        <TextBlock VerticalAlignment="Center" FontSize="15" Text="{Binding RestoreProgress}" />
+                    </StackPanel>
+                </StackPanel>
+            </ui:Card>
+
             <!-- ========== Bilgi ========== -->
             <ui:Card Padding="24">
                 <StackPanel>
@@ -110,7 +168,14 @@
                              Text="{Binding DatabasePath, Mode=OneWay}" Margin="0,0,0,10" />
                     <TextBlock Style="{StaticResource DetailLabelStyle}" Text="Test yazıcısı etiket klasörü" />
                     <TextBox IsReadOnly="True" BorderThickness="0" Background="Transparent" FontFamily="Consolas"
-                             Text="{Binding LabelDirectory, Mode=OneWay}" />
+                             Text="{Binding LabelDirectory, Mode=OneWay}" Margin="0,0,0,10" />
+                    <TextBlock Style="{StaticResource DetailLabelStyle}" Text="Hata günlüğü" />
+                    <DockPanel>
+                        <ui:Button DockPanel.Dock="Right" Appearance="Secondary" Content="Aç"
+                                   Icon="{ui:SymbolIcon FolderOpen24}" Command="{Binding OpenLogFolderCommand}" />
+                        <TextBox IsReadOnly="True" BorderThickness="0" Background="Transparent" FontFamily="Consolas"
+                                 VerticalAlignment="Center" Text="{Binding LogDirectory, Mode=OneWay}" />
+                    </DockPanel>
                 </StackPanel>
             </ui:Card>
         </StackPanel>

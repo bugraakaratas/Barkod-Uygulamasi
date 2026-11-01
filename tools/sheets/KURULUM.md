@@ -81,6 +81,19 @@ Script sizin adınıza çalıştığı için korumalı sayfaya yazmaya devam ede
 - **Script'i güncellemek:** `Code.gs` değişirse editöre yapıştırıp kaydedin, sonra **Dağıt → Dağıtımları yönet → (kalem) → Sürüm: Yeni sürüm → Dağıt**. URL aynı kalır, uygulamada değişiklik gerekmez.
 - **Anahtarı değiştirmek:** Proje Ayarları'nda `API_KEY` değerini değiştirin, sonra uygulamada da aynısını girip kaydedin.
 
+## Disk arızası / yeni bilgisayar: Sheets'ten geri kurma
+
+Script **v2** gerekir (`Code.gs` içinde `const VERSION = 2;`). Eski sürüm kuruluysa önce "Script'i güncellemek" adımını yapın.
+
+1. Uygulamayı yeni bilgisayara kurun ve açın (veritabanı boş açılır).
+2. **Ayarlar** (Ctrl+4) → Sheets adresi ve anahtarı girin → **Kaydet**.
+3. **Sheets'ten geri kur…** → **Evet, geri kur**.
+4. Bitince: tüm kesimler, iptaller ve baskı bilgisi gelir. Her istasyonun sıra numarası, tablodaki en büyük numaranın **1000 üstünden** devam eder (tabloya gönderilememiş son kayıtların ID'leri tekrar üretilmesin diye).
+
+Geri kurma yalnızca **boş** veritabanına yapılır. Tabloda tek bir bozuk satır varsa (elle değiştirilmiş hücre, silinmiş sütun…) hiçbir şey yazılmaz ve hangi satırın hatalı olduğu gösterilir. Bu yüzden 6. adımdaki sayfa koruması önemlidir.
+
+**Yerel yedekten dönmek** (dosya bozuldu, yanlış işlem): Ayarlar → Yerel yedekler → **Yedek klasörünü aç**. Uygulamayı kapatın, `%LOCALAPPDATA%\KumasBarkod\kumas.db` (ve yanındaki `-wal`, `-shm`) dosyalarını bir kenara taşıyın, istediğiniz günün `kumas-YYYY-MM-DD.db` yedeğini `kumas.db` adıyla oraya kopyalayın, uygulamayı açın.
+
 ## İlk kurulumda karşılaşılanlar (2026-11-01, test tablosu)
 
 - **Pano değişebiliyor:** Apps Script sayfasındaki "Kopyala" düğmeleri (proje kimliği, dağıtım kimliği) panoyu değiştirir. Anahtarı yapıştırmadan hemen önce panoya tekrar alın; kaydettikten sonra değerin anahtarla başladığını kontrol edin. (Bir kez anahtar yerine proje kimliği kaydedildi.)

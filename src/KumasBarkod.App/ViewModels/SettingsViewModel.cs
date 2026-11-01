@@ -1,7 +1,12 @@
+using System.Diagnostics;
+using System.Globalization;
+using System.IO;
 using System.Windows;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
+using CommunityToolkit.Mvvm.Messaging;
 using KumasBarkod.Core.Data;
+using KumasBarkod.Core.Diagnostics;
 using KumasBarkod.Core.Domain;
 using KumasBarkod.Core.Sync;
 using Wpf.Ui.Controls;
@@ -14,22 +19,56 @@ public partial class SettingsViewModel : ObservableObject
     /// <summary>Üst sınır ayarının kendi sınırı: 10.000 m (ayar hatasını da yakalasın).</summary>
     private const long MaxConfigurableCm = 10_000_00;
 
+    private static readonly CultureInfo Turkish = CultureInfo.GetCultureInfo("tr-TR");
+
     private readonly SettingsRepository _settings;
     private readonly SyncService _sync;
     private readonly SyncWorker _worker;
+    private readonly BackupService _backup;
+    private readonly RestoreService _restore;
+    private readonly ILog _log;
 
-    public SettingsViewModel(SettingsRepository settings, SyncService sync, SyncWorker worker)
+    public SettingsViewModel(SettingsRepository settings, SyncService sync, SyncWorker worker,
+        BackupService backup, RestoreService restore, ILog log)
     {
         _settings = settings;
         _sync = sync;
         _worker = worker;
+        _backup = backup;
+        _restore = restore;
+        _log = log;
 
         worker.StatusChanged += s => Application.Current?.Dispatcher.BeginInvoke(() => ApplyStatus(s));
         ApplyStatus(worker.Status);
+        WeakReferenceMessenger.Default.Register<SettingsViewModel, BackupChangedMessage>(
+            this, static (vm, _) => vm.RefreshBackupInfo());
     }
 
     public string DatabasePath => AppPaths.DatabasePath;
     public string LabelDirectory => AppPaths.LabelOutputDirectory;
+    public string BackupDirectory => AppPaths.BackupDirectory;
+    public string LogDirectory => AppPaths.LogDirectory;
+
+    // ---------- Yedek ----------
+
+    [ObservableProperty] public partial string LastBackupText { get; set; } = "";
+    [ObservableProperty] public partial bool IsBackingUp { get; set; }
+
+    // ---------- Geri kurma ----------
+
+    /// <summary>Geri kurma yalnızca boş veritabanına ve Sheets ayarlıyken.</summary>
+    [ObservableProperty]
+    [NotifyCanExecuteChangedFor(nameof(BeginRestoreCommand))]
+    public partial bool CanRestore { get; set; }
+
+    [ObservableProperty] public partial string RestoreHint { get; set; } = "";
+    [ObservableProperty] public partial bool IsRestoreConfirmOpen { get; set; }
+
+    [ObservableProperty]
+    [NotifyCanExecuteChangedFor(nameof(ConfirmRestoreCommand), nameof(BeginRestoreCommand))]
+    public partial bool IsRestoring { get; set; }
+
+    [ObservableProperty] public partial string RestoreProgress { get; set; } = "";
 
     [ObservableProperty] public partial string SheetsUrl { get; set; } = "";
     [ObservableProperty] public partial string SheetsKey { get; set; } = "";
@@ -57,7 +96,113 @@ public partial class SettingsViewModel : ObservableObject
         MaxLengthText = Length.Format(_settings.GetMaxLengthCm());
         StationCode = _settings.GetStationCode();
         MessageIsOpen = false;
+        IsRestoreConfirmOpen = false;
+        RefreshBackupInfo();
+        RefreshRestoreAvailability();
     }
+
+    private void RefreshBackupInfo()
+    {
+        var list = _backup.List();
+        LastBackupText = list.Count == 0
+            ? "Henüz yedek yok"
+            : $"Son yedek: {list[0].Day.ToString("dd.MM.yyyy", Turkish)} · {list[0].SizeBytes / 1024.0 / 1024.0:0.0} MB · toplam {list.Count} yedek (son {BackupService.KeepDays} gün saklanır)";
+    }
+
+    private void RefreshRestoreAvailability()
+    {
+        var empty = _restore.IsLocalDatabaseEmpty();
+        var configured = _settings.GetSyncTarget() is not null;
+        CanRestore = empty && configured && !IsRestoring;
+        RestoreHint = (empty, configured) switch
+        {
+            (false, _) => "Bu bilgisayarda kayıt var; geri kurma yalnızca yeni/boş kurulumda kullanılır.",
+            (true, false) => "Önce yukarıda Sheets adresini ve anahtarını girip kaydedin.",
+            _ => "Veritabanı boş. Sheets'teki kayıtlarla kurulabilir.",
+        };
+    }
+
+    [RelayCommand]
+    private async Task BackupNowAsync()
+    {
+        IsBackingUp = true;
+        try
+        {
+            var path = await Task.Run(_backup.CreateBackup);
+            _backup.Prune();
+            _log.Info($"Elle yedek alındı: {path}");
+            RefreshBackupInfo();
+            Show(InfoBarSeverity.Success, "Yedek alındı", path);
+        }
+        catch (Exception ex)
+        {
+            _log.Error("Elle yedek alınamadı", ex);
+            Show(InfoBarSeverity.Error, "Yedek alınamadı", ex.Message);
+        }
+        finally
+        {
+            IsBackingUp = false;
+        }
+    }
+
+    [RelayCommand]
+    private void OpenBackupFolder() => OpenFolder(AppPaths.BackupDirectory);
+
+    [RelayCommand]
+    private void OpenLogFolder() => OpenFolder(AppPaths.LogDirectory);
+
+    private static void OpenFolder(string path)
+    {
+        Directory.CreateDirectory(path);
+        Process.Start(new ProcessStartInfo("explorer.exe", $"\"{path}\"") { UseShellExecute = true });
+    }
+
+    [RelayCommand(CanExecute = nameof(CanBeginRestore))]
+    private void BeginRestore()
+    {
+        RefreshRestoreAvailability();
+        if (CanRestore) IsRestoreConfirmOpen = true;
+    }
+
+    private bool CanBeginRestore() => CanRestore && !IsRestoring;
+
+    [RelayCommand]
+    private void CancelRestore() => IsRestoreConfirmOpen = false;
+
+    [RelayCommand(CanExecute = nameof(NotRestoring))]
+    private async Task ConfirmRestoreAsync()
+    {
+        var target = _settings.GetSyncTarget();
+        if (target is null) return;
+
+        IsRestoring = true;
+        IsRestoreConfirmOpen = false;
+        RestoreProgress = "Başlıyor…";
+        _log.Info("Sheets'ten geri kurma başladı");
+        try
+        {
+            var progress = new Progress<string>(p => RestoreProgress = p);
+            var result = await Task.Run(() => _restore.RestoreAsync(target, progress));
+            var counters = string.Join(", ", result.Counters.Select(c => $"{c.Key} → sonraki {CutIds.Format(c.Key, Math.Min(c.Value + 1, CutIds.MaxSequence))}"));
+            _log.Info($"Geri kurma tamamlandı: {result.Cuts} kayıt, {result.Voided} iptal, sayaç {counters}");
+            Show(InfoBarSeverity.Success, "Geri kurma tamamlandı",
+                $"{result.Cuts:N0} kayıt ({result.Voided:N0} iptal) kuruldu. Yeni ID'ler: {counters}.");
+            WeakReferenceMessenger.Default.Send(new DatabaseRestoredMessage());
+        }
+        catch (Exception ex) when (ex is SyncException or CutValidationException)
+        {
+            _log.Error("Geri kurma yapılamadı", ex);
+            Show(InfoBarSeverity.Error, "Geri kurma yapılamadı", ex.Message);
+        }
+        finally
+        {
+            IsRestoring = false;
+            RestoreProgress = "";
+            RefreshRestoreAvailability();
+        }
+    }
+
+    private bool NotRestoring() => !IsRestoring;
 
     [RelayCommand(CanExecute = nameof(NotTesting))]
     private async Task TestConnectionAsync()
@@ -97,6 +242,7 @@ public partial class SettingsViewModel : ObservableObject
             return;
         }
 
+        RefreshRestoreAvailability();
         if (_settings.GetSyncTarget() is null)
         {
             Show(InfoBarSeverity.Informational, "Gönderim kapatıldı", "Adres veya anahtar boş. Kayıtlar yerelde birikir, ayar yapılınca gönderilir.");

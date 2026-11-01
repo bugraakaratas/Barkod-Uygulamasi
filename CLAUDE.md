@@ -138,13 +138,27 @@ tests/KumasBarkod.Tests  (xUnit) Data/, Domain/, Services/, Printing/
   - Tarayıcı notları: Google izin ekranı açılır pencerede (Chrome eklentisi göremez → kullanıcı onayladı). Apps Script "Kopyala" düğmeleri panoyu değiştirir (bir kez anahtar yerine proje kimliği kaydedildi). Ajan sızdırma kuralı: gizli anahtarı web formuna ajan yazmaz → kullanıcı yapıştırdı.
   - **Fabrika kurulumunda (Adım 11):** yeni, temiz tablo + yeni anahtar; `Kesimler` sayfası korunmalı (KURULUM.md 6. adım) — test tablosunda yapılmadı.
 - Uygulama ekran görüntüsü, uygulama arka plandayken `PrintWindow` (PW_RENDERFULLCONTENT=2) ile alınabilir; odak değişmez, tuş gönderilmez.
+- Kullanıcı test sırasında gerçek uygulamada "Lot 31, 19 m" kaydı açtı (K1-000001); aynı ID test tablosundaki test satırının üzerine yazıldı — beklenen davranış (test tablosu ile geliştirme makinesi aynı ID aralığında).
+
+| 9 | ✅ | (bu commit) | Günlük yerel yedek (Backup API, 30 gün), Sheets'ten geri kurma (Apps Script v2 `export`), hata günlüğü (`FileLog`, beklenmeyen hata yakalama), Ayarlar'da Yerel yedekler / Sheets'ten geri kur / Hata günlüğü. 228 test |
+
+### Adım 9 notları
+- **Yedek (`BackupService`):** `SqliteConnection.BackupDatabase` → `<veri>\backups\kumas-YYYY-MM-DD.db` (yerel tarih). Önce `.tmp`'ye yazılır, `journal_mode=DELETE` yapılır (yedek tek dosya; WAL ayarını kopyalıyordu), `integrity_check` → sonra adlandırılır. Açılışta ve saatte bir `EnsureDailyBackup` (günde bir). 30 günden eskiler silinir; klasördeki başka dosyalara dokunulmaz. Ayarlar: "Şimdi yedekle", "Yedek klasörünü aç". Yerelden geri dönüş elle (KURULUM.md).
+- **Geri kurma (`RestoreService`):** yalnızca BOŞ veritabanına (işlem içinde tekrar kontrol). Tablo 2000'lik sayfalarla okunur, TÜM satırlar doğrulanır (ID = istasyon+sıra, durum, metre, lot, zaman biçimleri, iptal tutarlılığı, tekrar ID) → tek hata bile varsa hiçbir şey yazılmaz ve satır numarasıyla Türkçe hata. Tek işlemde yazılır; kuyruğa yazılmaz (veri zaten tabloda); sayaç = istasyon başına en büyük sıra + 1000 (999999'da tavan); `settings.restored_at`.
+- **Apps Script v2:** `doPost` içinde `action: "export"` (anahtarlı) → `{ok, total, rows, version: 2}`, sütunlar başlık adına göre, boş hücre → null. Test tablosuna "Dağıtımları yönet → düzenle → Yeni sürüm" ile dağıtıldı (sürüm 2, adres aynı). v1 script'e okuma isteği gelirse uygulama "Apps Script'i son sürümle güncelleyin" der.
+- `AppsScriptTransport`: ortak `PostAsync<T>`; `JsonContent.Create(body, body.GetType(), Json)`; `NumberHandling = AllowReadingFromString`.
+- **Hata günlüğü (`FileLog`, Core/Diagnostics):** `<veri>\logs\kumas-YYYY-MM-DD.log`, `[BİLGİ]/[UYARI]/[HATA]`, 30 gün, yazılamazsa sessizce geçer. App: açılış/kapanış, `DispatcherUnhandledException` (günlüğe yaz + Türkçe uyarı + uygulama açık kalır), `TaskScheduler.UnobservedTaskException`, `AppDomain.UnhandledException`, veritabanı açılamazsa, yedek sonuçları, Sheets durum DEĞİŞİMLERİ (her yeniden deneme değil), geri kurma, baskı hataları (`PrintService` `ILog` alır).
+- **Hata günlüğü sayesinde bulunan hata:** kapanışta `ServiceProvider.Dispose()` → `SyncWorker` yalnızca `IAsyncDisposable` olduğu için hata atıyordu (Adım 8'den beri, kapanışta sessizce). Yeni yakalayıcı uyarı penceresi açınca uygulama kapanmada asılı kaldı. Çözüm: `OnExit`'te `_services.DisposeAsync()`.
+- Testler: geri kurma (tüm alanlar birebir, iptal+baskı, iki istasyon, sayaç +1000 ve sonraki ID `K1-001006`, tavan, kuyruğa yazmama, 2500 satır → 2 sayfa, dolu veritabanını reddetme, 6 çeşit bozuk hücre + tekrar satır → hiçbir şey yazılmaz, boş tablo, eski script, yanlış anahtar), yedek (WAL kontrol noktasından önce de son veri, günde bir, 30 gün temizliği, ilgisiz dosyalar, yedekten açılabilirlik), günlük (dosya/seviye/istisna, 30 gün, yazılamazsa atmaz). `InternalsVisibleTo KumasBarkod.Tests` (Core).
+- **Gerçek Google testi:** v2 sağlık `version:2`; boş geçici veritabanına 5 kayıt (1 iptal) kuruldu, sayaç 1005, sonraki ID K1-001006, kuyruk boş, ikinci geri kurma reddedildi. Gerçek uygulamada (geçici veri) Ayarlar → geri kur → Geçmiş'te 5 kayıt; yedek ve günlük dosyaları oluştu; uygulama temiz kapandı (çıkış kodu 0).
+- Yeni mesajlar: `BackupChangedMessage`, `DatabaseRestoredMessage`. Yeni yollar: `AppPaths.BackupDirectory`, `AppPaths.LogDirectory`.
 
 ## Şu anki durum
 
-- **Adım 8 tamamlandı** (gerçek Google testi dahil, 2026-11-01).
+- **Adım 9 tamamlandı** (2026-11-01).
 - **Karar (2026-11-01): ID 6 hane kalır** (seçenek a). Bir istasyon en fazla 999.999 ID üretir (günde 500 kesimle ~6,7 yıl); dolunca uygulama uyarır, Ayarlar'dan yeni istasyon kodu verilir. 7 haneye çıkarma önerilmişti, kullanıcı istemedi — tekrar önerme.
-- **Kalan adımlar (3):** 9 günlük yedek + Sheets'ten geri kurma + hata günlüğü, 10 gerçek yazıcı, 11 kurulum paketi + pilot.
-- **Sıradaki:** Adım 9. Geri kurma için Apps Script'e anahtarlı bir "tüm satırları oku" uç noktası gerekecek (şu an `doGet` veri döndürmüyor) → Code.gs v2 + test tablosuna yeniden dağıtım (Dağıtımları yönet → yeni sürüm; adres aynı kalır).
+- **Kalan adımlar (2):** 10 gerçek yazıcı (satın alma, şablon, etiket/kumaş denemesi — donanım gerekir), 11 kurulum paketi (self-contained + Inno Setup) + fabrika pilotu.
+- **Sıradaki:** Adım 10 yazıcı gelmeden yapılabilecek kısımlar: Windows yazıcı kuyruğuna ham ZPL gönderen `RawWindowsPrinter` (winspool), Ayarlar'da yazıcı seçimi; ya da önce Adım 11 kurulum paketi. Kullanıcıya sorulacak.
 - Gerçek USB okuyucu testi hâlâ açık (Adım 6).
 
 ## Açık konular / riskler

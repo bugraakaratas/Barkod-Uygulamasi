@@ -61,6 +61,8 @@ public partial class HistoryViewModel : ObservableObject
         // Başka ekranda kayıt/iptal/baskı olunca, ekran açıksa liste güncellensin.
         WeakReferenceMessenger.Default.Register<HistoryViewModel, CutChangedMessage>(
             this, static (vm, message) => { if (vm.IsActive) _ = vm.RefreshAsync(); });
+        WeakReferenceMessenger.Default.Register<HistoryViewModel, DatabaseRestoredMessage>(
+            this, static (vm, message) => { if (vm.IsActive) _ = vm.RefreshAsync(); });
     }
 
     /// <summary>Ekran görünürken true (görünmezken gereksiz sorgu yapılmaz).</summary>

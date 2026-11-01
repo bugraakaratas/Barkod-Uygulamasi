@@ -23,6 +23,8 @@ public partial class MainWindowViewModel : ObservableObject
         // Kayıt/baskı/iptal: sayıları yenile ve göndericiyi dürt (kısa süre sonra gönderir).
         WeakReferenceMessenger.Default.Register<MainWindowViewModel, CutChangedMessage>(
             this, (vm, _) => { vm.Refresh(); sync.Nudge(); });
+        WeakReferenceMessenger.Default.Register<MainWindowViewModel, DatabaseRestoredMessage>(
+            this, static (vm, _) => vm.Refresh());
 
         // Gönderici arka plan iş parçacığından bildirir; arayüze aktar.
         sync.StatusChanged += status =>

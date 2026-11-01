@@ -9,6 +9,7 @@ namespace KumasBarkod.Core.Sync;
 /// alan adları snake_case (tablo sütunlarıyla aynı). Yanıt: <c>{"ok": true}</c> ya da
 /// <c>{"ok": false, "error": "..."}</c>. Apps Script POST'a 302 ile yanıt verir; HttpClient
 /// yönlendirmeyi GET ile izler (varsayılan davranış).
+/// Geri kurma: <c>{"key", "action": "export", "offset", "limit"}</c> → <c>{"ok", "total", "rows"}</c>.
 /// </summary>
 public sealed class AppsScriptTransport(HttpClient http) : ISyncTransport
 {
@@ -16,9 +17,26 @@ public sealed class AppsScriptTransport(HttpClient http) : ISyncTransport
     {
         PropertyNamingPolicy = JsonNamingPolicy.SnakeCaseLower,
         DefaultIgnoreCondition = JsonIgnoreCondition.Never,
+        // Tabloda sayı metin olarak durursa ("2550") da okunabilsin
+        NumberHandling = JsonNumberHandling.AllowReadingFromString,
     };
 
     public async Task SendAsync(SyncTarget target, IReadOnlyList<CutSyncRow> rows, CancellationToken cancellationToken)
+    {
+        await PostAsync<Reply>(target, new Payload(target.Key, rows), cancellationToken);
+    }
+
+    public async Task<ExportPage> ExportAsync(SyncTarget target, int offset, int limit, CancellationToken cancellationToken)
+    {
+        var reply = await PostAsync<ExportReply>(target, new ExportRequest(target.Key, "export", offset, limit), cancellationToken);
+        if (reply.Rows is null)
+            throw new SyncException(SyncFailureKind.Rejected,
+                "Tablo okuma desteklenmiyor. Apps Script'i son sürümle güncelleyip yeniden dağıtın (KURULUM.md).");
+        return new ExportPage(reply.Total, reply.Rows);
+    }
+
+    private async Task<T> PostAsync<T>(SyncTarget target, object body, CancellationToken cancellationToken)
+        where T : class, IReply
     {
         if (!Uri.TryCreate(target.Url, UriKind.Absolute, out var uri) || uri.Scheme != Uri.UriSchemeHttps)
             throw new SyncException(SyncFailureKind.Rejected, "Sheets adresi geçerli bir https adresi değil.");
@@ -26,7 +44,8 @@ public sealed class AppsScriptTransport(HttpClient http) : ISyncTransport
         HttpResponseMessage response;
         try
         {
-            response = await http.PostAsJsonAsync(uri, new Payload(target.Key, rows), Json, cancellationToken);
+            using var content = JsonContent.Create(body, body.GetType(), options: Json);
+            response = await http.PostAsync(uri, content, cancellationToken);
         }
         catch (HttpRequestException ex)
         {
@@ -43,8 +62,8 @@ public sealed class AppsScriptTransport(HttpClient http) : ISyncTransport
                 throw new SyncException(SyncFailureKind.Offline, $"Google geçici hata verdi ({(int)response.StatusCode}).");
 
             var text = await response.Content.ReadAsStringAsync(cancellationToken);
-            Reply? reply = null;
-            try { reply = JsonSerializer.Deserialize<Reply>(text, Json); }
+            T? reply = null;
+            try { reply = JsonSerializer.Deserialize<T>(text, Json); }
             catch (JsonException) { }
 
             if (reply is null)
@@ -55,10 +74,21 @@ public sealed class AppsScriptTransport(HttpClient http) : ISyncTransport
             }
             if (!reply.Ok)
                 throw new SyncException(SyncFailureKind.Rejected, "Sheets reddetti: " + (reply.Error ?? "bilinmeyen hata"));
+            return reply;
         }
+    }
+
+    private interface IReply
+    {
+        bool Ok { get; }
+        string? Error { get; }
     }
 
     private sealed record Payload(string Key, IReadOnlyList<CutSyncRow> Rows);
 
-    private sealed record Reply(bool Ok, string? Error);
+    private sealed record ExportRequest(string Key, string Action, int Offset, int Limit);
+
+    private sealed record Reply(bool Ok, string? Error) : IReply;
+
+    private sealed record ExportReply(bool Ok, string? Error, int Total, List<CutSyncRow>? Rows) : IReply;
 }

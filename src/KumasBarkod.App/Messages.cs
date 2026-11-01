@@ -10,3 +10,9 @@ public sealed record OpenCutMessage(string CutId);
 
 /// <summary>İptal edilen kaydın yerine yeni kayıt: giriş ekranı bu lotla açılır.</summary>
 public sealed record StartNewCutMessage(string LotCode);
+
+/// <summary>Yeni yedek alındı (Ayarlar ekranındaki yedek bilgisi yenilenir).</summary>
+public sealed record BackupChangedMessage;
+
+/// <summary>Veritabanı Sheets'ten geri kuruldu: tüm listeler ve sayılar yeniden okunur.</summary>
+public sealed record DatabaseRestoredMessage;

@@ -31,6 +31,8 @@ public partial class CutEntryViewModel : ObservableObject
         // Başka ekranda iptal/baskı olunca son kayıtlar listesi güncel kalsın.
         WeakReferenceMessenger.Default.Register<CutEntryViewModel, CutChangedMessage>(
             this, static (vm, _) => vm.ReloadLists());
+        WeakReferenceMessenger.Default.Register<CutEntryViewModel, DatabaseRestoredMessage>(
+            this, static (vm, _) => vm.ReloadLists());
     }
 
     /// <summary>İptal edilen kaydın yerine yeni kayıt: lot dolu, metre boş, odak metrede.</summary>

@@ -1,5 +1,6 @@
 using Dapper;
 using KumasBarkod.Core.Data;
+using KumasBarkod.Core.Diagnostics;
 using KumasBarkod.Core.Domain;
 using KumasBarkod.Core.Printing;
 
@@ -13,9 +14,11 @@ public sealed class PrintService(
     SqliteConnectionFactory db,
     ILabelPrinter printer,
     TimeProvider clock,
-    TimeZoneInfo? timeZone = null)
+    TimeZoneInfo? timeZone = null,
+    ILog? log = null)
 {
     private readonly TimeZoneInfo _timeZone = timeZone ?? TimeZoneInfo.Local;
+    private readonly ILog _log = log ?? NullLog.Instance;
 
     public ILabelPrinter Printer => printer;
 
@@ -28,7 +31,15 @@ public sealed class PrintService(
         if (cut.IsVoided)
             throw new CutValidationException($"{cut.CutId} iptal edilmiş; etiketi basılamaz.");
 
-        printer.Print(LabelData.FromCut(cut, _timeZone));
+        try
+        {
+            printer.Print(LabelData.FromCut(cut, _timeZone));
+        }
+        catch (PrinterException ex)
+        {
+            _log.Error($"{cut.CutId} etiketi basılamadı ({printer.DisplayName})", ex);
+            throw;
+        }
 
         MarkPrinted(cut.CutId);
         return Find(cut.CutId)!;

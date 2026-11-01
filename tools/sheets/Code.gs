@@ -10,7 +10,9 @@
  * bir sonraki gönderimde üzerine yazılır.
  */
 
-const VERSION = 1;
+// v2: "export" eylemi (geri kurma için satırları sayfa sayfa okur; anahtar gerekir).
+const VERSION = 2;
+const EXPORT_MAX_LIMIT = 2000;
 const SHEET_NAME = 'Kesimler';
 
 // Sütun sırası sabittir. Geri kurma (Adım 9) sütunları başlık adına göre okur.
@@ -32,6 +34,11 @@ function doPost(e) {
   try {
     const body = JSON.parse(e.postData.contents);
     checkKey_(body.key);
+
+    if (body.action === 'export') {
+      return json_(export_(Number(body.offset) || 0, Number(body.limit) || EXPORT_MAX_LIMIT));
+    }
+
     const rows = Array.isArray(body.rows) ? body.rows : [];
 
     const lock = LockService.getScriptLock();
@@ -109,6 +116,34 @@ function upsert_(rows) {
   }
 
   return rows.length;
+}
+
+/**
+ * Geri kurma: veri satırlarını [offset, offset+limit) aralığında döndürür. Sütunlar başlık
+ * adına göre okunur (sıra değişse de çalışır). Boş hücre → null. Okuma kilit gerektirmez.
+ */
+function export_(offset, limit) {
+  const sh = sheet_();
+  limit = Math.max(1, Math.min(limit, EXPORT_MAX_LIMIT));
+  const total = Math.max(0, sh.getLastRow() - 1);
+  if (offset >= total) return { ok: true, total: total, rows: [], version: VERSION };
+
+  const width = sh.getLastColumn();
+  const header = sh.getRange(1, 1, 1, width).getValues()[0].map(String);
+  const count = Math.min(limit, total - offset);
+  const values = sh.getRange(2 + offset, 1, count, width).getValues();
+
+  const rows = values.map((v) => {
+    const row = {};
+    COLUMNS.forEach((c) => {
+      if (c === 'metre') return;
+      const i = header.indexOf(c);
+      const cell = i < 0 ? '' : v[i];
+      row[c] = cell === '' || cell === null ? null : cell;
+    });
+    return row;
+  });
+  return { ok: true, total: total, rows: rows, version: VERSION };
 }
 
 function validate_(r) {
