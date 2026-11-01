@@ -140,7 +140,7 @@ tests/KumasBarkod.Tests  (xUnit) Data/, Domain/, Services/, Printing/
 - Uygulama ekran görüntüsü, uygulama arka plandayken `PrintWindow` (PW_RENDERFULLCONTENT=2) ile alınabilir; odak değişmez, tuş gönderilmez.
 - Kullanıcı test sırasında gerçek uygulamada "Lot 31, 19 m" kaydı açtı (K1-000001); aynı ID test tablosundaki test satırının üzerine yazıldı — beklenen davranış (test tablosu ile geliştirme makinesi aynı ID aralığında).
 
-| 9 | ✅ | (bu commit) | Günlük yerel yedek (Backup API, 30 gün), Sheets'ten geri kurma (Apps Script v2 `export`), hata günlüğü (`FileLog`, beklenmeyen hata yakalama), Ayarlar'da Yerel yedekler / Sheets'ten geri kur / Hata günlüğü. 228 test |
+| 9 | ✅ | `4463ea7` | Günlük yerel yedek (Backup API, 30 gün), Sheets'ten geri kurma (Apps Script v2 `export`), hata günlüğü (`FileLog`, beklenmeyen hata yakalama), Ayarlar'da Yerel yedekler / Sheets'ten geri kur / Hata günlüğü. 228 test |
 
 ### Adım 9 notları
 - **Yedek (`BackupService`):** `SqliteConnection.BackupDatabase` → `<veri>\backups\kumas-YYYY-MM-DD.db` (yerel tarih). Önce `.tmp`'ye yazılır, `journal_mode=DELETE` yapılır (yedek tek dosya; WAL ayarını kopyalıyordu), `integrity_check` → sonra adlandırılır. Açılışta ve saatte bir `EnsureDailyBackup` (günde bir). 30 günden eskiler silinir; klasördeki başka dosyalara dokunulmaz. Ayarlar: "Şimdi yedekle", "Yedek klasörünü aç". Yerelden geri dönüş elle (KURULUM.md).
