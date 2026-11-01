@@ -199,7 +199,7 @@ docs/                    SUNUM.md (donanımsız sunum akışı), PILOT.md (fabri
 - **Kalan (donanım/fabrika gerektiren):** Adım 10'un kalanı (etiket yazıcısı seçimi/satın alma, etiket yazıcısına ham ZPL — `RawWindowsPrinter`/winspool, şablonu gerçek etikete uydurma, Türkçe karakter ve kumaş denemesi); fabrika pilotu (temiz PC + bir vardiya kağıtla paralel). Fabrika için yeni Google tablosu + anahtar.
 - **Sıradaki:** Kullanıcıya sorulacak. Seçenek: yazıcı modeli belli olmadan da yazılabilecek ham ZPL gönderimi (winspool) — gerçek yazıcıda denenene kadar "denenmedi" olarak işaretlenir.
 - Gerçek USB okuyucu testi hâlâ açık (Adım 6) — gösterim modunda elle giriş/"Okut (gösterim)" ile ikame edildi.
-- **GitHub:** son gönderilen `3f67142` (gösterim modu). Adım 11 commit'leri (`2900e52`, `49af323`, `1e144bd`, `af2847a`) ve bu CLAUDE.md düzeltmesi GÖNDERİLMEDİ — kullanıcıya soruldu.
+- **GitHub:** 2026-11-01 itibarıyla her şey gönderildi (Adım 11 dahil).
 
 ## Açık konular / riskler
 
