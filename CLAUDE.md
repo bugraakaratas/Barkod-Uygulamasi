@@ -169,7 +169,7 @@ tests/KumasBarkod.Tests  (xUnit) Data/, Domain/, Services/, Printing/
 ### Claude kullanım ayarı (2026-11-01, kullanıcı isteği)
 - `/usage`: claude-in-chrome %18 + beceri %12. `~/.claude.json` → `claudeInChromeDefaultEnabled: false` (Chrome yalnızca `/chrome` ile açılır). Hafıza notu `browser-usage`: tarayıcıyı az kullan, ekran görüntüsü yerine `find`/`get_page_text`, ölçek ≤0,5, 2 başarısız denemede dur.
 
-| 11 | 🔄 hazırlık ✅, Inno Setup kurulumu onay bekliyor | (bu commit) | Uygulama adı/sürümü (1.0.0) + simge, istasyon kodu Ayarlar'dan değiştirilebilir, self-contained yayın, Inno Setup betiği + derleme betiği, pilot kontrol listesi |
+| 11 | ✅ paket (pilot fabrikada) | `2900e52` + (bu commit) | Uygulama adı/sürümü (1.0.0) + simge, istasyon kodu Ayarlar'dan değiştirilebilir, self-contained yayın, Inno Setup betiği + derleme betiği, pilot kontrol listesi |
 
 ### Adım 11 notları
 - **Simge:** `tools/installer/generate-icon.ps1` → `src/KumasBarkod.App/Assets/app.ico` (`tools/icon/` klasörü KULLANILMAZ: `.gitignore`'daki macOS `Icon` satırı Windows'ta "icon" klasörünü de yok sayıyor) (turkuaz kare + beyaz barkod, 16–256 px PNG'li ICO). Exe simgesi (`ApplicationIcon`) + pencere `Icon` (pack URI).
@@ -177,13 +177,16 @@ tests/KumasBarkod.Tests  (xUnit) Data/, Domain/, Services/, Printing/
 - **İstasyon kodu** artık Ayarlar → Kesim'den değiştirilebilir (`SaveStationCode`, `SettingsChangedMessage` → durum çubuğu). Eski kayıtlar aynen kalır; yeni kod kendi sayacıyla başlar.
 - **Inno Setup (`tools/installer/KumasBarkod.iss`):** AppId `{B963423C-EC31-47F5-AD11-B7CF6D89F797}` (DEĞİŞTİRME: güncellemeler bununla eşleşir), kullanıcı başına kurulum (`PrivilegesRequired=lowest`, yönetici isterse tüm kullanıcılar), x64, Türkçe sihirbaz, masaüstü kısayolu seçeneği, güncellemede program klasörü temizlenir (`InstallDelete`), çalışan uygulama kapatılır, kaldırma VERİYİ SİLMEZ (mesajda söylenir). `build-installer.ps1`: testler → yayın → ISCC (`/DAppVersion` csproj'dan).
 - **Pilot:** `docs/PILOT.md` (kurulum, ayarlar, deneme kaydı, bir vardiya kağıtla paralel, vardiya sonu karşılaştırma tablosu).
+- **Inno Setup 6.7.3** kullanıcı onayıyla winget ile kuruldu: `%LOCALAPPDATA%\Programs\Inno Setup 6\ISCC.exe` (kullanıcı başına kurulum).
+- **Paket testi (2026-11-01):** `build-installer.ps1` → 236 test + yayın + ISCC → `KumasBarkod-Kurulum-1.0.0.exe` **46,4 MB**. Sessiz kurulum (`/VERYSILENT /CURRENTUSER /DIR=… /MERGETASKS="!desktopicon"`) 12 sn, çıkış 0, 271 dosya, Programlar listesinde "Kumaş Barkod 1.0.0", Başlat menüsü kısayolu. Kurulu uygulama 3,2 sn'de açıldı, temiz kapandı. Sessiz kaldırma: program klasörü, kayıt defteri girişi ve kısayol silindi; **veri (veritabanı, yedek, günlük) korundu**; gerçek veri klasörüne dokunulmadı.
+- **AÇIK (fabrikada):** temiz bilgisayara kurulum + bir vardiya kağıtla paralel pilot (`docs/PILOT.md`). Kod imzası yok: Windows SmartScreen "tanınmayan uygulama" uyarısı verebilir → "Ek bilgi → Yine de çalıştır".
 
 ## Şu anki durum
 
-- **Adım 9 tamamlandı; Adım 10'un donanımsız kısmı (gösterim modu) tamamlandı** (2026-11-01). Sunum için `docs/SUNUM.md`.
+- **Adım 11 kurulum paketi tamamlandı** (2026-11-01): `KumasBarkod-Kurulum-1.0.0.exe` üretildi ve kur/çalıştır/kaldır testi geçti. Adım 9 ve Adım 10'un donanımsız kısmı (gösterim modu) da tamam. Sunum: `docs/SUNUM.md`, pilot: `docs/PILOT.md`.
 - **Karar (2026-11-01): ID 6 hane kalır** (seçenek a). Bir istasyon en fazla 999.999 ID üretir (günde 500 kesimle ~6,7 yıl); dolunca uygulama uyarır, Ayarlar'dan yeni istasyon kodu verilir. 7 haneye çıkarma önerilmişti, kullanıcı istemedi — tekrar önerme.
-- **Kalan:** Adım 10'un kalanı (etiket yazıcısına ham ZPL — `RawWindowsPrinter`/winspool, yazıcı satın alma, şablonu gerçek etikete uydurma, kumaş denemesi — donanım gerekir); Adım 11 kurulum paketi (self-contained + Inno Setup) + fabrika pilotu.
-- **Sıradaki:** Kullanıcıya sorulacak: Adım 11 (kurulum paketi) mi, ham ZPL yazıcı desteği mi.
+- **Kalan (donanım/fabrika gerektiren):** Adım 10'un kalanı (etiket yazıcısı seçimi/satın alma, etiket yazıcısına ham ZPL — `RawWindowsPrinter`/winspool, şablonu gerçek etikete uydurma, Türkçe karakter ve kumaş denemesi); fabrika pilotu (temiz PC + bir vardiya kağıtla paralel). Fabrika için yeni Google tablosu + anahtar.
+- **Sıradaki:** Kullanıcıya sorulacak. Seçenek: yazıcı modeli belli olmadan da yazılabilecek ham ZPL gönderimi (winspool) — gerçek yazıcıda denenene kadar "denenmedi" olarak işaretlenir.
 - Gerçek USB okuyucu testi hâlâ açık (Adım 6) — gösterim modunda elle giriş/"Okut (gösterim)" ile ikame edildi.
 
 ## Açık konular / riskler
