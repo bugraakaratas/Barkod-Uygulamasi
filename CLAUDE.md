@@ -40,22 +40,33 @@ Bu dosya projenin hafızasıdır. Yeni oturumda önce bunu oku. **Her iş bitinc
 ## Mimari
 
 ```
-src/KumasBarkod.Core     (net10.0)  iş mantığı, veri, yazdırma — arayüzden bağımsız, test edilir
-  Data/       SqliteConnectionFactory, Migrations (şema), DatabaseMigrator, SettingsRepository, CutRepository
-  Domain/     Cut, CutStatus, CutIds (ID/barkod biçimi), Stations, Length (metre ayrıştırma), Timestamps
-  Services/   CutService (kesim oluşturma), PrintService (baskı + baskı kaydı)
-  Printing/   LabelData, ILabelTemplate, ILabelPrinter, ZplLabelTemplate, FileLabelPrinter, PrinterException
-src/KumasBarkod.App      (net10.0-windows, WPF)
-  App.xaml(.cs)  DI kurulumu, açılışta veritabanı göçü
-  AppPaths.cs    veri klasörü, db yolu, etiket klasörü
-  Messages.cs    CutCreatedMessage (WeakReferenceMessenger)
+src/KumasBarkod.Core     (net10.0)  iş mantığı, veri, yazdırma, senkron — arayüzden bağımsız, test edilir
+  Data/        SqliteConnectionFactory, Migrations (şema), DatabaseMigrator, SettingsRepository,
+               CutRepository (+ Search/CutQuery), BackupService
+  Domain/      Cut, CutStatus, CutIds (ID/barkod biçimi, TryParseScan), Stations, Length, Timestamps
+  Services/    CutService (oluşturma, iptal), PrintService (baskı + baskı kaydı + günlük)
+  Printing/    LabelData, ILabelTemplate, ILabelPrinter, ZplLabelTemplate, FileLabelPrinter, Code128 (ZXing)
+  Scanning/    ScanBurstDetector (okuyucu hız + biçim tespiti)
+  Sync/        AppsScriptTransport, OutboxRepository, SyncService, SyncWorker, RestoreService, modeller
+  Diagnostics/ ILog, FileLog, NullLog
+src/KumasBarkod.App      (net10.0-windows, WPF; çıktı adı KumasBarkod.exe)
+  App.xaml(.cs)  DI, kültür tr-TR, günlük + beklenmeyen hata yakalama, göç, gönderici, günlük yedek zamanlayıcı
+  AppPaths.cs    veri klasörü (KUMASBARKOD_DATA_DIR ile değişir), db, labels, backups, logs
+  Messages.cs    CutChanged, OpenCut, StartNewCut, BackupChanged, DatabaseRestored, SettingsChanged
+  Scanning/      ScanCapture (pencere düzeyinde okutma yakalama)
+  Printing/      ScreenOnlyPrinter, PagePrinter (Windows yazıcı/PDF), SelectablePrinter (ayara göre)
+  Controls/      LabelPreview (50×30 mm etiket çizimi, gerçek Code128)
+  Assets/        app.ico
   Themes/Styles.xaml, Converters.cs
-  ViewModels/    MainWindowViewModel, CutEntryViewModel, (Scan/History/Settings boş)
-  Views/         MainWindow (FluentWindow + NavigationView + durum çubuğu), Pages/*
-tests/KumasBarkod.Tests  (xUnit) Data/, Domain/, Services/, Printing/
+  ViewModels/    MainWindow, CutEntry, Scan, History, Settings
+  Views/         MainWindow (FluentWindow + NavigationView + durum çubuğu), Pages/ (CutEntry, Scan, History, Settings)
+tests/KumasBarkod.Tests  (xUnit, 236 test) Data/, Domain/, Services/, Printing/, Scanning/, Sync/ (FakeAppsScript)
+tools/sheets/            Code.gs (Apps Script v2), KURULUM.md
+tools/installer/         KumasBarkod.iss, build-installer.ps1, generate-icon.ps1
+docs/                    SUNUM.md (donanımsız sunum akışı), PILOT.md (fabrika pilotu)
 ```
 
-**Paketler:** WPF-UI 4.3.0 (Fluent), CommunityToolkit.Mvvm 8.4.2, Microsoft.Extensions.DependencyInjection 10.0.14, Microsoft.Data.Sqlite 10.0.14, Dapper 2.1.89.
+**Paketler:** WPF-UI 4.3.0 (Fluent), CommunityToolkit.Mvvm 8.4.2, Microsoft.Extensions.DependencyInjection 10.0.14, Microsoft.Data.Sqlite 10.0.14, Dapper 2.1.89, ZXing.Net 0.16.11 (yalnızca önizleme barkodu).
 
 ### Önemli tasarım kararları
 - **Veritabanı:** SQLite, WAL + `synchronous=FULL` + `foreign_keys` + `busy_timeout=5000`. Şema sürümü `PRAGMA user_version`; her göç kendi işleminde. **Yayınlanmış göç asla değiştirilmez, yeni sürüm eklenir.** Uygulamadan yeni şemalı veritabanı açılmaz.
@@ -72,7 +83,7 @@ tests/KumasBarkod.Tests  (xUnit) Data/, Domain/, Services/, Printing/
 - **Sayfalar:** her `Page`'de `ScrollViewer.CanContentScroll="False"` (WPF-UI'nin dış kaydırma alanını kapatır; yoksa sanallaştırma bozulur). Kaydırma sayfanın içinde yönetilir.
 - **Arayüz testi düğmeleri:** odaklanamayan düğmeler (Focusable=False) testte UI Automation `InvokePattern` ile, ComboBox `ExpandCollapsePattern`/`SelectionItemPattern` ile kullanılır.
 - **Baskı:** Kayıt önce yazılır, sonra basılır. Başarılı baskı `print_count+1`, `last_printed_at` yazar ve kuyruğa `upsert` ekler. Baskı hatası kaydı bozmaz; F5 aynı ID ile tekrar basar. İptal edilmiş kesim basılmaz.
-- **Etiket (ZPL):** 50×30 mm, 203 dpi, `^CI28` (UTF-8), Code128 `^BCN,80,N,N,N,A` (otomatik mod), lot `^FH_` ile kaçışlı (`^ ~ _`). Şimdilik `FileLabelPrinter` → `<veri klasörü>\labels\*.zpl`. Durum çubuğunda "Test yazıcısı" turuncu görünür.
+- **Etiket (ZPL):** 50×30 mm, 203 dpi, `^CI28` (UTF-8), Code128 `^BCN,80,N,N,N,A` (otomatik mod), lot `^FH_` ile kaçışlı (`^ ~ _`). Yazıcı Ayarlar'dan seçilir (`SelectablePrinter`): **Gösterim (yalnızca ekran) varsayılan**, Kağıt (Windows yazıcısı/PDF), Test (`FileLabelPrinter` → `<veri>\labels\*.zpl`). Fiziksel olmayan yazıcı durum çubuğunda turuncu görünür. Etiket yazıcısına ham ZPL henüz yok (Adım 10 kalanı).
 - **Bekleyen kayıt sayısı:** `count(DISTINCT cut_id)` gönderilmemiş kuyruk satırları.
 
 ## İlerleme günlüğü
@@ -188,6 +199,7 @@ tests/KumasBarkod.Tests  (xUnit) Data/, Domain/, Services/, Printing/
 - **Kalan (donanım/fabrika gerektiren):** Adım 10'un kalanı (etiket yazıcısı seçimi/satın alma, etiket yazıcısına ham ZPL — `RawWindowsPrinter`/winspool, şablonu gerçek etikete uydurma, Türkçe karakter ve kumaş denemesi); fabrika pilotu (temiz PC + bir vardiya kağıtla paralel). Fabrika için yeni Google tablosu + anahtar.
 - **Sıradaki:** Kullanıcıya sorulacak. Seçenek: yazıcı modeli belli olmadan da yazılabilecek ham ZPL gönderimi (winspool) — gerçek yazıcıda denenene kadar "denenmedi" olarak işaretlenir.
 - Gerçek USB okuyucu testi hâlâ açık (Adım 6) — gösterim modunda elle giriş/"Okut (gösterim)" ile ikame edildi.
+- **GitHub:** son gönderilen `3f67142` (gösterim modu). Adım 11 commit'leri (`2900e52`, `49af323`, `1e144bd`, `af2847a`) ve bu CLAUDE.md düzeltmesi GÖNDERİLMEDİ — kullanıcıya soruldu.
 
 ## Açık konular / riskler
 
@@ -195,4 +207,5 @@ tests/KumasBarkod.Tests  (xUnit) Data/, Domain/, Services/, Printing/
 - **Etiket boyutu** (50×30 mm, 203 dpi) varsayım; yazıcı/etiket seçilince şablon güncellenecek (Adım 10).
 - **Code128 otomatik mod (A)** eski Zebra firmware'de yoksa `^BCN,80,N,N,N,N` + elle alt küme kullanılır.
 - **Veritabanı konumu** kullanıcı klasöründe; fabrika bilgisayarında birden çok Windows kullanıcısı olacaksa ortak klasöre (ProgramData) taşınmalı.
-- Etiket önizlemesi (ekranda görüntü) yok; istenirse eklenebilir. labelary.com ZPL'yi görüntüler ama veriyi dışarı gönderir.
+- Etiket önizlemesi var (`LabelPreview`, Adım 10a); ZPL'nin gerçek yazıcıdaki görünümü ancak yazıcıyla doğrulanır (labelary.com ZPL'yi görüntüler ama veriyi dışarı gönderir — kullanılmadı).
+- Kurulum paketi kod imzasız → SmartScreen uyarısı. İmza için ücretli kod imzalama sertifikası gerekir.
