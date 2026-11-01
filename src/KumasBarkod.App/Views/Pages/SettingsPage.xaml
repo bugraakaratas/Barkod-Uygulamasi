@@ -74,6 +74,32 @@
                 </StackPanel>
             </ui:Card>
 
+            <!-- ========== Yazıcı ========== -->
+            <ui:Card Padding="24" Margin="0,0,0,16">
+                <StackPanel>
+                    <DockPanel Margin="0,0,0,4">
+                        <ui:SymbolIcon DockPanel.Dock="Left" Symbol="Print24" FontSize="22" Margin="0,0,10,0" />
+                        <TextBlock FontSize="20" FontWeight="SemiBold" Text="Yazıcı" />
+                    </DockPanel>
+                    <TextBlock Style="{StaticResource PageSubtitleStyle}" Margin="0,0,0,12"
+                               Text="Etiket yazıcısı alınana kadar Gösterim veya normal bir yazıcı/PDF kullanılabilir. Etiket yazıcısı (Zebra) bağlanınca burada ayrıca görünecek." />
+                    <StackPanel Orientation="Horizontal">
+                        <ComboBox Width="420" FontSize="15" ItemsSource="{Binding PrinterOptions}"
+                                  SelectedItem="{Binding SelectedPrinter}" DisplayMemberPath="Title"
+                                  AutomationProperties.Name="Yazıcı seçimi">
+                            <ComboBox.ItemContainerStyle>
+                                <Style TargetType="ComboBoxItem" BasedOn="{StaticResource {x:Type ComboBoxItem}}">
+                                    <Setter Property="AutomationProperties.Name" Value="{Binding Title}" />
+                                </Style>
+                            </ComboBox.ItemContainerStyle>
+                        </ComboBox>
+                        <ui:Button Margin="8,0,0,0" MinHeight="36" Appearance="Primary" Content="Kaydet"
+                                   Command="{Binding SavePrinterCommand}" AutomationProperties.Name="Yazıcıyı kaydet" />
+                    </StackPanel>
+                    <TextBlock Style="{StaticResource FieldHintStyle}" TextWrapping="Wrap" Text="{Binding SelectedPrinter.Description}" />
+                </StackPanel>
+            </ui:Card>
+
             <!-- ========== Kesim ========== -->
             <ui:Card Padding="24" Margin="0,0,0,16">
                 <StackPanel>

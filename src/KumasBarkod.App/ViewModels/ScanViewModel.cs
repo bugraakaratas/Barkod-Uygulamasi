@@ -22,7 +22,8 @@ public sealed record CutDetails(
     string? Operator,
     bool IsVoided,
     string? VoidReason,
-    string? VoidedAt)
+    string? VoidedAt,
+    LabelData Label)
 {
     public static CutDetails From(Cut c) => new(
         c.CutId,
@@ -35,7 +36,8 @@ public sealed record CutDetails(
         c.Operator,
         c.IsVoided,
         c.VoidReason,
-        c.VoidedAt is null ? null : Local(c.VoidedAt));
+        c.VoidedAt is null ? null : Local(c.VoidedAt),
+        LabelData.FromCut(c, TimeZoneInfo.Local));
 
     private static string Local(string utc) => Timestamps.Parse(utc).ToLocalTime().ToString("dd.MM.yyyy HH:mm:ss");
 }

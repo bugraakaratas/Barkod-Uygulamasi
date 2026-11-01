@@ -35,7 +35,15 @@
             <!-- ========== Kayıt ayrıntısı ========== -->
             <ui:Card Margin="0,16,0,0" Padding="28,24"
                      Visibility="{Binding HasCurrent, Converter={StaticResource BoolToVisibility}}">
-                <StackPanel DataContext="{Binding Current}">
+                <DockPanel DataContext="{Binding Current}">
+                <!-- Okutulan etiketin görüntüsü -->
+                <StackPanel DockPanel.Dock="Right" Width="300" Margin="24,0,0,0" VerticalAlignment="Top">
+                    <TextBlock Style="{StaticResource DetailLabelStyle}" Text="Etiket" Margin="0,0,0,6" />
+                    <Border Background="{DynamicResource ControlFillColorSecondaryBrush}" CornerRadius="6" Padding="10">
+                        <controls:LabelPreview xmlns:controls="clr-namespace:KumasBarkod.App.Controls" Label="{Binding Label}" />
+                    </Border>
+                </StackPanel>
+                <StackPanel>
                     <DockPanel Margin="0,0,0,20">
                         <Border DockPanel.Dock="Right" VerticalAlignment="Center" Padding="16,6" CornerRadius="16">
                             <Border.Style>
@@ -132,6 +140,7 @@
                         </StackPanel>
                     </Border>
                 </StackPanel>
+                </DockPanel>
             </ui:Card>
 
             <!-- ========== İşlemler ========== -->

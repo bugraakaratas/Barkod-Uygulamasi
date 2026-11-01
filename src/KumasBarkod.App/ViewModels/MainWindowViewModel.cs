@@ -1,8 +1,8 @@
 using System.Windows;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Messaging;
+using KumasBarkod.App.Printing;
 using KumasBarkod.Core.Data;
-using KumasBarkod.Core.Printing;
 using KumasBarkod.Core.Sync;
 
 namespace KumasBarkod.App.ViewModels;
@@ -13,12 +13,17 @@ public partial class MainWindowViewModel : ObservableObject
     private readonly SettingsRepository _settings;
     private readonly CutRepository _cuts;
 
-    public MainWindowViewModel(SettingsRepository settings, CutRepository cuts, ILabelPrinter printer, SyncWorker sync)
+    public MainWindowViewModel(SettingsRepository settings, CutRepository cuts, SelectablePrinter printer, SyncWorker sync)
     {
         _settings = settings;
         _cuts = cuts;
         PrinterName = printer.DisplayName;
         PrinterIsPhysical = printer.IsPhysical;
+        printer.Changed += () =>
+        {
+            PrinterName = printer.DisplayName;
+            PrinterIsPhysical = printer.IsPhysical;
+        };
 
         // Kayıt/baskı/iptal: sayıları yenile ve göndericiyi dürt (kısa süre sonra gönderir).
         WeakReferenceMessenger.Default.Register<MainWindowViewModel, CutChangedMessage>(
@@ -46,10 +51,12 @@ public partial class MainWindowViewModel : ObservableObject
     [ObservableProperty]
     public partial bool SyncNeedsAttention { get; set; }
 
-    public string PrinterName { get; }
+    [ObservableProperty]
+    public partial string PrinterName { get; set; } = "";
 
-    /// <summary>Test yazıcısında durum çubuğu uyarı rengiyle gösterir: etiket gerçekte basılmıyor.</summary>
-    public bool PrinterIsPhysical { get; }
+    /// <summary>Gösterim/test yazıcısında durum çubuğu uyarı rengiyle gösterir: etiket gerçekte basılmıyor.</summary>
+    [ObservableProperty]
+    public partial bool PrinterIsPhysical { get; set; }
 
     public void Refresh()
     {

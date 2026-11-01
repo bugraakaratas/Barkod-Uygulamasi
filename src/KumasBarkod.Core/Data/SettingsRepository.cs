@@ -11,6 +11,7 @@ public static class SettingKeys
     public const string MaxLengthCm = "max_length_cm";
     public const string SheetsUrl = "sheets_url";
     public const string SheetsKey = "sheets_key";
+    public const string Printer = "printer";
 }
 
 /// <summary><c>settings</c> tablosu: anahtar/değer. Kayıt yoksa varsayılan döner.</summary>

@@ -153,13 +153,27 @@ tests/KumasBarkod.Tests  (xUnit) Data/, Domain/, Services/, Printing/
 - **Gerçek Google testi:** v2 sağlık `version:2`; boş geçici veritabanına 5 kayıt (1 iptal) kuruldu, sayaç 1005, sonraki ID K1-001006, kuyruk boş, ikinci geri kurma reddedildi. Gerçek uygulamada (geçici veri) Ayarlar → geri kur → Geçmiş'te 5 kayıt; yedek ve günlük dosyaları oluştu; uygulama temiz kapandı (çıkış kodu 0).
 - Yeni mesajlar: `BackupChangedMessage`, `DatabaseRestoredMessage`. Yeni yollar: `AppPaths.BackupDirectory`, `AppPaths.LogDirectory`.
 
+| 10a | ✅ | (bu commit) | **Gösterim modu (donanımsız sunum):** Code128 üretici (ZXing.Net), ekranda etiket önizlemesi (`LabelPreview`), "Okut (gösterim)", yazıcı seçimi (Gösterim / Kağıt-PDF / Test dosyası), sunum akışı `docs/SUNUM.md`. 236 test |
+
+### Adım 10a notları (gösterim modu — kullanıcı isteği 2026-11-01)
+- Amaç: barkod yazıcı/okuyucu almadan fabrikada uçtan uca sunum. Okuma yolu: Okutma ekranına elle ID (zaten vardı) + "Okut (gösterim)" düğmesi (`OpenCutMessage`, gerçek okuyucunun sonucu ile aynı yol). İsteğe bağlı: telefonu klavye gibi okuyucu yapan uygulama.
+- **`Code128` (Core/Printing):** ZXing.Net 0.16.11 `Code128Writer` (margin 0) → modül dizisi. Yalnızca ekran/kağıt önizlemesi için; etiket yazıcısı barkodu kendi ZPL `^BC` komutuyla basar. Testler: üretilen barkod bağımsız `Code128Reader` ile geri okunuyor (K1000123 vb.).
+- **`LabelPreview` (App/Controls):** 50×30 mm etiket, `ZplLabelTemplate` sabitleriyle aynı yerleşim (`BarcodeX/Y`, `IdY`, `LotLine()`, `DateText()` ZPL şablonundan herkese açık yapıldı; ZPL referans testi değişmedi). **Ekranda barkod modülleri tam piksele (≥2 px) oturtulur** (`SnapBarcodeToPixels`): orantılı çizimde ~1,6 px/modül → genişlikler bozuluyor ve barkod OKUNMUYORDU (ekran görüntüsünden doğrulandı). Yazdırırken `SnapBarcodeToPixels=false` (gerçek boyut, yazıcı çözünürlüğü).
+- **Yazıcılar (App/Printing/Printers.cs):** `ScreenOnlyPrinter` (Gösterim, varsayılan), `PagePrinter` (normal Windows yazıcısı/PDF; `PrintDialog.PrintVisual`, arayüz iş parçacığında `Dispatcher.Invoke`; etiket gerçek boyutta, 15 mm kenar), `FileLabelPrinter` (test). `SelectablePrinter` ayara göre yönlendirir (`settings.printer`: `screen` | `file` | `page:<ad>`), değişince `Changed` → durum çubuğu. Etiket yazıcısına ham ZPL (Zebra) Adım 10'un kalanında eklenecek.
+- Kesim Girişi sağ üst: "Son etiket" kartı (önizleme + Okut (gösterim)); Okutma ekranı ayrıntı kartında etiket önizlemesi (`CutDetails.Label`). Ayarlar: Yazıcı kartı (ComboBox öğelerinde `AutomationProperties.Name` = başlık).
+- **Doğrulama:** ekran görüntülerindeki barkod bağımsız okuyucuyla okundu (K1000002, K1000001); "Microsoft Print to PDF" çıktısı (80×60 mm sayfa, 50×30 etiket) Windows PDF motoruyla 300 dpi'ye çevrilip okundu: K1000004.
+- Test betikleri: `decode.cs` (PNG'den Code128 okur), `pdfdecode.cs` (`#:property TargetFramework=net10.0-windows10.0.19041.0`, `Windows.Data.Pdf`). PDF "Farklı kaydet" penceresi uygulama penceresinin ALT öğesi (`#32770`), UI Automation'a dosya adı kutusunu vermiyor → pencere öne alınıp (her adımda ön planda mı kontrolü) dosya adı kutusuna tıklanıp yazıldı. Bir denemede terminal öne geçti; betik tuş göndermeden durdu.
+
+### Claude kullanım ayarı (2026-11-01, kullanıcı isteği)
+- `/usage`: claude-in-chrome %18 + beceri %12. `~/.claude.json` → `claudeInChromeDefaultEnabled: false` (Chrome yalnızca `/chrome` ile açılır). Hafıza notu `browser-usage`: tarayıcıyı az kullan, ekran görüntüsü yerine `find`/`get_page_text`, ölçek ≤0,5, 2 başarısız denemede dur.
+
 ## Şu anki durum
 
-- **Adım 9 tamamlandı** (2026-11-01).
+- **Adım 9 tamamlandı; Adım 10'un donanımsız kısmı (gösterim modu) tamamlandı** (2026-11-01). Sunum için `docs/SUNUM.md`.
 - **Karar (2026-11-01): ID 6 hane kalır** (seçenek a). Bir istasyon en fazla 999.999 ID üretir (günde 500 kesimle ~6,7 yıl); dolunca uygulama uyarır, Ayarlar'dan yeni istasyon kodu verilir. 7 haneye çıkarma önerilmişti, kullanıcı istemedi — tekrar önerme.
-- **Kalan adımlar (2):** 10 gerçek yazıcı (satın alma, şablon, etiket/kumaş denemesi — donanım gerekir), 11 kurulum paketi (self-contained + Inno Setup) + fabrika pilotu.
-- **Sıradaki:** Adım 10 yazıcı gelmeden yapılabilecek kısımlar: Windows yazıcı kuyruğuna ham ZPL gönderen `RawWindowsPrinter` (winspool), Ayarlar'da yazıcı seçimi; ya da önce Adım 11 kurulum paketi. Kullanıcıya sorulacak.
-- Gerçek USB okuyucu testi hâlâ açık (Adım 6).
+- **Kalan:** Adım 10'un kalanı (etiket yazıcısına ham ZPL — `RawWindowsPrinter`/winspool, yazıcı satın alma, şablonu gerçek etikete uydurma, kumaş denemesi — donanım gerekir); Adım 11 kurulum paketi (self-contained + Inno Setup) + fabrika pilotu.
+- **Sıradaki:** Kullanıcıya sorulacak: Adım 11 (kurulum paketi) mi, ham ZPL yazıcı desteği mi.
+- Gerçek USB okuyucu testi hâlâ açık (Adım 6) — gösterim modunda elle giriş/"Okut (gösterim)" ile ikame edildi.
 
 ## Açık konular / riskler
 

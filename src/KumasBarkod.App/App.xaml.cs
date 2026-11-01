@@ -4,6 +4,7 @@ using System.Windows;
 using System.Windows.Markup;
 using System.Windows.Threading;
 using CommunityToolkit.Mvvm.Messaging;
+using KumasBarkod.App.Printing;
 using KumasBarkod.App.ViewModels;
 using KumasBarkod.App.Views;
 using KumasBarkod.App.Views.Pages;
@@ -169,11 +170,14 @@ public partial class App : Application
         services.AddSingleton(sp => new BackupService(
             sp.GetRequiredService<SqliteConnectionFactory>(), AppPaths.BackupDirectory, sp.GetRequiredService<TimeProvider>()));
 
-        // Yazıcı: gerçek yazıcı 10. adımda eklenecek; o zamana kadar etiketler dosyaya yazılır.
+        // Yazıcı: Ayarlar'dan seçilir — Gösterim (ekran, varsayılan), Kağıt (normal yazıcı/PDF), Test (dosyaya ZPL).
+        // Etiket yazıcısına ham ZPL gönderimi Adım 10'da eklenecek.
         services.AddSingleton<ILabelTemplate, ZplLabelTemplate>();
-        // (ScanViewModel ve CutEntryViewModel MainWindow'a da enjekte edilir; tekil oldukları için aynı örnek.)
-        services.AddSingleton<ILabelPrinter>(sp => new FileLabelPrinter(
+        services.AddSingleton(sp => new FileLabelPrinter(
             sp.GetRequiredService<ILabelTemplate>(), AppPaths.LabelOutputDirectory, sp.GetRequiredService<TimeProvider>()));
+        services.AddSingleton<SelectablePrinter>();
+        services.AddSingleton<ILabelPrinter>(sp => sp.GetRequiredService<SelectablePrinter>());
+        // (ScanViewModel ve CutEntryViewModel MainWindow'a da enjekte edilir; tekil oldukları için aynı örnek.)
         services.AddSingleton(sp => new PrintService(
             sp.GetRequiredService<SqliteConnectionFactory>(),
             sp.GetRequiredService<ILabelPrinter>(),

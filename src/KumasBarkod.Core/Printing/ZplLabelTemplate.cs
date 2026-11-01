@@ -27,10 +27,23 @@ public sealed class ZplLabelTemplate : ILabelTemplate
 
     public byte[] Render(LabelData label) => Encoding.UTF8.GetBytes(RenderText(label));
 
+    // Etiket yerleşimi (nokta, 8 nokta = 1 mm). Ekran önizlemesi de bunları kullanır.
+    public const int BarcodeX = Margin, BarcodeY = 16, BarcodeHeight = 80, ModuleDots = 2;
+    public const int IdY = 106, IdFont = 44;
+    public const int LotY = 158;
+    public const int LengthY = 198, LengthFont = 32;
+    public const int DateY = 206, DateFont = 22;
+    public const int TextX = Margin;
+    public const int TextWidth = ContentWidth;
+
+    /// <summary>Lot satırı ve yazı boyutu (uzun lotta küçülür/kırpılır).</summary>
+    public static (int Font, string Text) LotLine(string lotCode) => FitLot("Lot: " + lotCode);
+
+    public static string DateText(DateTime createdAtLocal) => createdAtLocal.ToString("dd.MM.yyyy HH:mm", Turkish);
+
     public string RenderText(LabelData label)
     {
-        var lotLine = "Lot: " + label.LotCode;
-        var (lotFont, lotText) = FitLot(lotLine);
+        var (lotFont, lotText) = LotLine(label.LotCode);
 
         var sb = new StringBuilder();
         sb.Append("^XA\n");
@@ -39,12 +52,12 @@ public sealed class ZplLabelTemplate : ILabelTemplate
 
         // Barkod: modül 2 nokta, yükseklik 80 nokta (10 mm), okunur satır kapalı (ID altta büyük basılır),
         // mod A = otomatik alt küme seçimi (rakamlar sıkıştırılır, barkod kısalır).
-        sb.Append($"^FO{Margin},16^BY2,3,80^BCN,80,N,N,N,A^FD{label.Barcode}^FS\n");
+        sb.Append($"^FO{BarcodeX},{BarcodeY}^BY{ModuleDots},3,{BarcodeHeight}^BCN,{BarcodeHeight},N,N,N,A^FD{label.Barcode}^FS\n");
 
-        sb.Append($"^FO{Margin},106^A0N,44,44^FD{label.CutId}^FS\n");
-        sb.Append($"^FO{Margin},158^A0N,{lotFont},{lotFont}^FH_^FD{Escape(lotText)}^FS\n");
-        sb.Append($"^FO{Margin},198^A0N,32,32^FD{Length.Format(label.LengthCm)} m^FS\n");
-        sb.Append($"^FO{Margin},206^A0N,22,22^FB{ContentWidth},1,0,R^FD{label.CreatedAtLocal.ToString("dd.MM.yyyy HH:mm", Turkish)}^FS\n");
+        sb.Append($"^FO{TextX},{IdY}^A0N,{IdFont},{IdFont}^FD{label.CutId}^FS\n");
+        sb.Append($"^FO{TextX},{LotY}^A0N,{lotFont},{lotFont}^FH_^FD{Escape(lotText)}^FS\n");
+        sb.Append($"^FO{TextX},{LengthY}^A0N,{LengthFont},{LengthFont}^FD{Length.Format(label.LengthCm)} m^FS\n");
+        sb.Append($"^FO{TextX},{DateY}^A0N,{DateFont},{DateFont}^FB{ContentWidth},1,0,R^FD{DateText(label.CreatedAtLocal)}^FS\n");
 
         sb.Append("^PQ1\n");
         sb.Append("^XZ\n");

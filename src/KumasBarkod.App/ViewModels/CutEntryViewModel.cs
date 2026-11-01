@@ -47,8 +47,19 @@ public partial class CutEntryViewModel : ObservableObject
 
     /// <summary>Bu oturumda en son kaydedilen kesim; F5 bunun etiketini tekrar basar.</summary>
     [ObservableProperty]
-    [NotifyCanExecuteChangedFor(nameof(ReprintLastCommand))]
+    [NotifyCanExecuteChangedFor(nameof(ReprintLastCommand), nameof(DemoScanCommand))]
     public partial string? LastCutId { get; set; }
+
+    /// <summary>Son kaydın etiket önizlemesi (yazıcı türünden bağımsız her zaman gösterilir).</summary>
+    [ObservableProperty]
+    public partial LabelData? LastLabel { get; set; }
+
+    /// <summary>
+    /// Gösterim: son etiketi "okut". Okuyucunun yaptığının sonucunu üretir: kayıt okutma ekranında açılır.
+    /// (Gerçek okuyucu da aynı yoldan gelir: <see cref="OpenCutMessage"/>.)
+    /// </summary>
+    [RelayCommand(CanExecute = nameof(CanReprintLast))]
+    private void DemoScan() => WeakReferenceMessenger.Default.Send(new OpenCutMessage(LastCutId!));
 
     /// <summary>Görünüme hangi alana odaklanacağını söyler (odak bir görünüm işidir).</summary>
     public event Action<EntryField>? FocusRequested;
@@ -172,6 +183,7 @@ public partial class CutEntryViewModel : ObservableObject
 
         // Kayıt tamam: ekranı hemen hazırla, sonra etiketi bas.
         LastCutId = cut.CutId;
+        LastLabel = LabelData.FromCut(cut, TimeZoneInfo.Local);
         LengthText = "";
         LotText = cut.LotCode;      // Son lot seçili kalır
         ReloadLists();
@@ -224,7 +236,7 @@ public partial class CutEntryViewModel : ObservableObject
     }
 
     private string PrintedText() =>
-        _printService.Printer.IsPhysical ? "etiket basıldı" : "etiket dosyaya yazıldı (test yazıcısı)";
+        _printService.Printer.IsPhysical ? "etiket basıldı" : $"etiket → {_printService.Printer.DisplayName}";
 
     private void ShowResult(InfoBarSeverity severity, string title, string message)
     {

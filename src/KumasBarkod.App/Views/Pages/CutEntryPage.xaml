@@ -142,8 +142,33 @@
             </StackPanel>
         </ScrollViewer>
 
+        <Grid Grid.Row="1" Grid.Column="2">
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="*" />
+            </Grid.RowDefinitions>
+
+        <!-- ========== Son etiket (önizleme) ========== -->
+        <ui:Card Grid.Row="0" Padding="16,12" Margin="0,0,0,12">
+            <StackPanel>
+                <DockPanel Margin="0,0,0,8">
+                    <ui:Button DockPanel.Dock="Right" Padding="12,4" Appearance="Secondary" Focusable="False"
+                               Icon="{ui:SymbolIcon BarcodeScanner24}" Content="Okut (gösterim)"
+                               ToolTip="Okuyucunun yapacağını taklit eder: bu etiketin kaydı okutma ekranında açılır"
+                               Command="{Binding DemoScanCommand}" />
+                    <TextBlock VerticalAlignment="Center" FontSize="18" FontWeight="SemiBold" Text="Son etiket" />
+                </DockPanel>
+                <Border Background="{DynamicResource ControlFillColorSecondaryBrush}" CornerRadius="6" Padding="14">
+                    <controls:LabelPreview xmlns:controls="clr-namespace:KumasBarkod.App.Controls"
+                                           Label="{Binding LastLabel}" MaxHeight="190" HorizontalAlignment="Center" />
+                </Border>
+                <TextBlock Margin="2,6,0,0" Style="{StaticResource FieldHintStyle}" TextWrapping="Wrap"
+                           Text="Etiketin gerçek görünümü (50 × 30 mm). Barkod gerçektir: okuyucu veya telefon uygulamasıyla ekrandan okunabilir." />
+            </StackPanel>
+        </ui:Card>
+
         <!-- ========== Son kayıtlar ========== -->
-        <ui:Card Grid.Row="1" Grid.Column="2" Padding="0" VerticalAlignment="Stretch" VerticalContentAlignment="Stretch">
+        <ui:Card Grid.Row="1" Padding="0" VerticalAlignment="Stretch" VerticalContentAlignment="Stretch">
             <DockPanel>
                 <TextBlock DockPanel.Dock="Top" Margin="20,16,20,8" FontSize="18" FontWeight="SemiBold" Text="Son kayıtlar" />
                 <Grid DockPanel.Dock="Top" Margin="20,0,20,6">
@@ -226,5 +251,6 @@
                 </ScrollViewer>
             </DockPanel>
         </ui:Card>
+        </Grid>
     </Grid>
 </Page>

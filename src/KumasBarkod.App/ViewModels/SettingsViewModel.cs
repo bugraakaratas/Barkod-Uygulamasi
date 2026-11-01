@@ -5,6 +5,7 @@ using System.Windows;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using CommunityToolkit.Mvvm.Messaging;
+using KumasBarkod.App.Printing;
 using KumasBarkod.Core.Data;
 using KumasBarkod.Core.Diagnostics;
 using KumasBarkod.Core.Domain;
@@ -28,8 +29,10 @@ public partial class SettingsViewModel : ObservableObject
     private readonly RestoreService _restore;
     private readonly ILog _log;
 
+    private readonly SelectablePrinter _printer;
+
     public SettingsViewModel(SettingsRepository settings, SyncService sync, SyncWorker worker,
-        BackupService backup, RestoreService restore, ILog log)
+        BackupService backup, RestoreService restore, ILog log, SelectablePrinter printer)
     {
         _settings = settings;
         _sync = sync;
@@ -37,6 +40,7 @@ public partial class SettingsViewModel : ObservableObject
         _backup = backup;
         _restore = restore;
         _log = log;
+        _printer = printer;
 
         worker.StatusChanged += s => Application.Current?.Dispatcher.BeginInvoke(() => ApplyStatus(s));
         ApplyStatus(worker.Status);
@@ -48,6 +52,38 @@ public partial class SettingsViewModel : ObservableObject
     public string LabelDirectory => AppPaths.LabelOutputDirectory;
     public string BackupDirectory => AppPaths.BackupDirectory;
     public string LogDirectory => AppPaths.LogDirectory;
+
+    // ---------- Yazıcı ----------
+
+    public sealed record PrinterOption(string Setting, string Title, string Description);
+
+    public System.Collections.ObjectModel.ObservableCollection<PrinterOption> PrinterOptions { get; } = [];
+
+    [ObservableProperty] public partial PrinterOption? SelectedPrinter { get; set; }
+
+    private void LoadPrinterOptions()
+    {
+        PrinterOptions.Clear();
+        PrinterOptions.Add(new(SelectablePrinter.ScreenSetting, "Gösterim (yalnızca ekran)",
+            "Hiçbir şey basılmaz; etiket Kesim Girişi ekranında görünür. Sunum ve deneme için."));
+        foreach (var name in PagePrinter.InstalledPrinters())
+            PrinterOptions.Add(new(SelectablePrinter.PagePrefix + name, $"Kağıda bas: {name}",
+                "Etiket sayfanın sol üstüne gerçek boyutta (50 × 30 mm) basılır; kesip yapıştırılabilir."));
+        PrinterOptions.Add(new(SelectablePrinter.FileSetting, "Test (dosyaya ZPL yazar)",
+            "Etiket yazıcısı komutu dosyaya yazılır (geliştirme için)."));
+
+        var current = _printer.CurrentSetting;
+        SelectedPrinter = PrinterOptions.FirstOrDefault(o => o.Setting == current) ?? PrinterOptions[0];
+    }
+
+    [RelayCommand]
+    private void SavePrinter()
+    {
+        if (SelectedPrinter is null) return;
+        _printer.Select(SelectedPrinter.Setting);
+        _log.Info($"Yazıcı seçildi: {SelectedPrinter.Title}");
+        Show(InfoBarSeverity.Success, "Yazıcı kaydedildi", SelectedPrinter.Title);
+    }
 
     // ---------- Yedek ----------
 
@@ -97,6 +133,7 @@ public partial class SettingsViewModel : ObservableObject
         StationCode = _settings.GetStationCode();
         MessageIsOpen = false;
         IsRestoreConfirmOpen = false;
+        LoadPrinterOptions();
         RefreshBackupInfo();
         RefreshRestoreAvailability();
     }
