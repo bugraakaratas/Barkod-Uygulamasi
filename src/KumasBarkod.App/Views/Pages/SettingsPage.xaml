@@ -117,10 +117,16 @@
                     <TextBlock Style="{StaticResource FieldHintStyle}" TextWrapping="Wrap"
                                Text="Bundan uzun kesim girilemez. Yanlış yazımı (25,50 yerine 2550) yakalamak için gerçekçi bir değer seçin." />
 
-                    <TextBlock Style="{StaticResource FieldLabelStyle}" Margin="0,16,0,4" Text="İstasyon kodu" />
-                    <TextBlock FontSize="18" FontWeight="SemiBold" FontFamily="Consolas" Text="{Binding StationCode}" />
+                    <TextBlock Style="{StaticResource FieldLabelStyle}" Margin="0,16,0,6" Text="İstasyon kodu" />
+                    <StackPanel Orientation="Horizontal">
+                        <ui:TextBox Width="90" FontSize="16" FontFamily="Consolas" MaxLength="2" CharacterCasing="Upper"
+                                    Text="{Binding StationCode, UpdateSourceTrigger=PropertyChanged}"
+                                    AutomationProperties.Name="İstasyon kodu" />
+                        <ui:Button Margin="8,0,0,0" MinHeight="36" Appearance="Secondary" Content="Kaydet"
+                                   Command="{Binding SaveStationCodeCommand}" AutomationProperties.Name="İstasyon kodunu kaydet" />
+                    </StackPanel>
                     <TextBlock Style="{StaticResource FieldHintStyle}" TextWrapping="Wrap"
-                               Text="Kesim ID'lerinin başındaki kod. İkinci istasyon kurulurken farklı kod verilir; kurulumda ayarlanır." />
+                               Text="Kesim ID'lerinin başındaki 2 karakter (büyük harf + harf/rakam, ör. K1). Her istasyon bilgisayarına FARKLI kod verilir; böylece ID'ler hiç çakışmaz. Değiştirince yeni kayıtlar yeni kodla başlar, eskiler aynen kalır." />
                 </StackPanel>
             </ui:Card>
 
@@ -189,6 +195,8 @@
                         <ui:SymbolIcon DockPanel.Dock="Left" Symbol="Folder24" FontSize="22" Margin="0,0,10,0" />
                         <TextBlock FontSize="20" FontWeight="SemiBold" Text="Dosyalar" />
                     </DockPanel>
+                    <TextBlock Style="{StaticResource DetailLabelStyle}" Text="Uygulama" />
+                    <TextBlock FontSize="15" Margin="0,0,0,10" Text="{Binding VersionText}" />
                     <TextBlock Style="{StaticResource DetailLabelStyle}" Text="Veritabanı" />
                     <TextBox IsReadOnly="True" BorderThickness="0" Background="Transparent" FontFamily="Consolas"
                              Text="{Binding DatabasePath, Mode=OneWay}" Margin="0,0,0,10" />

@@ -23,7 +23,9 @@ Bu dosya projenin hafızasıdır. Yeni oturumda önce bunu oku. **Her iş bitinc
 - .NET SDK 10.0.403, Git 2.56 (winget ile kuruldu). Yeni PowerShell'de PATH yenilemek gerekebilir:
   `$env:Path = [Environment]::GetEnvironmentVariable('Path','Machine') + ';' + [Environment]::GetEnvironmentVariable('Path','User')`
 - Derleme: `dotnet build D:\dev\kumas-barkod` · Test: `dotnet test` (proje klasöründe)
-- Uygulama: `src\KumasBarkod.App\bin\Debug\net10.0-windows\KumasBarkod.App.exe`
+- Uygulama: `src\KumasBarkod.App\bin\Debug\net10.0-windows\KumasBarkod.exe` (Adım 11'den beri `AssemblyName=KumasBarkod`; süreç adı `KumasBarkod`, eskiden `KumasBarkod.App`).
+- Yayın: `dotnet publish src\KumasBarkod.App -c Release -o artifacts\publish` (self-contained win-x64, ReadyToRun, ~144 MB). Kurulum paketi: `pwsh tools\installer\build-installer.ps1` → `artifacts\installer\KumasBarkod-Kurulum-<sürüm>.exe` (Inno Setup 6 gerekir). `artifacts/` git'e girmez.
+- Bu ortamda `Remove-Item -Recurse` bazen "system path '/'" diye engelleniyor → silmeden üzerine yaz.
 - Uygulama açıkken derleme exe kilidi yüzünden başarısız olur → önce uygulamayı kapat.
 - Gerçek veritabanı: `%LOCALAPPDATA%\KumasBarkod\kumas.db` (+ `-wal`, `-shm`).
 - **Test/geliştirme:** `KUMASBARKOD_DATA_DIR` ortam değişkeni veri klasörünü değiştirir; arayüz testleri her zaman geçici klasörle çalıştırılır, gerçek veritabanına yazılmaz.
@@ -166,6 +168,15 @@ tests/KumasBarkod.Tests  (xUnit) Data/, Domain/, Services/, Printing/
 
 ### Claude kullanım ayarı (2026-11-01, kullanıcı isteği)
 - `/usage`: claude-in-chrome %18 + beceri %12. `~/.claude.json` → `claudeInChromeDefaultEnabled: false` (Chrome yalnızca `/chrome` ile açılır). Hafıza notu `browser-usage`: tarayıcıyı az kullan, ekran görüntüsü yerine `find`/`get_page_text`, ölçek ≤0,5, 2 başarısız denemede dur.
+
+| 11 | 🔄 hazırlık ✅, Inno Setup kurulumu onay bekliyor | (bu commit) | Uygulama adı/sürümü (1.0.0) + simge, istasyon kodu Ayarlar'dan değiştirilebilir, self-contained yayın, Inno Setup betiği + derleme betiği, pilot kontrol listesi |
+
+### Adım 11 notları
+- **Simge:** `tools/icon/generate-icon.ps1` → `src/KumasBarkod.App/Assets/app.ico` (turkuaz kare + beyaz barkod, 16–256 px PNG'li ICO). Exe simgesi (`ApplicationIcon`) + pencere `Icon` (pack URI).
+- **csproj (App):** `AssemblyName=KumasBarkod`, `Version=1.0.0`, `Product`, `AssemblyTitle`; Release'te `RuntimeIdentifier=win-x64`, `SelfContained`, `PublishReadyToRun`, `SatelliteResourceLanguages=tr;en`. Yayınlanan uygulama geçici veriyle denendi: açılış ~5,3 sn (ilk açılış), yedek + günlük, temiz kapanış.
+- **İstasyon kodu** artık Ayarlar → Kesim'den değiştirilebilir (`SaveStationCode`, `SettingsChangedMessage` → durum çubuğu). Eski kayıtlar aynen kalır; yeni kod kendi sayacıyla başlar.
+- **Inno Setup (`tools/installer/KumasBarkod.iss`):** AppId `{B963423C-EC31-47F5-AD11-B7CF6D89F797}` (DEĞİŞTİRME: güncellemeler bununla eşleşir), kullanıcı başına kurulum (`PrivilegesRequired=lowest`, yönetici isterse tüm kullanıcılar), x64, Türkçe sihirbaz, masaüstü kısayolu seçeneği, güncellemede program klasörü temizlenir (`InstallDelete`), çalışan uygulama kapatılır, kaldırma VERİYİ SİLMEZ (mesajda söylenir). `build-installer.ps1`: testler → yayın → ISCC (`/DAppVersion` csproj'dan).
+- **Pilot:** `docs/PILOT.md` (kurulum, ayarlar, deneme kaydı, bir vardiya kağıtla paralel, vardiya sonu karşılaştırma tablosu).
 
 ## Şu anki durum
 

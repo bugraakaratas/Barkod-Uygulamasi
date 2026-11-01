@@ -30,6 +30,8 @@ public partial class MainWindowViewModel : ObservableObject
             this, (vm, _) => { vm.Refresh(); sync.Nudge(); });
         WeakReferenceMessenger.Default.Register<MainWindowViewModel, DatabaseRestoredMessage>(
             this, static (vm, _) => vm.Refresh());
+        WeakReferenceMessenger.Default.Register<MainWindowViewModel, SettingsChangedMessage>(
+            this, static (vm, _) => vm.Refresh());
 
         // Gönderici arka plan iş parçacığından bildirir; arayüze aktar.
         sync.StatusChanged += status =>

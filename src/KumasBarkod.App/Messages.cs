@@ -16,3 +16,6 @@ public sealed record BackupChangedMessage;
 
 /// <summary>Veritabanı Sheets'ten geri kuruldu: tüm listeler ve sayılar yeniden okunur.</summary>
 public sealed record DatabaseRestoredMessage;
+
+/// <summary>Bir ayar değişti (ör. istasyon kodu): durum çubuğu yenilenir.</summary>
+public sealed record SettingsChangedMessage;

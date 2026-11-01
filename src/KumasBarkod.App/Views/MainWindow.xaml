@@ -5,6 +5,7 @@
                  xmlns:pages="clr-namespace:KumasBarkod.App.Views.Pages"
                  xmlns:vm="clr-namespace:KumasBarkod.App.ViewModels"
                  Title="Kumaş Barkod"
+                 Icon="pack://application:,,,/Assets/app.ico"
                  Width="1200" Height="720" MinWidth="960" MinHeight="600"
                  WindowStartupLocation="CenterScreen"
                  WindowState="Maximized"

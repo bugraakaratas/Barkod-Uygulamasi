@@ -241,6 +241,39 @@ public partial class SettingsViewModel : ObservableObject
 
     private bool NotRestoring() => !IsRestoring;
 
+    /// <summary>
+    /// İstasyon kodu: yeni istasyon kurulurken verilir (K1, K2…). Değişince yeni kayıtlar yeni kodla
+    /// ve o kodun kendi sayacıyla başlar; eski kayıtlar ve ID'leri aynen kalır.
+    /// </summary>
+    [RelayCommand]
+    private void SaveStationCode()
+    {
+        var code = StationCode.Trim().ToUpperInvariant();
+        var old = _settings.GetStationCode();
+        if (code == old)
+        {
+            Show(InfoBarSeverity.Informational, "Değişiklik yok", $"İstasyon kodu zaten {old}.");
+            return;
+        }
+        try
+        {
+            _settings.SetStationCode(code);
+        }
+        catch (CutValidationException ex)
+        {
+            Show(InfoBarSeverity.Error, "İstasyon kodu kaydedilmedi", ex.Message);
+            return;
+        }
+        StationCode = code;
+        _log.Info($"İstasyon kodu değişti: {old} → {code}");
+        Show(InfoBarSeverity.Success, "İstasyon kodu kaydedildi",
+            $"Yeni kayıtlar {code}-… ile başlar. Eski {old} kayıtları aynen kalır.");
+        WeakReferenceMessenger.Default.Send(new SettingsChangedMessage());
+    }
+
+    public string VersionText { get; } =
+        $"Sürüm {typeof(SettingsViewModel).Assembly.GetName().Version?.ToString(3)}";
+
     [RelayCommand(CanExecute = nameof(NotTesting))]
     private async Task TestConnectionAsync()
     {
