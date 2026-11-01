@@ -153,7 +153,7 @@ tests/KumasBarkod.Tests  (xUnit) Data/, Domain/, Services/, Printing/
 - **Gerçek Google testi:** v2 sağlık `version:2`; boş geçici veritabanına 5 kayıt (1 iptal) kuruldu, sayaç 1005, sonraki ID K1-001006, kuyruk boş, ikinci geri kurma reddedildi. Gerçek uygulamada (geçici veri) Ayarlar → geri kur → Geçmiş'te 5 kayıt; yedek ve günlük dosyaları oluştu; uygulama temiz kapandı (çıkış kodu 0).
 - Yeni mesajlar: `BackupChangedMessage`, `DatabaseRestoredMessage`. Yeni yollar: `AppPaths.BackupDirectory`, `AppPaths.LogDirectory`.
 
-| 10a | ✅ | (bu commit) | **Gösterim modu (donanımsız sunum):** Code128 üretici (ZXing.Net), ekranda etiket önizlemesi (`LabelPreview`), "Okut (gösterim)", yazıcı seçimi (Gösterim / Kağıt-PDF / Test dosyası), sunum akışı `docs/SUNUM.md`. 236 test |
+| 10a | ✅ | `099f048` | **Gösterim modu (donanımsız sunum):** Code128 üretici (ZXing.Net), ekranda etiket önizlemesi (`LabelPreview`), "Okut (gösterim)", yazıcı seçimi (Gösterim / Kağıt-PDF / Test dosyası), sunum akışı `docs/SUNUM.md`. 236 test |
 
 ### Adım 10a notları (gösterim modu — kullanıcı isteği 2026-11-01)
 - Amaç: barkod yazıcı/okuyucu almadan fabrikada uçtan uca sunum. Okuma yolu: Okutma ekranına elle ID (zaten vardı) + "Okut (gösterim)" düğmesi (`OpenCutMessage`, gerçek okuyucunun sonucu ile aynı yol). İsteğe bağlı: telefonu klavye gibi okuyucu yapan uygulama.
