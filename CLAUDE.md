@@ -207,6 +207,15 @@ docs/                    SUNUM.md (donanımsız sunum akışı), PILOT.md (fabri
 - Gerçek uygulama v4'e bağlandı (hata yok), sayaç K1 = 5 → sonraki gerçek kesim **K1-000006**; bekleyen 0. Tablodaki K1-000004/5 (TEST-LOT-B) gerçek veritabanında yok — test satırı, fabrika tablosu yeni olacak.
 - Panoya kopyalama: Windows PowerShell 5 konsolu Türkçe karakteri bozuk GÖSTERİR; pwsh ile `Get-Clipboard` dosyayla karşılaştırıldı, içerik doğruydu.
 
+| Sürüm 1.0.1 | ✅ yayında | `31d815d` (etiket `v1.0.1`) | GitHub Release + sabit indirme linki |
+
+### Sürüm yayınlama (GitHub Releases)
+- **İndirme linki (her zaman en yeni sürüm):** <https://github.com/bugraakaratas/Barkod-Uygulamasi/releases/latest/download/KumasBarkod-Kurulum.exe>. Dosya her sürümde **aynı adla** (`KumasBarkod-Kurulum.exe`) yüklenmeli, yoksa link kırılır.
+- **Depo HERKESE AÇIK** — kullanıcıya soruldu (2026-11-02), "herkese açık kalsın" dedi: link herkes için, GitHub hesabı olmadan çalışır.
+- `gh` CLI kurulu DEĞİL. Release, GitHub REST API ile yapıldı; anahtar `git credential fill` (Git Credential Manager) ile alındı, ekrana/dosyaya yazılmadı. Adımlar: `<Version>` artır → `build-installer.ps1` → commit + push → `POST /repos/.../releases` (`tag_name` vX.Y.Z, `target_commitish` HEAD, `make_latest`) → `uploads.github.com/...?name=KumasBarkod-Kurulum.exe` → linkten indirip SHA-256 karşılaştır.
+- 1.0.1 doğrulandı: anonim indirme, dosya özgün ile birebir aynı (46,5 MB).
+- Hız testi (`CutSearchTests`) artık paralel olmayan koleksiyonda (`TimingCollection`): paralel koşuda 1 sn sınırını aşıp kurulum derlemesini durdurmuştu.
+
 ## Şu anki durum
 
 - **Adım 11 kurulum paketi tamamlandı** (2026-11-01): `KumasBarkod-Kurulum-1.0.0.exe` üretildi ve kur/çalıştır/kaldır testi geçti. Adım 9 ve Adım 10'un donanımsız kısmı (gösterim modu) da tamam. Sunum: `docs/SUNUM.md`, pilot: `docs/PILOT.md`.
@@ -215,7 +224,7 @@ docs/                    SUNUM.md (donanımsız sunum akışı), PILOT.md (fabri
 - **2026-11-02:** ID benzersizliği düzeltmesi tamamlandı ve gerçek Google ile doğrulandı (test tablosunda script v4). Fabrika tablosu kurulurken v4 Code.gs kullanılmalı.
 - **Sıradaki:** Kullanıcıya sorulacak. Seçenek: yazıcı modeli belli olmadan da yazılabilecek ham ZPL gönderimi (winspool) — gerçek yazıcıda denenene kadar "denenmedi" olarak işaretlenir.
 - Gerçek USB okuyucu testi hâlâ açık (Adım 6) — gösterim modunda elle giriş/"Okut (gösterim)" ile ikame edildi.
-- **GitHub:** 2026-11-01 itibarıyla her şey gönderildi (Adım 11 dahil).
+- **GitHub:** 2026-11-02 itibarıyla her şey gönderildi; **v1.0.1 yayında** (Releases, sabit indirme linki).
 - **Donanım araştırması (2026-11-02, yalnızca öneri, satın alma yok):** Kullanıcının fikri = mevcut ofis PC + Cat6 KVM uzatıcı (HDMI+USB) ile makine başına monitör + yazıcı. Önerilen = **makine başına ayrı mini PC (N100, 16/512, Win11 Pro) + 22" monitör + Zebra ZD220t (USB, yerel ZPL) + Zebra DS2208 + 850 VA UPS**, ~35 bin TL. Uzatıcı yolu ~31 bin TL ama ofis PC'si yalnızca bu işe ayrılmalı (aynı masaüstü iki ekranda), ucuz KVM uzatıcılar USB yazıcıyı genelde taşımaz → Ethernet'li yazıcı (ZD421t) gerekir. Endüstriyel paket (IP65 fansız dokunmatik panel PC + ZD421t) ~75 bin TL. Notlar: ZD220t 74 m ribon alır (TSC TE200 300 m alır ama ZPL emülasyonu denenmeli); kuşe etiket kumaşta tutmayabilir → sentetik etiket denenmeli; yedekler aynı diskte → USB belleğe kopyalama ileride eklenebilir.
 
 ## Açık konular / riskler
