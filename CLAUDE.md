@@ -43,7 +43,7 @@ Bu dosya projenin hafızasıdır. Yeni oturumda önce bunu oku. **Her iş bitinc
 src/KumasBarkod.Core     (net10.0)  iş mantığı, veri, yazdırma, senkron — arayüzden bağımsız, test edilir
   Data/        SqliteConnectionFactory, Migrations (şema), DatabaseMigrator, SettingsRepository, StationCounters,
                CutRepository (+ Search/CutQuery), BackupService
-  Domain/      Cut, CutStatus, CutIds (ID/barkod biçimi, TryParseScan), Stations, Length, Timestamps
+  Domain/      Cut, CutStatus, CutIds (ID/barkod biçimi, TryParseScan), Stations, Length, Timestamps, VoidReasons
   Services/    CutService (oluşturma, iptal), PrintService (baskı + baskı kaydı + günlük)
   Printing/    LabelData, ILabelTemplate, ILabelPrinter, ZplLabelTemplate, FileLabelPrinter, Code128 (ZXing)
   Scanning/    ScanBurstDetector (okuyucu hız + biçim tespiti)
@@ -60,7 +60,7 @@ src/KumasBarkod.App      (net10.0-windows, WPF; çıktı adı KumasBarkod.exe)
   Themes/Styles.xaml, Converters.cs
   ViewModels/    MainWindow, CutEntry, Scan, History, Settings
   Views/         MainWindow (FluentWindow + NavigationView + durum çubuğu), Pages/ (CutEntry, Scan, History, Settings)
-tests/KumasBarkod.Tests  (xUnit, 245 test) Data/, Domain/, Services/, Printing/, Scanning/, Sync/ (FakeAppsScript)
+tests/KumasBarkod.Tests  (xUnit, 247 test) Data/, Domain/, Services/, Printing/, Scanning/, Sync/ (FakeAppsScript)
 tools/sheets/            Code.gs (Apps Script v3), Code.test.js (node --test), KURULUM.md
 tools/installer/         KumasBarkod.iss, build-installer.ps1, generate-icon.ps1
 docs/                    SUNUM.md (donanımsız sunum akışı), PILOT.md (fabrika pilotu)
@@ -110,7 +110,7 @@ docs/                    SUNUM.md (donanımsız sunum akışı), PILOT.md (fabri
 - **Okutma tespiti (plandan sapma):** Okuyucuda ön ek ayarı GEREKMİYOR. `ScanBurstDetector` (Core): karakter arası ≤ 100 ms, ≥ 8 karakter, Enter ve geçerli ID → okutma. `ScanCapture` (App) pencere düzeyinde `PreviewTextInput`/`PreviewKeyDown` (handledEventsToo) dinler; dizinin ilk karakterinde odaktaki TextBox'ın metnini/seçimini saklar, okutma anlaşılınca geri yükler ve Enter'ı yutar → lot bozulmaz, metre kutusunda kayıt tetiklenmez. Sorun çıkarsa ön ek desteği eklenebilir.
 - **Eşik 100 ms neden:** 60 ms ile bir testte (SendKeys ~31–47 ms aralık, meşgul PC) okutma kaçtı ve ID lot kutusuna düştü. Okutmayı kaçırmak pahalı, yazımı okutma sanmak zararsız (yalnızca kayıt açılır).
 - `CutIds.TryParseScan`: `K1000123`, `K1-000123`, küçük harf, boşluk, `*` (ABD düzenli okuyucu + Türkçe Q'da tire), `ı/i/İ → I`.
-- `CutService.VoidCut`: sebep zorunlu (≤ 200, kontrol karakteri yok), zaten iptal → hata, kuyruğa upsert. İptal edilmiş kayıt basılmaz.
+- `CutService.VoidCut`: sebep zorunlu (≤ 200, kontrol karakteri yok), zaten iptal → hata, kuyruğa upsert. İptal edilmiş kayıt basılmaz. (2026-11-02'den beri arayüzde serbest metin yok, sabit liste — bkz. İptal sebepleri notları.)
 - Okutma ekranı kısayolları: F5 tekrar bas, F8 iptal, F9 yerine yeni kayıt (giriş ekranı aynı lotla açılır), Esc vazgeç/temizle. Elle yazılan ID için Enter (ScanBox_PreviewKeyDown).
 - Mesajlar: `CutChangedMessage` (oluşturma/baskı/iptal → listeler ve durum çubuğu), `ScanDetectedMessage`, `StartNewCutMessage`.
 - Giriş ekranı "Son kayıtlar": iptal edilen satır üstü çizili + kırmızı simge.
@@ -215,6 +215,16 @@ docs/                    SUNUM.md (donanımsız sunum akışı), PILOT.md (fabri
 - `gh` CLI kurulu DEĞİL. Release, GitHub REST API ile yapıldı; anahtar `git credential fill` (Git Credential Manager) ile alındı, ekrana/dosyaya yazılmadı. Adımlar: `<Version>` artır → `build-installer.ps1` → commit + push → `POST /repos/.../releases` (`tag_name` vX.Y.Z, `target_commitish` HEAD, `make_latest`) → `uploads.github.com/...?name=KumasBarkod-Kurulum.exe` → linkten indirip SHA-256 karşılaştır.
 - 1.0.1 doğrulandı: anonim indirme, dosya özgün ile birebir aynı (46,5 MB).
 - Hız testi (`CutSearchTests`) artık paralel olmayan koleksiyonda (`TimingCollection`): paralel koşuda 1 sn sınırını aşıp kurulum derlemesini durdurmuştu.
+
+| İptal sebepleri | ✅ | (bu commit) | Okutma ekranında serbest metin yerine sabit 4 sebep (tek seçim, 1–4 / ↑↓ / Enter). 247 test |
+
+### İptal sebepleri notları (kullanıcı isteği, 2026-11-02)
+- **Karar:** tek seçim, liste sabit (Ayarlar'dan düzenlenmez), "Diğer"/ek not YOK. Sebepler `Core/Domain/VoidReasons.cs`: 1 Yanlış metre girildi · 2 Yanlış lot girildi · 3 Çift kayıt · 4 Kesim yapılmadı / vazgeçildi. "Etiket bozuk/okunmuyor" bilerek yok (çözüm F5 tekrar baskı, iptal değil). **Metinleri değiştirme** — raporlardaki sayım bölünür; yeni sebep eklenecekse sona ekle.
+- Seçilen metin `void_reason`'a aynen yazılır → şema, Sheets, geri kurma değişmedi; eski serbest metinli iptaller geçerli. `VoidCut` hâlâ serbest metin kabul eder (liste kuralı arayüzde).
+- Arayüz: F8 → panel seçeneklerle açılır, seçim boş; odak `VoidPanel` kartında (seçenekler `Focusable=False`), panel `BringIntoView` ile ekrana kaydırılır (1366×768'de onay düğmeleri altta kalıyordu). Tuşlar sayfa işleyicisinde, yalnızca panel açık + okutma kutusunda odak yok + değiştirici tuş yok + olay işlenmemişse: 1–4 (NumPad dahil) seçer, ↑↓ kaydırır, Enter onaylar, Esc vazgeçer. Seçimsiz Enter → panel içinde kırmızı uyarı (üstteki InfoBar ekran dışında kalıyordu).
+- **Rakam tuşları `Handled` işaretlenmez:** işaretlenirse TextInput üretilmez ve panel açıkken yapılan okutma `ScanCapture`'a ulaşmaz. Okutmanın Enter'ı `ScanCapture`'da işlenir ve `Open` eşzamanlı paneli kapatır → iptal tetiklenmez. Ctrl+1–4 ekran kısayolları sebep seçmez.
+- Arayüz testi (geçici veri, SendKeys, 2 koşu): seçimsiz Enter iptal etmiyor + uyarı görünüyor; 2 + ↓ → "Çift kayıt" iptali; seç + Esc → iptal yok; tekrar F8 seçim boş; panel açıkken hızlı okutma K1-000003'ü açtı, iptal etmedi; 1 + Enter → "Yanlış metre girildi". Veritabanı doğrulandı.
+- Test betiği notu: Windows PowerShell 5 BOM'suz UTF-8 betiği bozuk okuyor → `pwsh -STA` kullan; betikte `Type` adlı fonksiyon yazma (`Get-Content` takma adı).
 
 ## Şu anki durum
 

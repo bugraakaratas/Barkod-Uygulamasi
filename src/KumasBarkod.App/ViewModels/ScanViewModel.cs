@@ -42,6 +42,21 @@ public sealed record CutDetails(
     private static string Local(string utc) => Timestamps.Parse(utc).ToLocalTime().ToString("dd.MM.yyyy HH:mm:ss");
 }
 
+/// <summary>İptal panelindeki bir sebep seçeneği (numara = klavye tuşu).</summary>
+public sealed partial class VoidReasonOption(int number, string text, Action<VoidReasonOption> selected) : ObservableObject
+{
+    public int Number { get; } = number;
+    public string Text { get; } = text;
+
+    [ObservableProperty]
+    public partial bool IsSelected { get; set; }
+
+    partial void OnIsSelectedChanged(bool value)
+    {
+        if (value) selected(this);
+    }
+}
+
 public partial class ScanViewModel : ObservableObject
 {
     private readonly CutService _cutService;
@@ -51,6 +66,55 @@ public partial class ScanViewModel : ObservableObject
     {
         _cutService = cutService;
         _printService = printService;
+        VoidReasonOptions = VoidReasons.All
+            .Select((text, i) => new VoidReasonOption(i + 1, text, OnVoidReasonSelected))
+            .ToList();
+    }
+
+    /// <summary>İptal sebepleri (sabit liste, tek seçim).</summary>
+    public IReadOnlyList<VoidReasonOption> VoidReasonOptions { get; }
+
+    /// <summary>İptal panelinin içinde (seçeneklerin altında) gösterilen hata; boşsa gizli.</summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(HasVoidPanelError))]
+    public partial string VoidPanelError { get; set; } = "";
+
+    public bool HasVoidPanelError => VoidPanelError.Length > 0;
+
+    /// <summary>Seçili iptal sebebi; seçilmemişse null.</summary>
+    public string? SelectedVoidReason => VoidReasonOptions.FirstOrDefault(o => o.IsSelected)?.Text;
+
+    /// <summary>Numarayla (1..n) sebep seçer; geçersiz numara yok sayılır.</summary>
+    public void SelectVoidReason(int number)
+    {
+        if (!IsVoidPanelOpen || number < 1 || number > VoidReasonOptions.Count) return;
+        VoidReasonOptions[number - 1].IsSelected = true;
+    }
+
+    /// <summary>Seçimi yukarı/aşağı kaydırır (seçim yoksa ilk/son seçenek).</summary>
+    public void MoveVoidReason(int delta)
+    {
+        if (!IsVoidPanelOpen) return;
+        var current = VoidReasonOptions.FirstOrDefault(o => o.IsSelected)?.Number;
+        var next = current is null
+            ? (delta > 0 ? 1 : VoidReasonOptions.Count)
+            : Math.Clamp(current.Value + delta, 1, VoidReasonOptions.Count);
+        SelectVoidReason(next);
+    }
+
+    private void OnVoidReasonSelected(VoidReasonOption chosen)
+    {
+        foreach (var o in VoidReasonOptions)
+            if (!ReferenceEquals(o, chosen)) o.IsSelected = false;
+        VoidPanelError = "";
+        OnPropertyChanged(nameof(SelectedVoidReason));
+    }
+
+    private void ClearVoidReason()
+    {
+        foreach (var o in VoidReasonOptions) o.IsSelected = false;
+        VoidPanelError = "";
+        OnPropertyChanged(nameof(SelectedVoidReason));
     }
 
     public event Action<ScanField>? FocusRequested;
@@ -70,9 +134,6 @@ public partial class ScanViewModel : ObservableObject
     public partial bool IsVoidPanelOpen { get; set; }
 
     [ObservableProperty]
-    public partial string VoidReason { get; set; } = "";
-
-    [ObservableProperty]
     public partial bool MessageIsOpen { get; set; }
 
     [ObservableProperty]
@@ -88,7 +149,7 @@ public partial class ScanViewModel : ObservableObject
     public void Open(string input)
     {
         IsVoidPanelOpen = false;
-        VoidReason = "";
+        ClearVoidReason();
         InputText = "";
 
         if (!CutIds.TryParseScan(input, out var cutId))
@@ -152,7 +213,7 @@ public partial class ScanViewModel : ObservableObject
     [RelayCommand(CanExecute = nameof(CanBeginVoid))]
     private void BeginVoid()
     {
-        VoidReason = "";
+        ClearVoidReason();
         IsVoidPanelOpen = true;
         FocusRequested?.Invoke(ScanField.VoidReason);
     }
@@ -160,10 +221,16 @@ public partial class ScanViewModel : ObservableObject
     [RelayCommand]
     private void ConfirmVoid()
     {
-        if (Current is null) return;
+        if (Current is null || !IsVoidPanelOpen) return;
+        if (SelectedVoidReason is null)
+        {
+            VoidPanelError = $"Önce iptal sebebini seçin (1–{VoidReasonOptions.Count} tuşu veya tıklayarak), sonra Enter.";
+            FocusRequested?.Invoke(ScanField.VoidReason);
+            return;
+        }
         try
         {
-            var cut = _cutService.VoidCut(Current.CutId, VoidReason);
+            var cut = _cutService.VoidCut(Current.CutId, SelectedVoidReason);
             Current = CutDetails.From(cut);
             IsVoidPanelOpen = false;
             ShowMessage(InfoBarSeverity.Success, $"{cut.CutId} iptal edildi",
@@ -173,7 +240,7 @@ public partial class ScanViewModel : ObservableObject
         }
         catch (CutValidationException ex)
         {
-            ShowMessage(InfoBarSeverity.Error, "İptal edilmedi", ex.Message);
+            VoidPanelError = "İptal edilmedi: " + ex.Message;
             FocusRequested?.Invoke(ScanField.VoidReason);
         }
     }
@@ -182,7 +249,7 @@ public partial class ScanViewModel : ObservableObject
     private void CancelVoid()
     {
         IsVoidPanelOpen = false;
-        VoidReason = "";
+        ClearVoidReason();
         FocusRequested?.Invoke(ScanField.Input);
     }
 

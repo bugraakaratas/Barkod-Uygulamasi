@@ -233,6 +233,25 @@ public class CutServiceTests : IDisposable
     }
 
     [Fact]
+    public void Fixed_void_reasons_are_four_distinct_valid_texts()
+    {
+        Assert.Equal(
+            ["Yanlış metre girildi", "Yanlış lot girildi", "Çift kayıt", "Kesim yapılmadı / vazgeçildi"],
+            VoidReasons.All);
+        Assert.Equal(VoidReasons.All.Count, VoidReasons.All.Distinct().Count());
+    }
+
+    [Fact]
+    public void Each_fixed_void_reason_is_stored_verbatim()
+    {
+        foreach (var reason in VoidReasons.All)
+        {
+            var cut = _service.CreateCut("LOT-A", 100);
+            Assert.Equal(reason, _service.VoidCut(cut.CutId, reason).VoidReason);
+        }
+    }
+
+    [Fact]
     public void Voiding_does_not_affect_next_sequence()
     {
         var cut = _service.CreateCut("LOT-A", 100);

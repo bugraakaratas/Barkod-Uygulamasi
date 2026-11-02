@@ -162,21 +162,40 @@
             </WrapPanel>
 
             <!-- ========== İptal onayı ========== -->
-            <ui:Card Margin="0,6,0,0" Padding="24"
+            <!-- Odak bu panelde durur (seçenekler odak almaz); 1–4 / ↑↓ / Enter sayfa kısayollarıyla. -->
+            <ui:Card x:Name="VoidPanel" Margin="0,6,0,0" Padding="24"
+                     Focusable="True" FocusVisualStyle="{x:Null}"
+                     AutomationProperties.Name="İptal sebebi"
                      Visibility="{Binding IsVoidPanelOpen, Converter={StaticResource BoolToVisibility}}">
                 <StackPanel>
                     <TextBlock Style="{StaticResource FieldLabelStyle}">
                         <Run Text="İptal sebebi —" />
                         <Run Text="{Binding Current.CutId, Mode=OneWay}" FontFamily="Consolas" />
                     </TextBlock>
-                    <ui:TextBox x:Name="VoidReasonBox"
-                                Text="{Binding VoidReason, UpdateSourceTrigger=PropertyChanged}"
-                                PlaceholderText="ör. Yanlış metre girildi"
-                                FontSize="20" MinHeight="50"
-                                MaxLength="200"
-                                PreviewKeyDown="VoidReasonBox_PreviewKeyDown" />
-                    <TextBlock Margin="2,8,0,12" Style="{StaticResource FieldHintStyle}" TextWrapping="Wrap"
-                               Text="İptal geri alınamaz. Etiket geçersiz olur ve kumaştan sökülmelidir." />
+                    <ItemsControl ItemsSource="{Binding VoidReasonOptions}" Focusable="False">
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate>
+                                <RadioButton Margin="0,0,0,4" MinHeight="44" Padding="10,0,0,0"
+                                             VerticalContentAlignment="Center"
+                                             Focusable="False"
+                                             IsChecked="{Binding IsSelected, Mode=TwoWay}"
+                                             AutomationProperties.Name="{Binding Text}">
+                                    <TextBlock FontSize="20">
+                                        <Run Text="{Binding Number, Mode=OneWay}" FontWeight="SemiBold"
+                                             Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
+                                        <Run Text="  " />
+                                        <Run Text="{Binding Text, Mode=OneWay}" />
+                                    </TextBlock>
+                                </RadioButton>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                    <TextBlock Margin="2,0,0,8" FontSize="17" FontWeight="SemiBold" TextWrapping="Wrap"
+                               Foreground="{DynamicResource SystemFillColorCriticalBrush}"
+                               Text="{Binding VoidPanelError}"
+                               Visibility="{Binding HasVoidPanelError, Converter={StaticResource BoolToVisibility}}" />
+                    <TextBlock Margin="2,4,0,12" Style="{StaticResource FieldHintStyle}" TextWrapping="Wrap"
+                               Text="1–4 tuşuyla (veya ↑↓) sebebi seçin, Enter ile onaylayın. İptal geri alınamaz; etiket geçersiz olur ve kumaştan sökülmelidir." />
                     <StackPanel Orientation="Horizontal">
                         <ui:Button MinHeight="44" Padding="18,0" FontSize="16" Focusable="False"
                                    Appearance="Danger" Command="{Binding ConfirmVoidCommand}"
