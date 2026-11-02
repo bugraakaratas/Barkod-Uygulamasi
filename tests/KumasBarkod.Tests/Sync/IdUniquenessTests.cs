@@ -204,6 +204,8 @@ public class IdUniquenessTests : IDisposable
         Assert.Equal(SyncFailureKind.Rejected, r.Failure!.Kind);
         Assert.Contains("eski sürüm", r.Failure.Message);
         Assert.Equal(1, i.Outbox.CountPendingCuts());
+        Assert.Empty(_sheet.Sheet);                      // eski script'e satır HİÇ gönderilmedi (ezme riski yok)
+        Assert.Equal([0], _sheet.BatchSizes);
     }
 
     [Fact]

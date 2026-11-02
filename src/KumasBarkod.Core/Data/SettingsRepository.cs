@@ -12,8 +12,6 @@ public static class SettingKeys
     public const string SheetsUrl = "sheets_url";
     public const string SheetsKey = "sheets_key";
     public const string Printer = "printer";
-    /// <summary>Sayaçların en son hangi Sheets adresinden öğrenildiği (yeni adreste bir kez sorulur).</summary>
-    public const string SheetsCountersCheckedUrl = "sheets_counters_checked_url";
 }
 
 /// <summary><c>settings</c> tablosu: anahtar/değer. Kayıt yoksa varsayılan döner.</summary>

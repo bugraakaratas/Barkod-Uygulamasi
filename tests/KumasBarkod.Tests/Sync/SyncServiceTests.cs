@@ -34,6 +34,16 @@ public class SyncServiceTests : IDisposable
 
     private Task<SyncRunResult> Run() => _sync.RunOnceAsync();
 
+    /// <summary>
+    /// Bağlantı kontrolü (boş paket: sürüm + sayaçlar) bu oturumda yapılmış olsun; sonraki
+    /// istekler doğrudan veri taşır. İstek sayaçları sıfırlanır.
+    /// </summary>
+    private async Task Connect()
+    {
+        Assert.True((await Run()).Succeeded);
+        _sheet.BatchSizes.Clear();
+    }
+
     // ---------- Temel gönderim ----------
 
     [Fact]
@@ -49,7 +59,7 @@ public class SyncServiceTests : IDisposable
         Assert.Equal(2, _sheet.Sheet.Count);
         Assert.Equal(0, _outbox.CountPendingCuts());
 
-        // İkinci tur: gönderilecek bir şey yok, istek de atılmaz
+        // İkinci tur: gönderilecek bir şey yok, istek de atılmaz (bağlantı bu oturumda doğrulandı)
         var before = _sheet.RequestCount;
         Assert.Equal(0, (await Run()).SentCuts);
         Assert.Equal(before, _sheet.RequestCount);
@@ -79,6 +89,7 @@ public class SyncServiceTests : IDisposable
     [Fact]
     public async Task Large_backlog_is_sent_in_batches_of_200()
     {
+        await Connect();
         for (var i = 0; i < 450; i++) _cuts.CreateCut("LOT-A", 100);
 
         var r = await Run();
@@ -136,6 +147,7 @@ public class SyncServiceTests : IDisposable
     [Fact]
     public async Task Lost_response_resend_does_not_duplicate_rows()
     {
+        await Connect();
         for (var i = 0; i < 5; i++) _cuts.CreateCut("LOT-A", 100 + i);
         _sheet.LoseNextResponse = 1;
 
@@ -153,6 +165,7 @@ public class SyncServiceTests : IDisposable
     [Fact]
     public async Task Failure_mid_backlog_keeps_order_and_resumes()
     {
+        await Connect();
         for (var i = 0; i < 450; i++) _cuts.CreateCut("LOT-A", 100);
 
         // 1. paket gider, 2. pakette bağlantı kopar
@@ -195,6 +208,8 @@ public class SyncServiceTests : IDisposable
     [Fact]
     public async Task Change_during_send_is_not_lost()
     {
+        await Connect();
+        var requestsBefore = _sheet.RequestCount;
         var cut = _cuts.CreateCut("LOT-A", 100);
 
         // Paket yoldayken kesim iptal ediliyor: giden paket eski (aktif) hâli taşır.
@@ -211,7 +226,7 @@ public class SyncServiceTests : IDisposable
         await Run();
 
         Assert.Equal("active", statusInFirstRequest);
-        Assert.Equal(2, _sheet.RequestCount);                                   // ikinci paket iptali taşıdı
+        Assert.Equal(requestsBefore + 2, _sheet.RequestCount);                  // ikinci paket iptali taşıdı
         Assert.Equal("voided", _sheet.Row(cut.CutId)["status"].GetString());
         Assert.Single(_sheet.Sheet);
         Assert.Equal(0, _outbox.CountPendingCuts());

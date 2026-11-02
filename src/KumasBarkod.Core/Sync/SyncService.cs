@@ -19,32 +19,37 @@ public sealed class SyncService(
     public const int MaxBatchesPerRun = 25;          // bir turda en fazla 5.000 kesim
     public static readonly TimeSpan KeepSentFor = TimeSpan.FromDays(30);
 
+    /// <summary>Bu oturumda sürümü doğrulanıp sayaçları öğrenilen adres.</summary>
+    private string? _verifiedUrl;
+
     public async Task<SyncRunResult> RunOnceAsync(CancellationToken cancellationToken = default)
     {
         var target = settings.GetSyncTarget();
         if (target is null) return new SyncRunResult(false, 0, null);
 
+        // Bu oturumda bu tabloya ilk kez gidiliyorsa önce BOŞ paket: script sürümü (v3, çakışma
+        // koruması) satır yazılmadan doğrulanır ve sayaçlar tablodan öğrenilir (yeni kurulum ya da
+        // başka bilgisayar tabloda zaten bulunan ID'leri tekrar üretmesin).
+        if (_verifiedUrl != target.Url)
+        {
+            try
+            {
+                counters.RaiseTo((await transport.SendAsync(target, [], cancellationToken)).MaxSequences);
+                _verifiedUrl = target.Url;
+            }
+            catch (SyncException ex)
+            {
+                var waiting = outbox.GetPendingBatch(BatchSize);
+                if (waiting.Count > 0) outbox.MarkFailed(waiting, ex.Message);
+                return new SyncRunResult(true, 0, ex);
+            }
+        }
+
         var sent = 0;
         for (var i = 0; i < MaxBatchesPerRun; i++)
         {
             var batch = outbox.GetPendingBatch(BatchSize);
-            if (batch.Count == 0)
-            {
-                // Bu tabloya ilk kez bağlanılıyorsa sayaçları tablodan öğren (yeni kurulum, tabloda
-                // zaten bulunan ID'leri tekrar üretmesin) — gönderilecek kayıt olmasa da.
-                if (i == 0 && settings.Get(SettingKeys.SheetsCountersCheckedUrl) != target.Url)
-                {
-                    try
-                    {
-                        Learn(target, await transport.SendAsync(target, [], cancellationToken));
-                    }
-                    catch (SyncException ex)
-                    {
-                        return new SyncRunResult(true, 0, ex);
-                    }
-                }
-                break;
-            }
+            if (batch.Count == 0) break;
 
             SendResult result;
             try
@@ -57,7 +62,7 @@ public sealed class SyncService(
                 return new SyncRunResult(true, sent, ex);
             }
 
-            Learn(target, result);
+            counters.RaiseTo(result.MaxSequences);
 
             var conflicted = result.Conflicts.Select(c => c.CutId).ToHashSet(StringComparer.Ordinal);
             var accepted = batch.Where(p => !conflicted.Contains(p.Row.CutId)).ToList();
@@ -75,12 +80,6 @@ public sealed class SyncService(
 
         outbox.PurgeSent(clock.GetUtcNow() - KeepSentFor);
         return new SyncRunResult(true, sent, null);
-    }
-
-    private void Learn(SyncTarget target, SendResult result)
-    {
-        counters.RaiseTo(result.MaxSequences);
-        settings.Set(SettingKeys.SheetsCountersCheckedUrl, target.Url);
     }
 
     public static string ConflictMessage(IReadOnlyList<SyncConflict> conflicts)
