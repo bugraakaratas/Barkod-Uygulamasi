@@ -50,7 +50,7 @@ public class RestoreServiceTests : IDisposable
     }
 
     private async Task SyncOldToSheet() =>
-        await new SyncService(new OutboxRepository(_oldDb.Factory), _oldSettings, _transport, _clock).RunOnceAsync();
+        await new SyncService(new OutboxRepository(_oldDb.Factory), _oldSettings, new StationCounters(_oldDb.Factory), _transport, _clock).RunOnceAsync();
 
     private static List<Cut> AllCuts(SqliteConnectionFactory f)
     {
@@ -121,9 +121,11 @@ public class RestoreServiceTests : IDisposable
         Assert.Equal(0, new OutboxRepository(_newDb.Factory).CountPendingCuts());
         var newSettings = new SettingsRepository(_newDb.Factory);
         newSettings.SetSyncTarget(Url, FakeAppsScript.Key);
-        var r = await new SyncService(new OutboxRepository(_newDb.Factory), newSettings, _transport, _clock).RunOnceAsync();
+        var r = await new SyncService(new OutboxRepository(_newDb.Factory), newSettings, new StationCounters(_newDb.Factory), _transport, _clock).RunOnceAsync();
         Assert.Equal(0, r.SentCuts);
-        Assert.Equal(requestsBefore + 1, _sheet.RequestCount);   // yalnızca geri kurmanın okuma isteği
+        // Geri kurmanın okuma isteği + tabloya ilk bağlanışta sayaç öğrenme (boş paket); kesim gönderilmedi
+        Assert.Equal(requestsBefore + 2, _sheet.RequestCount);
+        Assert.Equal(0, _sheet.BatchSizes[^1]);
     }
 
     [Fact]

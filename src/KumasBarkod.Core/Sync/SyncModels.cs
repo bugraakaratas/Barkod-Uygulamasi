@@ -42,12 +42,27 @@ public sealed class SyncException(SyncFailureKind kind, string message, Exceptio
 /// <summary>Satırları uzak tabloya gönderir. Başarısızlıkta <see cref="SyncException"/> atar.</summary>
 public interface ISyncTransport
 {
-    /// <summary>Boş liste: yalnızca bağlantı ve anahtar testi.</summary>
-    Task SendAsync(SyncTarget target, IReadOnlyList<CutSyncRow> rows, CancellationToken cancellationToken);
+    /// <summary>
+    /// Boş liste: yalnızca bağlantı ve anahtar testi. Tabloda aynı ID'yi taşıyan BAŞKA bir kesim
+    /// varsa o satır yazılmaz, <see cref="SendResult.Conflicts"/> içinde döner.
+    /// </summary>
+    Task<SendResult> SendAsync(SyncTarget target, IReadOnlyList<CutSyncRow> rows, CancellationToken cancellationToken);
 
     /// <summary>Geri kurma: tablodaki satırları [offset, offset+limit) aralığında okur.</summary>
     Task<ExportPage> ExportAsync(SyncTarget target, int offset, int limit, CancellationToken cancellationToken);
 }
+
+/// <summary>
+/// Tabloda aynı ID ile başka bir kesim var (kayıt zamanı farklı): başka bir veritabanı aynı
+/// istasyon koduyla aynı numarayı üretmiş. Tablodaki eski satırın üzerine yazılmadı.
+/// </summary>
+public sealed record SyncConflict(string CutId, string CreatedAt, string ExistingCreatedAt);
+
+/// <summary>
+/// Gönderim sonucu. <see cref="MaxSequences"/>: tablodaki istasyon başına en büyük sıra numarası;
+/// yerel sayaç bunun altında kalmamalı.
+/// </summary>
+public sealed record SendResult(IReadOnlyList<SyncConflict> Conflicts, IReadOnlyDictionary<string, long> MaxSequences);
 
 /// <summary>Tablodan okunan bir sayfa; <see cref="Total"/> tablodaki toplam veri satırı.</summary>
 public sealed record ExportPage(int Total, IReadOnlyList<CutSyncRow> Rows);

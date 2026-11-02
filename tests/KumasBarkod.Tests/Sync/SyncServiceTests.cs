@@ -27,7 +27,7 @@ public class SyncServiceTests : IDisposable
         _settings.SetSyncTarget(Url, FakeAppsScript.Key);
         _cuts = new CutService(_db.Factory, _settings, _clock);
         _outbox = new OutboxRepository(_db.Factory);
-        _sync = new SyncService(_outbox, _settings, new AppsScriptTransport(new HttpClient(_sheet)), _clock);
+        _sync = new SyncService(_outbox, _settings, new StationCounters(_db.Factory), new AppsScriptTransport(new HttpClient(_sheet)), _clock);
     }
 
     public void Dispose() => _db.Dispose();

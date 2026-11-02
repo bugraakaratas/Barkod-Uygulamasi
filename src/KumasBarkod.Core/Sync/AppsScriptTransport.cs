@@ -21,9 +21,17 @@ public sealed class AppsScriptTransport(HttpClient http) : ISyncTransport
         NumberHandling = JsonNumberHandling.AllowReadingFromString,
     };
 
-    public async Task SendAsync(SyncTarget target, IReadOnlyList<CutSyncRow> rows, CancellationToken cancellationToken)
+    /// <summary>Gönderim için gereken en düşük Apps Script sürümü (v3: ID çakışma koruması).</summary>
+    public const int RequiredScriptVersion = 3;
+
+    public async Task<SendResult> SendAsync(SyncTarget target, IReadOnlyList<CutSyncRow> rows, CancellationToken cancellationToken)
     {
-        await PostAsync<Reply>(target, new Payload(target.Key, rows), cancellationToken);
+        var reply = await PostAsync<Reply>(target, new Payload(target.Key, rows), cancellationToken);
+        if (reply.Version < RequiredScriptVersion)
+            throw new SyncException(SyncFailureKind.Rejected,
+                $"Apps Script eski sürüm (v{reply.Version}). Aynı ID'li kayıtlar birbirinin üzerine yazılmasın diye " +
+                $"v{RequiredScriptVersion} gerekir: Code.gs'yi güncelleyip yeniden dağıtın (KURULUM.md).");
+        return new SendResult(reply.Conflicts ?? [], reply.MaxSequences ?? new Dictionary<string, long>());
     }
 
     public async Task<ExportPage> ExportAsync(SyncTarget target, int offset, int limit, CancellationToken cancellationToken)
@@ -88,7 +96,9 @@ public sealed class AppsScriptTransport(HttpClient http) : ISyncTransport
 
     private sealed record ExportRequest(string Key, string Action, int Offset, int Limit);
 
-    private sealed record Reply(bool Ok, string? Error) : IReply;
+    private sealed record Reply(
+        bool Ok, string? Error, int Version,
+        List<SyncConflict>? Conflicts, Dictionary<string, long>? MaxSequences) : IReply;
 
     private sealed record ExportReply(bool Ok, string? Error, int Total, List<CutSyncRow>? Rows) : IReply;
 }

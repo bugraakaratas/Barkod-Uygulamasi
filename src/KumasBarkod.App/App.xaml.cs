@@ -188,6 +188,7 @@ public partial class App : Application
         services.AddSingleton(new HttpClient { Timeout = TimeSpan.FromSeconds(60) });
         services.AddSingleton<ISyncTransport, AppsScriptTransport>();
         services.AddSingleton<OutboxRepository>();
+        services.AddSingleton<StationCounters>();
         services.AddSingleton<SyncService>();
         services.AddSingleton<SyncWorker>();
         services.AddSingleton<RestoreService>();

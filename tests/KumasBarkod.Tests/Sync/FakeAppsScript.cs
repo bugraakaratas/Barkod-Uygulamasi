@@ -6,7 +6,8 @@ namespace KumasBarkod.Tests.Sync;
 
 /// <summary>
 /// Apps Script web uygulamasının (tools/sheets/Code.gs) davranışını taklit eden HTTP işleyici:
-/// anahtar kontrolü, cut_id'ye göre upsert, tablo sırası. Kesinti ve hata senaryoları için düğmeler.
+/// anahtar kontrolü, cut_id'ye göre upsert, v3 çakışma reddi (aynı ID + farklı created_at),
+/// created_at sırası, max_sequences. Kesinti ve hata senaryoları için düğmeler.
 /// </summary>
 public sealed class FakeAppsScript : HttpMessageHandler
 {
@@ -24,6 +25,9 @@ public sealed class FakeAppsScript : HttpMessageHandler
 
     /// <summary>Sonraki N istekte tabloya YAZ ama yanıtı kaybet (bağlantı yazımdan sonra koptu).</summary>
     public int LoseNextResponse { get; set; }
+
+    /// <summary>Script sürümü (gönderim yanıtında). 3'ten küçükse eski script gibi davranır: çakışmayı ezer.</summary>
+    public int Version { get; set; } = 3;
 
     /// <summary>Eski (v1) script gibi davran: okuma eylemini tanıma.</summary>
     public bool ExportUnsupported { get; set; }
@@ -77,14 +81,44 @@ public sealed class FakeAppsScript : HttpMessageHandler
 
         var rows = root.GetProperty("rows").EnumerateArray().ToList();
         BatchSizes.Add(rows.Count);
+        var conflicts = new List<object>();
+        var upserted = 0;
+        var appended = false;
         foreach (var row in rows)
         {
             var values = row.EnumerateObject().ToDictionary(p => p.Name, p => p.Value.Clone());
             var id = values["cut_id"].GetString();
             var existing = Sheet.FindIndex(r => r["cut_id"].GetString() == id);
-            if (existing >= 0) Sheet[existing] = values;
-            else Sheet.Add(values);
+            if (existing >= 0)
+            {
+                var oldCreated = Created(Sheet[existing]);
+                if (Version >= 3 && oldCreated != Created(values))
+                {
+                    conflicts.Add(new { cut_id = id, created_at = Created(values), existing_created_at = oldCreated });
+                    continue;
+                }
+                Sheet[existing] = values;
+            }
+            else
+            {
+                Sheet.Add(values);
+                appended = true;
+            }
+            upserted++;
         }
+
+        if (Version >= 3 && appended)   // kayıt zamanına göre, eşitse ID'ye göre (Code.gs ile aynı)
+        {
+            var sorted = Sheet.OrderBy(Created, StringComparer.Ordinal)
+                .ThenBy(r => r["cut_id"].GetString(), StringComparer.Ordinal).ToList();
+            Sheet.Clear();
+            Sheet.AddRange(sorted);
+        }
+
+        var maxSequences = Sheet
+            .Select(r => r["cut_id"].GetString()!)
+            .GroupBy(id => id[..2])
+            .ToDictionary(g => g.Key, g => g.Max(id => long.Parse(id[3..])));
 
         if (LoseNextResponse > 0)
         {
@@ -92,7 +126,32 @@ public sealed class FakeAppsScript : HttpMessageHandler
             throw new HttpRequestException("Yanıt kayboldu (sahte).");
         }
 
-        return Reply(new { ok = true, upserted = rows.Count, version = 1 });
+        if (Version < 3)
+            return Reply(new { ok = true, upserted = rows.Count, version = Version });
+        return Reply(new { ok = true, upserted, conflicts, max_sequences = maxSequences, version = Version });
+    }
+
+    private static string? Created(Dictionary<string, JsonElement> row) =>
+        row.TryGetValue("created_at", out var v) && v.ValueKind == JsonValueKind.String ? v.GetString() : null;
+
+    /// <summary>Tabloya başka bir veritabanından gelmiş gibi satır ekler (gönderim yolu dışında).</summary>
+    public void AddForeignRow(string cutId, string createdAt, string lot = "BASKA")
+    {
+        Sheet.Add(new Dictionary<string, JsonElement>
+        {
+            ["cut_id"] = JsonSerializer.SerializeToElement(cutId),
+            ["station_code"] = JsonSerializer.SerializeToElement(cutId[..2]),
+            ["sequence_no"] = JsonSerializer.SerializeToElement(long.Parse(cutId[3..])),
+            ["lot_code"] = JsonSerializer.SerializeToElement(lot),
+            ["length_cm"] = JsonSerializer.SerializeToElement(1000L),
+            ["operator"] = JsonSerializer.SerializeToElement<string?>(null),
+            ["status"] = JsonSerializer.SerializeToElement("active"),
+            ["void_reason"] = JsonSerializer.SerializeToElement<string?>(null),
+            ["voided_at"] = JsonSerializer.SerializeToElement<string?>(null),
+            ["created_at"] = JsonSerializer.SerializeToElement(createdAt),
+            ["print_count"] = JsonSerializer.SerializeToElement(0L),
+            ["last_printed_at"] = JsonSerializer.SerializeToElement<string?>(null),
+        });
     }
 
     private static HttpResponseMessage Reply(object body) => new(HttpStatusCode.OK)

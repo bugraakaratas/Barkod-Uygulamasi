@@ -41,7 +41,7 @@ Bu dosya projenin hafızasıdır. Yeni oturumda önce bunu oku. **Her iş bitinc
 
 ```
 src/KumasBarkod.Core     (net10.0)  iş mantığı, veri, yazdırma, senkron — arayüzden bağımsız, test edilir
-  Data/        SqliteConnectionFactory, Migrations (şema), DatabaseMigrator, SettingsRepository,
+  Data/        SqliteConnectionFactory, Migrations (şema), DatabaseMigrator, SettingsRepository, StationCounters,
                CutRepository (+ Search/CutQuery), BackupService
   Domain/      Cut, CutStatus, CutIds (ID/barkod biçimi, TryParseScan), Stations, Length, Timestamps
   Services/    CutService (oluşturma, iptal), PrintService (baskı + baskı kaydı + günlük)
@@ -60,8 +60,8 @@ src/KumasBarkod.App      (net10.0-windows, WPF; çıktı adı KumasBarkod.exe)
   Themes/Styles.xaml, Converters.cs
   ViewModels/    MainWindow, CutEntry, Scan, History, Settings
   Views/         MainWindow (FluentWindow + NavigationView + durum çubuğu), Pages/ (CutEntry, Scan, History, Settings)
-tests/KumasBarkod.Tests  (xUnit, 236 test) Data/, Domain/, Services/, Printing/, Scanning/, Sync/ (FakeAppsScript)
-tools/sheets/            Code.gs (Apps Script v2), KURULUM.md
+tests/KumasBarkod.Tests  (xUnit, 245 test) Data/, Domain/, Services/, Printing/, Scanning/, Sync/ (FakeAppsScript)
+tools/sheets/            Code.gs (Apps Script v3), Code.test.js (node --test), KURULUM.md
 tools/installer/         KumasBarkod.iss, build-installer.ps1, generate-icon.ps1
 docs/                    SUNUM.md (donanımsız sunum akışı), PILOT.md (fabrika pilotu)
 ```
@@ -151,7 +151,7 @@ docs/                    SUNUM.md (donanımsız sunum akışı), PILOT.md (fabri
   - Tarayıcı notları: Google izin ekranı açılır pencerede (Chrome eklentisi göremez → kullanıcı onayladı). Apps Script "Kopyala" düğmeleri panoyu değiştirir (bir kez anahtar yerine proje kimliği kaydedildi). Ajan sızdırma kuralı: gizli anahtarı web formuna ajan yazmaz → kullanıcı yapıştırdı.
   - **Fabrika kurulumunda (Adım 11):** yeni, temiz tablo + yeni anahtar; `Kesimler` sayfası korunmalı (KURULUM.md 6. adım) — test tablosunda yapılmadı.
 - Uygulama ekran görüntüsü, uygulama arka plandayken `PrintWindow` (PW_RENDERFULLCONTENT=2) ile alınabilir; odak değişmez, tuş gönderilmez.
-- Kullanıcı test sırasında gerçek uygulamada "Lot 31, 19 m" kaydı açtı (K1-000001); aynı ID test tablosundaki test satırının üzerine yazıldı — beklenen davranış (test tablosu ile geliştirme makinesi aynı ID aralığında).
+- Kullanıcı test sırasında gerçek uygulamada "Lot 31, 19 m" kaydı açtı (K1-000001); aynı ID test tablosundaki test satırının üzerine yazıldı. **Bu bir hataydı** — 2026-11-02'de düzeltildi (bkz. ID benzersizliği notları).
 
 | 9 | ✅ | `4463ea7` | Günlük yerel yedek (Backup API, 30 gün), Sheets'ten geri kurma (Apps Script v2 `export`), hata günlüğü (`FileLog`, beklenmeyen hata yakalama), Ayarlar'da Yerel yedekler / Sheets'ten geri kur / Hata günlüğü. 228 test |
 
@@ -192,11 +192,23 @@ docs/                    SUNUM.md (donanımsız sunum akışı), PILOT.md (fabri
 - **Paket testi (2026-11-01):** `build-installer.ps1` → 236 test + yayın + ISCC → `KumasBarkod-Kurulum-1.0.0.exe` **46,4 MB**. Sessiz kurulum (`/VERYSILENT /CURRENTUSER /DIR=… /MERGETASKS="!desktopicon"`) 12 sn, çıkış 0, 271 dosya, Programlar listesinde "Kumaş Barkod 1.0.0", Başlat menüsü kısayolu. Kurulu uygulama 3,2 sn'de açıldı, temiz kapandı. Sessiz kaldırma: program klasörü, kayıt defteri girişi ve kısayol silindi; **veri (veritabanı, yedek, günlük) korundu**; gerçek veri klasörüne dokunulmadı.
 - **AÇIK (fabrikada):** temiz bilgisayara kurulum + bir vardiya kağıtla paralel pilot (`docs/PILOT.md`). Kod imzası yok: Windows SmartScreen "tanınmayan uygulama" uyarısı verebilir → "Ek bilgi → Yine de çalıştır".
 
+| ID düzeltmesi | ✅ kod + test (gerçek Google bekliyor) | (bkz. git log) | Sheets'te aynı ID'li farklı kesimin üzerine yazılması engellendi; satırlar kayıt zamanına göre sıralı; yeni kurulum sayaçları tablodan öğrenir. Apps Script **v3**. 245 test + 6 Code.gs testi |
+
+### ID benzersizliği notları (kullanıcı hatası bildirimi, 2026-11-02)
+- **Sorun:** ID = istasyon + YEREL sayaç. Yeni/boş veritabanı (yeniden kurulum, test veritabanı, aynı kodlu 2. PC) yine `K1-000001`'den başlıyordu; Code.gs yalnızca `cut_id`'ye bakıp upsert yaptığı için eski, farklı kesimin satırını eziyordu ve yeni kesim tablonun ortasında kalıyordu (Adım 8 notundaki "Lot 31" olayı buydu — o zaman "beklenen" denmişti, YANLIŞTI).
+- **Code.gs v3:** kesim kimliği = `cut_id` + `created_at`. Aynı ID farklı `created_at` ile gelirse satır yazılmaz, yanıtta `conflicts` döner (aynı paket içindeki çift de). Yeni satırlar `created_at`'e göre sıralı eklenir; eklenen satır tablodaki son kayıttan eskiyse veri alanı `created_at`, `cut_id`'ye göre yeniden sıralanır. Yanıtta `max_sequences` (istasyon → en büyük sıra). `created_at` boşsa paket reddedilir.
+- **Uygulama:** `AppsScriptTransport.SendAsync` → `SendResult(Conflicts, MaxSequences)`; script sürümü < 3 ise `Rejected` ("Apps Script eski sürüm") → gönderim durur, kayıtlar kuyrukta bekler. `StationCounters.RaiseTo` (Core/Data) sayacı yalnızca YÜKSELTİR (999999 tavan, geçersiz kod yok sayılır). `SyncService`: her gönderimde sayaçları öğrenir; kuyruk boşsa ve bu adres için henüz öğrenilmediyse (`settings.sheets_counters_checked_url`) bir kez boş paket gönderir. Çakışan kesimler kuyrukta kalır (`MarkFailed`), çakışmayanlar `MarkSent`; tur durur, hata durum çubuğunda (tam metin ipucunda).
+- **Sınır (çevrimdışı tasarımın doğası):** Sheets ayarlanmadan önce yapılan kesimler veya aynı istasyon kodlu iki PC hâlâ aynı numarayı üretebilir; artık tabloda EZİLMEZ ve görünür hata verir. Çözüm her PC'ye ayrı istasyon kodu (KURULUM.md'ye yazıldı).
+- **Testler:** `IdUniquenessTests` (9 test, iki/üç veritabanı tek sahte tabloya yazar: bildirilen senaryo, çakışma ezilmez + kuyrukta kalır + sonraki ID çakışmaz, kendi satırını güncelleme, istasyonlar arası zaman sırası, 450 kesim sırası, eski script reddi, sayaç öğrenme boşta tek istek, `RaiseTo` kuralları). `FakeAppsScript` v3 gibi davranır (`Version` ayarlanabilir, `AddForeignRow`). **Gerçek Code.gs testi:** `node --test tools/sheets/Code.test.js` (sahte SpreadsheetApp ile; 6 test).
+- `Search_100k_rows_under_one_second` tam koşuda bir kez 1 sn sınırını aştı (CPU yükü), tek başına ve sonraki 4 tam koşuda geçti — kararsız olabilir.
+- **AÇIK:** Test tablosundaki Apps Script'e v3 yüklenip yeni sürüm dağıtılmalı (kullanıcı veya Chrome ile). Yüklenene kadar gerçek uygulama "eski sürüm" der ve göndermez (veri kaybolmaz). Sonra gerçek Google testi: iki geçici veritabanı + çakışma + sıra.
+
 ## Şu anki durum
 
 - **Adım 11 kurulum paketi tamamlandı** (2026-11-01): `KumasBarkod-Kurulum-1.0.0.exe` üretildi ve kur/çalıştır/kaldır testi geçti. Adım 9 ve Adım 10'un donanımsız kısmı (gösterim modu) da tamam. Sunum: `docs/SUNUM.md`, pilot: `docs/PILOT.md`.
 - **Karar (2026-11-01): ID 6 hane kalır** (seçenek a). Bir istasyon en fazla 999.999 ID üretir (günde 500 kesimle ~6,7 yıl); dolunca uygulama uyarır, Ayarlar'dan yeni istasyon kodu verilir. 7 haneye çıkarma önerilmişti, kullanıcı istemedi — tekrar önerme.
 - **Kalan (donanım/fabrika gerektiren):** Adım 10'un kalanı (etiket yazıcısı seçimi/satın alma, etiket yazıcısına ham ZPL — `RawWindowsPrinter`/winspool, şablonu gerçek etikete uydurma, Türkçe karakter ve kumaş denemesi); fabrika pilotu (temiz PC + bir vardiya kağıtla paralel). Fabrika için yeni Google tablosu + anahtar.
+- **2026-11-02:** ID benzersizliği düzeltmesi (yukarıda). Sheets'teki script v3'e güncellenmeli — yapılmadan gönderim durur.
 - **Sıradaki:** Kullanıcıya sorulacak. Seçenek: yazıcı modeli belli olmadan da yazılabilecek ham ZPL gönderimi (winspool) — gerçek yazıcıda denenene kadar "denenmedi" olarak işaretlenir.
 - Gerçek USB okuyucu testi hâlâ açık (Adım 6) — gösterim modunda elle giriş/"Okut (gösterim)" ile ikame edildi.
 - **GitHub:** 2026-11-01 itibarıyla her şey gönderildi (Adım 11 dahil).

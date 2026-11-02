@@ -5,13 +5,22 @@
  * "varsa güncelle, yoksa ekle" (upsert) yapar. Aynı paket iki kez gelse de (yanıt kaybolup
  * tekrar gönderilirse) her kesim tabloda TEK satır olur.
  *
+ * v3 — ID benzersizliği ve sıra:
+ *  - Bir kesimin kimliği cut_id + created_at'tir. Tabloda aynı cut_id BAŞKA bir created_at ile
+ *    varsa (başka veritabanı aynı ID'yi üretmiş) eski satırın üzerine YAZILMAZ; satır
+ *    "conflicts" listesinde döner ve uygulama hata gösterir.
+ *  - Yeni satırlar created_at (kayıt zamanı) sırasına göre yerleşir: en yeni kesim en altta.
+ *  - Yanıtta "max_sequences": tablodaki istasyon başına en büyük sıra numarası. Uygulama
+ *    sayacını bunun altında tutmaz (yeni kurulum eski ID'leri tekrar üretmesin).
+ *
  * Kurulum: tools/sheets/KURULUM.md
  * Asıl veri uygulamadaki SQLite'tadır; bu tablo yalnızca kopyadır. Elle değişiklik
  * bir sonraki gönderimde üzerine yazılır.
  */
 
 // v2: "export" eylemi (geri kurma için satırları sayfa sayfa okur; anahtar gerekir).
-const VERSION = 2;
+// v3: çakışan ID'nin üzerine yazmaz, kayıt zamanına göre sıralar, max_sequences döner.
+const VERSION = 3;
 const EXPORT_MAX_LIMIT = 2000;
 const SHEET_NAME = 'Kesimler';
 
@@ -29,6 +38,8 @@ const TEXT_COLUMNS = new Set([
 ]);
 
 const CUT_ID_PATTERN = /^[A-Z][A-Z0-9]-\d{6}$/;
+const COL_CUT_ID = COLUMNS.indexOf('cut_id') + 1;         // 1 tabanlı sütun numaraları
+const COL_CREATED_AT = COLUMNS.indexOf('created_at') + 1;
 
 function doPost(e) {
   try {
@@ -46,8 +57,11 @@ function doPost(e) {
       return json_({ ok: false, error: 'Tablo meşgul, sonra tekrar denenecek.' });
     }
     try {
-      const upserted = upsert_(rows);
-      return json_({ ok: true, upserted: upserted, version: VERSION });
+      const result = upsert_(rows);
+      return json_({
+        ok: true, upserted: result.upserted, conflicts: result.conflicts,
+        max_sequences: result.maxSequences, version: VERSION,
+      });
     } finally {
       lock.releaseLock();
     }
@@ -80,42 +94,85 @@ function sheet_() {
 
 function upsert_(rows) {
   const sh = sheet_();
-  if (rows.length === 0) return 0; // bağlantı testi: anahtar ve tablo doğrulandı
+  rows.forEach(validate_);
 
-  // Mevcut cut_id → satır numarası
+  // Mevcut satırlar: cut_id → { satır numarası, created_at }
   const index = new Map();
+  let lastCreated = '';
   const last = sh.getLastRow();
   if (last > 1) {
-    sh.getRange(2, 1, last - 1, 1).getValues()
-      .forEach((r, i) => index.set(String(r[0]), i + 2));
+    sh.getRange(2, 1, last - 1, COLUMNS.length).getValues().forEach((v, i) => {
+      const created = String(v[COL_CREATED_AT - 1]);
+      index.set(String(v[COL_CUT_ID - 1]), { row: i + 2, created: created });
+      if (created > lastCreated) lastCreated = created;
+    });
   }
 
+  const conflicts = [];
   const appends = [];
   const appendIndex = new Map(); // aynı pakette iki kez gelen kesim tek satır olsun
+  let upserted = 0;
 
   rows.forEach((r) => {
-    validate_(r);
     const values = toValues_(r);
-    const rowNumber = index.get(r.cut_id);
-    if (rowNumber) {
-      sh.getRange(rowNumber, 1, 1, COLUMNS.length).setValues([values]);
+    const existing = index.get(r.cut_id);
+    if (existing) {
+      if (existing.created !== String(r.created_at)) {
+        // Aynı ID, farklı kesim: eski kaydı silmek yerine reddet.
+        conflicts.push({ cut_id: r.cut_id, created_at: r.created_at, existing_created_at: existing.created });
+        return;
+      }
+      sh.getRange(existing.row, 1, 1, COLUMNS.length).setValues([values]);
     } else if (appendIndex.has(r.cut_id)) {
+      const prev = appends[appendIndex.get(r.cut_id)];
+      if (String(prev[COL_CREATED_AT - 1]) !== String(r.created_at)) {
+        conflicts.push({ cut_id: r.cut_id, created_at: r.created_at, existing_created_at: String(prev[COL_CREATED_AT - 1]) });
+        return;
+      }
       appends[appendIndex.get(r.cut_id)] = values;
     } else {
       appendIndex.set(r.cut_id, appends.length);
       appends.push(values);
     }
+    upserted++;
   });
 
   if (appends.length > 0) {
-    const range = sh.getRange(sh.getLastRow() + 1, 1, appends.length, COLUMNS.length);
+    // Kayıt zamanına göre (eşitse ID'ye göre) sırala; created_at sabit uzunluklu ISO metin.
+    appends.sort((a, b) => compare_(a, b));
+    const first = sh.getLastRow() + 1;
+    const range = sh.getRange(first, 1, appends.length, COLUMNS.length);
     const formats = appends.map(() => COLUMNS.map((c) =>
       TEXT_COLUMNS.has(c) ? '@' : (c === 'metre' ? '0.00' : '0')));
     range.setNumberFormats(formats);
     range.setValues(appends);
+
+    // Yeni satırlardan biri tablodaki son kayıttan eskiyse (ör. başka istasyonun internetsiz
+    // birikmiş kayıtları) tüm veri satırlarını kayıt zamanına göre yeniden diz.
+    if (String(appends[0][COL_CREATED_AT - 1]) < lastCreated) {
+      sh.getRange(2, 1, sh.getLastRow() - 1, sh.getLastColumn())
+        .sort([{ column: COL_CREATED_AT, ascending: true }, { column: COL_CUT_ID, ascending: true }]);
+    }
   }
 
-  return rows.length;
+  // İstasyon başına en büyük sıra numarası (tablodaki + bu paketteki)
+  const maxSequences = {};
+  const note = (id) => {
+    const station = id.substring(0, 2);
+    const seq = Number(id.substring(3));
+    if (!(maxSequences[station] >= seq)) maxSequences[station] = seq;
+  };
+  index.forEach((_, id) => { if (CUT_ID_PATTERN.test(id)) note(id); });
+  appendIndex.forEach((_, id) => note(id));
+
+  return { upserted: upserted, conflicts: conflicts, maxSequences: maxSequences };
+}
+
+function compare_(a, b) {
+  const ca = String(a[COL_CREATED_AT - 1]), cb = String(b[COL_CREATED_AT - 1]);
+  if (ca !== cb) return ca < cb ? -1 : 1;
+  const ia = String(a[COL_CUT_ID - 1]), ib = String(b[COL_CUT_ID - 1]);
+  return ia < ib ? -1 : (ia > ib ? 1 : 0);
 }
 
 /**
@@ -149,6 +206,9 @@ function export_(offset, limit) {
 function validate_(r) {
   if (!r || !CUT_ID_PATTERN.test(r.cut_id)) {
     throw new Error('Geçersiz cut_id: ' + (r && r.cut_id));
+  }
+  if (!r.created_at) {
+    throw new Error('created_at eksik: ' + r.cut_id);
   }
 }
 
