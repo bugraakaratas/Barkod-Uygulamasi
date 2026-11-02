@@ -79,15 +79,15 @@ Script sizin adınıza çalıştığı için korumalı sayfaya yazmaya devam ede
 - **Elle değişiklik:** Tablodaki bir hücreyi değiştirirseniz o satır, kesim bir sonraki kez gönderildiğinde uygulamadaki değerle değişir. Düzeltme uygulamadan yapılır (iptal + yeni kayıt).
 - **Sütunlar:** `cut_id … last_printed_at` uygulamadaki veritabanının birebir kopyasıdır (geri kurma bunları kullanır). Son sütun `metre`, rapor kolaylığı içindir.
 - **Script'i güncellemek:** `Code.gs` değişirse editöre yapıştırıp kaydedin, sonra **Dağıt → Dağıtımları yönet → (kalem) → Sürüm: Yeni sürüm → Dağıt**. URL aynı kalır, uygulamada değişiklik gerekmez.
-- **Uygulama script v3 ister** (`const VERSION = 3;`). Eski script kuruluysa uygulama göndermez, durum çubuğunda "Apps Script eski sürüm" yazar; kayıtlar kaybolmaz, script güncellenince hepsi gider.
+- **Uygulama script v3 veya üstünü ister** (güncel: `const VERSION = 4;`). Eski script kuruluysa uygulama göndermez, durum çubuğunda "Apps Script eski sürüm" yazar; kayıtlar kaybolmaz, script güncellenince hepsi gider.
 - **ID'ler benzersizdir:** Tablodaki her ID tek bir kesime aittir. Aynı ID ile *farklı* bir kesim gelirse (aynı istasyon kodu iki bilgisayarda/veritabanında kullanılmış) tablodaki satırın üzerine **yazılmaz**; uygulama o kesimi göndermez ve durum çubuğunda "… gönderilmedi: bu ID Sheets'te başka bir kesime ait" yazar. Çözüm: o bilgisayara Ayarlar'dan farklı bir istasyon kodu verin. Her bilgisayarın kendi istasyon kodu olmalı (K1, K2…).
 - **Yeni kurulum eski ID'leri tekrar vermez:** Uygulama tabloya ilk bağlandığında her istasyonun tablodaki en büyük numarasını öğrenir ve oradan devam eder. Bu yüzden yeni kurulumda **kesim yapmadan önce** Sheets ayarlarını girin.
-- **Sıra:** Satırlar kayıt zamanına göre dizilir; en yeni kesim en alttadır. İnternetsiz kalmış eski kayıtlar sonradan gelirse zamanına göre araya yerleşir.
+- **Sıra:** Satırlar kayıt zamanına göre dizilir; en yeni kesim en alttadır. İnternetsiz kalmış eski kayıtlar sonradan gelirse zamanına göre araya yerleşir. Tablo elle başka sütuna göre sıralanırsa uygulamanın bir sonraki bağlantısında kendiliğinden kayıt zamanı sırasına döner.
 - **Anahtarı değiştirmek:** Proje Ayarları'nda `API_KEY` değerini değiştirin, sonra uygulamada da aynısını girip kaydedin.
 
 ## Disk arızası / yeni bilgisayar: Sheets'ten geri kurma
 
-Script **v3** gerekir (`Code.gs` içinde `const VERSION = 3;`). Eski sürüm kuruluysa önce "Script'i güncellemek" adımını yapın.
+Script **v3 veya üstü** gerekir (güncel `Code.gs`: `const VERSION = 4;`). Eski sürüm kuruluysa önce "Script'i güncellemek" adımını yapın.
 
 1. Uygulamayı yeni bilgisayara kurun ve açın (veritabanı boş açılır).
 2. **Ayarlar** (Ctrl+4) → Sheets adresi ve anahtarı girin → **Kaydet**.

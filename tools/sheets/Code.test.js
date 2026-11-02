@@ -68,11 +68,11 @@ function row(cutId, createdAt, lot = 'LOT', extra = {}) {
 }
 const t = (s) => `2026-11-02T09:00:${String(s).padStart(2, '0')}.000Z`;
 
-test('sürüm 3, boş paket sayaçları döndürür', () => {
+test('sürüm 4, boş paket sayaçları döndürür', () => {
   const s = load();
   const r = s.post({ rows: [] });
   assert.strictEqual(r.ok, true);
-  assert.strictEqual(r.version, 3);
+  assert.strictEqual(r.version, 4);
   assert.deepStrictEqual(r.max_sequences, {});
   s.post({ rows: [row('K1-000007', t(1)), row('K2-000003', t(2))] });
   assert.deepStrictEqual(s.post({ rows: [] }).max_sequences, { K1: 7, K2: 3 });
@@ -121,4 +121,23 @@ test('created_at eksikse reddedilir, hiçbir şey yazılmaz', () => {
   const r = s.post({ rows: [row('K1-000001', t(1)), row('K1-000002', '')] });
   assert.strictEqual(r.ok, false);
   assert.deepStrictEqual(s.ids(), []);
+});
+
+test('eski hatadan kalan sırasız tablo boş pakette (uygulama açılışı) kendiliğinden sıralanır', () => {
+  const s = load();
+  s.post({ rows: [] }); // başlık
+  // Gerçek tablodaki durum: üzerine yazılmış K1-000001..3 (sonra), test satırları K1-000004..5 (önce)
+  const bad = [row('K1-000001', t(30)), row('K1-000002', t(40)), row('K1-000004', t(10)), row('K1-000005', t(11))];
+  bad.forEach((r, i) => { s.data[i + 1] = Object.values(r).concat([r.length_cm / 100]); });
+  const r = s.post({ rows: [] });
+  assert.strictEqual(r.ok, true);
+  assert.deepStrictEqual(s.ids(), ['K1-000004', 'K1-000005', 'K1-000001', 'K1-000002']);
+  assert.deepStrictEqual(r.max_sequences, { K1: 5 });
+});
+
+test('sıralı tabloda yalnızca güncelleme yapılınca sıralama gerekmez, sıra bozulmaz', () => {
+  const s = load();
+  s.post({ rows: [row('K1-000001', t(1)), row('K1-000002', t(2))] });
+  s.post({ rows: [row('K1-000001', t(1), 'LOT', { print_count: 3 })] });
+  assert.deepStrictEqual(s.ids(), ['K1-000001', 'K1-000002']);
 });

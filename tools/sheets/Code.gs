@@ -20,7 +20,8 @@
 
 // v2: "export" eylemi (geri kurma için satırları sayfa sayfa okur; anahtar gerekir).
 // v3: çakışan ID'nin üzerine yazmaz, kayıt zamanına göre sıralar, max_sequences döner.
-const VERSION = 3;
+// v4: tablo herhangi bir sebeple sırasızsa (eski hata, elle sıralama) kendiliğinden yeniden sıralar.
+const VERSION = 4;
 const EXPORT_MAX_LIMIT = 2000;
 const SHEET_NAME = 'Kesimler';
 
@@ -99,12 +100,16 @@ function upsert_(rows) {
   // Mevcut satırlar: cut_id → { satır numarası, created_at }
   const index = new Map();
   let lastCreated = '';
+  let previous = null;
+  let unsorted = false;   // tablo şu an kayıt zamanı sırasında değil
   const last = sh.getLastRow();
   if (last > 1) {
     sh.getRange(2, 1, last - 1, COLUMNS.length).getValues().forEach((v, i) => {
       const created = String(v[COL_CREATED_AT - 1]);
       index.set(String(v[COL_CUT_ID - 1]), { row: i + 2, created: created });
       if (created > lastCreated) lastCreated = created;
+      if (previous !== null && compare_(previous, v) > 0) unsorted = true;
+      previous = v;
     });
   }
 
@@ -146,13 +151,15 @@ function upsert_(rows) {
       TEXT_COLUMNS.has(c) ? '@' : (c === 'metre' ? '0.00' : '0')));
     range.setNumberFormats(formats);
     range.setValues(appends);
+  }
 
-    // Yeni satırlardan biri tablodaki son kayıttan eskiyse (ör. başka istasyonun internetsiz
-    // birikmiş kayıtları) tüm veri satırlarını kayıt zamanına göre yeniden diz.
-    if (String(appends[0][COL_CREATED_AT - 1]) < lastCreated) {
-      sh.getRange(2, 1, sh.getLastRow() - 1, sh.getLastColumn())
-        .sort([{ column: COL_CREATED_AT, ascending: true }, { column: COL_CUT_ID, ascending: true }]);
-    }
+  // Yeni satırlardan biri tablodaki son kayıttan eskiyse (ör. başka istasyonun internetsiz
+  // birikmiş kayıtları) ya da tablo zaten sırasızsa tüm veri satırlarını kayıt zamanına göre diz.
+  // Uygulama her açılışta boş paket gönderdiği için sırasız tablo kendiliğinden düzelir.
+  const olderAppended = appends.length > 0 && String(appends[0][COL_CREATED_AT - 1]) < lastCreated;
+  if ((olderAppended || unsorted) && sh.getLastRow() > 2) {
+    sh.getRange(2, 1, sh.getLastRow() - 1, sh.getLastColumn())
+      .sort([{ column: COL_CREATED_AT, ascending: true }, { column: COL_CUT_ID, ascending: true }]);
   }
 
   // İstasyon başına en büyük sıra numarası (tablodaki + bu paketteki)
