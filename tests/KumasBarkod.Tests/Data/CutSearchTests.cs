@@ -7,6 +7,17 @@ using Xunit.Abstractions;
 
 namespace KumasBarkod.Tests.Data;
 
+/// <summary>
+/// Hız ölçümü içeren sınıflar diğer testlerle paralel ÇALIŞMAZ: paralel testler CPU'yu paylaşınca
+/// 1 sn sınırı ara sıra aşılıyordu (kurulum paketi derlemesini durdurdu). Ölçüm tek başına yapılır.
+/// </summary>
+[CollectionDefinition(Name, DisableParallelization = true)]
+public sealed class TimingCollection
+{
+    public const string Name = "Hız ölçümleri (paralel değil)";
+}
+
+[Collection(TimingCollection.Name)]
 public class CutSearchTests : IDisposable
 {
     private static readonly TimeZoneInfo Istanbul =
