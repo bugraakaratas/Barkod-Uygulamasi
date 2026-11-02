@@ -216,7 +216,7 @@ docs/                    SUNUM.md (donanımsız sunum akışı), PILOT.md (fabri
 - 1.0.1 doğrulandı: anonim indirme, dosya özgün ile birebir aynı (46,5 MB).
 - Hız testi (`CutSearchTests`) artık paralel olmayan koleksiyonda (`TimingCollection`): paralel koşuda 1 sn sınırını aşıp kurulum derlemesini durdurmuştu.
 
-| İptal sebepleri | ✅ | (bu commit) | Okutma ekranında serbest metin yerine sabit 4 sebep (tek seçim, 1–4 / ↑↓ / Enter). 247 test |
+| İptal sebepleri | ✅ | `eb9d025` | Okutma ekranında serbest metin yerine sabit 4 sebep (tek seçim, 1–4 / ↑↓ / Enter). 247 test |
 
 ### İptal sebepleri notları (kullanıcı isteği, 2026-11-02)
 - **Karar:** tek seçim, liste sabit (Ayarlar'dan düzenlenmez), "Diğer"/ek not YOK. Sebepler `Core/Domain/VoidReasons.cs`: 1 Yanlış metre girildi · 2 Yanlış lot girildi · 3 Çift kayıt · 4 Kesim yapılmadı / vazgeçildi. "Etiket bozuk/okunmuyor" bilerek yok (çözüm F5 tekrar baskı, iptal değil). **Metinleri değiştirme** — raporlardaki sayım bölünür; yeni sebep eklenecekse sona ekle.
