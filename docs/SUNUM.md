@@ -14,9 +14,9 @@ Barkod yazıcısı ve okuyucu olmadan sistemi uçtan uca göstermek için. Süre
 
 | # | Ne yapılır | Ne gösterilir |
 |---|---|---|
-| 1 | **Kesim Girişi**: lot yaz → Enter → metre yaz → Enter | Fare yok, iki tuş. Kayıt anında; benzersiz ID (K1-000001). |
+| 1 | **Kesim Girişi**: lot yaz → Enter → uzunluğu cm yaz (ör. 2550) → Enter | Fare yok, iki tuş. Kayıt anında; benzersiz ID (K1-000001). |
 | 2 | Sağdaki **Son etiket** | Etiketin gerçek görünümü: Code128 barkod, büyük ID, lot, metre, tarih. Barkod gerçektir. |
-| 3 | Aynı lotta 2–3 kesim daha | Lot seçili kalır; yalnızca metre girilir. "Son kayıtlar" listesi. |
+| 3 | Aynı lotta 2–3 kesim daha | Lot seçili kalır; yalnızca uzunluk (cm) girilir. "Son kayıtlar" listesi. |
 | 4 | **Okut (gösterim)** düğmesi | Okuyucunun yaptığı: kayıt **Okutma** ekranında açılır. Etiket görüntüsü de orada. |
 | 5 | **Okutma** (Ctrl+2): etiketteki kodu elle yaz (ör. `K1000002`) → Enter | Elle giriş de çalışır; okuyucu da aynı kutuya "yazar". |
 | 6 | Okutma ekranında **İptal et (F8)** → sebep → Enter, sonra **Yerine yeni kayıt (F9)** | Yanlış kayıt düzeltilmez, iptal edilip yenisi basılır; iptal kalıcı ve görünür. |

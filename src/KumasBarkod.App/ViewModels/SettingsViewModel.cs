@@ -14,7 +14,7 @@ using Wpf.Ui.Controls;
 
 namespace KumasBarkod.App.ViewModels;
 
-/// <summary>Ayarlar: Google Sheets bağlantısı, metre üst sınırı, bilgi.</summary>
+/// <summary>Ayarlar: Google Sheets bağlantısı, uzunluk üst sınırı, bilgi.</summary>
 public partial class SettingsViewModel : ObservableObject
 {
     /// <summary>Üst sınır ayarının kendi sınırı: 10.000 m (ayar hatasını da yakalasın).</summary>
@@ -129,7 +129,7 @@ public partial class SettingsViewModel : ObservableObject
         var target = _settings.GetSyncTarget();
         SheetsUrl = target?.Url ?? "";
         SheetsKey = target?.Key ?? "";
-        MaxLengthText = Length.Format(_settings.GetMaxLengthCm());
+        MaxLengthText = Length.FormatCm(_settings.GetMaxLengthCm());
         StationCode = _settings.GetStationCode();
         MessageIsOpen = false;
         IsRestoreConfirmOpen = false;
@@ -334,14 +334,14 @@ public partial class SettingsViewModel : ObservableObject
     [RelayCommand]
     private void SaveMaxLength()
     {
-        if (!Length.TryParseMeters(MaxLengthText, MaxConfigurableCm, out var cm, out var error))
+        if (!Length.TryParseCentimeters(MaxLengthText, MaxConfigurableCm, out var cm, out var error))
         {
             Show(InfoBarSeverity.Error, "Üst sınır kaydedilmedi", error);
             return;
         }
         _settings.SetMaxLengthCm(cm);
-        MaxLengthText = Length.Format(cm);
-        Show(InfoBarSeverity.Success, "Üst sınır kaydedildi", $"Bundan sonra en fazla {Length.Format(cm)} m girilebilir.");
+        MaxLengthText = Length.FormatCm(cm);
+        Show(InfoBarSeverity.Success, "Üst sınır kaydedildi", $"Bundan sonra en fazla {Length.FormatCm(cm)} cm girilebilir.");
     }
 
     private bool NotTesting() => !IsTesting;

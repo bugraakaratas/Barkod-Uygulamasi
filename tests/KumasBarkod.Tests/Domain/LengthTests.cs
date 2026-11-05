@@ -4,23 +4,18 @@ namespace KumasBarkod.Tests.Domain;
 
 public class LengthTests
 {
-    private const long Max = 300_00; // 300 m
+    private const long Max = 300_00; // 30000 cm = 300 m
 
     [Theory]
-    [InlineData("25,50", 2550)]
-    [InlineData("25.50", 2550)]
-    [InlineData("25,5", 2550)]
-    [InlineData("25.5", 2550)]
-    [InlineData("25", 2500)]
-    [InlineData("  7  ", 700)]
-    [InlineData("0,01", 1)]
-    [InlineData(",5", 50)]
-    [InlineData("5,", 500)]
-    [InlineData("300", 30000)]      // tam sınır kabul
-    [InlineData("007,10", 710)]
-    public void Valid_inputs_are_parsed_to_centimeters(string input, long expectedCm)
+    [InlineData("2550", 2550)]
+    [InlineData("  700  ", 700)]
+    [InlineData("1", 1)]
+    [InlineData("25", 25)]          // metre alışkanlığı: 25 cm'dir, canlı ipucu "= 0,25 m" gösterir
+    [InlineData("007", 7)]
+    [InlineData("30000", 30000)]    // tam sınır kabul
+    public void Valid_inputs_are_whole_centimeters(string input, long expectedCm)
     {
-        Assert.True(Length.TryParseMeters(input, Max, out var cm, out var error), error);
+        Assert.True(Length.TryParseCentimeters(input, Max, out var cm, out var error), error);
         Assert.Equal(expectedCm, cm);
     }
 
@@ -29,24 +24,39 @@ public class LengthTests
     [InlineData("")]
     [InlineData("   ")]
     [InlineData("0")]
-    [InlineData("0,00")]
+    [InlineData("000")]
     [InlineData("-3")]
     [InlineData("+3")]
     [InlineData("abc")]
     [InlineData("12a")]
-    [InlineData(",")]
-    [InlineData("1,234")]           // 3 ondalık: yuvarlanmaz, reddedilir
-    [InlineData("1.234,5")]         // binlik ayırıcı belirsiz
-    [InlineData("1,2,3")]
+    [InlineData("25,50")]           // eski metre biçimi: sessizce çevrilmez
+    [InlineData("25.50")]
+    [InlineData("25,")]
+    [InlineData(",5")]
+    [InlineData("1.234")]
     [InlineData("1e3")]
     [InlineData("25 50")]
-    [InlineData("300,01")]          // sınırın üstü
-    [InlineData("9999999")]
+    [InlineData("30001")]           // sınırın üstü
+    [InlineData("9999999999999999999999")]  // long'a sığmaz, taşma hatası olmamalı
     public void Invalid_inputs_are_rejected_with_message(string? input)
     {
-        Assert.False(Length.TryParseMeters(input, Max, out var cm, out var error));
+        Assert.False(Length.TryParseCentimeters(input, Max, out var cm, out var error));
         Assert.Equal(0, cm);
         Assert.False(string.IsNullOrWhiteSpace(error));
+    }
+
+    [Fact]
+    public void Decimal_input_error_shows_centimeter_example()
+    {
+        Length.TryParseCentimeters("25,50", Max, out _, out var error);
+        Assert.Contains("cm", error);
+        Assert.Contains("2550", error);
+    }
+
+    [Fact]
+    public void FormatCm_is_digits_only()
+    {
+        Assert.Equal("30000", Length.FormatCm(30000));
     }
 
     [Theory]

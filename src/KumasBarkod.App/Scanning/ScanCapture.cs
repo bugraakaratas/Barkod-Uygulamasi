@@ -10,7 +10,7 @@ namespace KumasBarkod.App.Scanning;
 /// Pencere genelinde okutma yakalar: hangi ekranda, hangi kutu odaktayken okutulursa okutulsun
 /// kayıt açılır. Okuyucunun hızlı "yazdığı" karakterler o an odaktaki kutuya düşer; okutma
 /// anlaşılınca kutu eski hâline döndürülür ve Enter kutuya ulaşmaz (ör. lot alanı bozulmaz,
-/// metre kutusunda kayıt tetiklenmez).
+/// uzunluk kutusunda kayıt tetiklenmez).
 /// </summary>
 public sealed class ScanCapture
 {
@@ -45,7 +45,7 @@ public sealed class ScanCapture
         var cutId = _detector.OnEnter(e.Timestamp);
         if (cutId is null) return;
 
-        e.Handled = true;   // Enter odaktaki kutuya (lot → metre, metre → kaydet) ulaşmasın
+        e.Handled = true;   // Enter odaktaki kutuya (lot → uzunluk, uzunluk → kaydet) ulaşmasın
         Restore();
         WeakReferenceMessenger.Default.Send(new OpenCutMessage(cutId));
     }

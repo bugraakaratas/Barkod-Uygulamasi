@@ -16,7 +16,7 @@ Bitti sayılır: pilot sonunda uygulamadaki kayıtlar kağıttaki kayıtlarla **
 - [ ] Kurulum dosyasını çalıştırın → İleri → Kur → "Kumaş Barkod uygulamasını başlat". (Yönetici izni gerekmez.)
 - [ ] **Ayarlar** (Ctrl+4):
   - [ ] İstasyon kodu → Kaydet
-  - [ ] Metre üst sınırı (fabrikadaki en uzun kesime göre)
+  - [ ] Uzunluk üst sınırı, cm (fabrikadaki en uzun kesime göre)
   - [ ] Yazıcı → Kaydet
   - [ ] Sheets adresi + anahtar → **Bağlantıyı test et** → Kaydet
 - [ ] Deneme kaydı: lot `DENEME`, 1 m → etiket çıktı mı / ekranda göründü mü?

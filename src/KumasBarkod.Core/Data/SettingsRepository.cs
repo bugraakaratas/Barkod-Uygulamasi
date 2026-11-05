@@ -17,7 +17,7 @@ public static class SettingKeys
 /// <summary><c>settings</c> tablosu: anahtar/değer. Kayıt yoksa varsayılan döner.</summary>
 public sealed class SettingsRepository(SqliteConnectionFactory db)
 {
-    /// <summary>Varsayılan metre üst sınırı: 300 m. Yanlış yazımı (2550 yerine 25,50) yakalar.</summary>
+    /// <summary>Varsayılan uzunluk üst sınırı: 30000 cm (300 m). Fazladan yazılan rakamı (2550 yerine 25500) yakalar.</summary>
     public const long DefaultMaxLengthCm = 300_00;
 
     public string? Get(string key)

@@ -78,14 +78,14 @@
                             </ListBox.ItemContainerStyle>
                         </ListBox>
 
-                        <TextBlock Style="{StaticResource FieldLabelStyle}" Margin="0,14,0,6" Text="Metre" />
+                        <TextBlock Style="{StaticResource FieldLabelStyle}" Margin="0,14,0,6" Text="Uzunluk (cm)" />
                         <ui:TextBox x:Name="LengthBox"
                                     Text="{Binding LengthText, UpdateSourceTrigger=PropertyChanged}"
-                                    PlaceholderText="ör. 25,50"
+                                    PlaceholderText="ör. 2550"
                                     FontSize="32"
                                     MinHeight="64"
                                     ClearButtonEnabled="False"
-                                    AutomationProperties.Name="Metre">
+                                    AutomationProperties.Name="Uzunluk (cm)">
                             <ui:TextBox.InputBindings>
                                 <KeyBinding Key="Enter" Command="{Binding SaveCommand}" />
                             </ui:TextBox.InputBindings>
@@ -137,7 +137,7 @@
 
                 <TextBlock Margin="4,16,0,0" Style="{StaticResource FieldHintStyle}" TextWrapping="Wrap">
                     <Run FontWeight="SemiBold" Text="Kısayollar:" />
-                    <Run Text="Enter → sonraki alan / kaydet   ·   F2 → lot   ·   ↑ ↓ (lotta) → son lotlar   ·   F5 → son etiketi tekrar bas   ·   Esc → metreyi temizle" />
+                    <Run Text="Enter → sonraki alan / kaydet   ·   F2 → lot   ·   ↑ ↓ (lotta) → son lotlar   ·   F5 → son etiketi tekrar bas   ·   Esc → uzunluğu temizle" />
                 </TextBlock>
             </StackPanel>
         </ScrollViewer>

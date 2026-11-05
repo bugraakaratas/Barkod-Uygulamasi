@@ -17,9 +17,9 @@ public sealed class CutService(SqliteConnectionFactory db, SettingsRepository se
         var lot = NormalizeLot(lotCode);
         var maxCm = settings.GetMaxLengthCm();
         if (lengthCm <= 0)
-            throw new CutValidationException("Metre 0'dan büyük olmalı.");
+            throw new CutValidationException("Uzunluk 0'dan büyük olmalı.");
         if (lengthCm > maxCm)
-            throw new CutValidationException($"Metre en fazla {Length.Format(maxCm)} olabilir.");
+            throw new CutValidationException($"Uzunluk en fazla {Length.FormatCm(maxCm)} cm olabilir.");
 
         var station = settings.GetStationCode();
         var now = Timestamps.Format(clock.GetUtcNow());

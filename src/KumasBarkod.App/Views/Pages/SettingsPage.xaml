@@ -108,14 +108,14 @@
                         <TextBlock FontSize="20" FontWeight="SemiBold" Text="Kesim" />
                     </DockPanel>
 
-                    <TextBlock Style="{StaticResource FieldLabelStyle}" Text="Metre üst sınırı" />
+                    <TextBlock Style="{StaticResource FieldLabelStyle}" Text="Uzunluk üst sınırı" />
                     <StackPanel Orientation="Horizontal">
                         <ui:TextBox Width="160" FontSize="15" Text="{Binding MaxLengthText, UpdateSourceTrigger=PropertyChanged}" />
-                        <TextBlock Margin="8,0,16,0" VerticalAlignment="Center" FontSize="15" Text="m" />
+                        <TextBlock Margin="8,0,16,0" VerticalAlignment="Center" FontSize="15" Text="cm" />
                         <ui:Button MinHeight="36" Appearance="Secondary" Content="Kaydet" Command="{Binding SaveMaxLengthCommand}" />
                     </StackPanel>
                     <TextBlock Style="{StaticResource FieldHintStyle}" TextWrapping="Wrap"
-                               Text="Bundan uzun kesim girilemez. Yanlış yazımı (25,50 yerine 2550) yakalamak için gerçekçi bir değer seçin." />
+                               Text="Bundan uzun kesim girilemez. Fazladan yazılan rakamı (2550 yerine 25500) yakalamak için gerçekçi bir değer seçin. Örnek: 30000 cm = 300 m." />
 
                     <TextBlock Style="{StaticResource FieldLabelStyle}" Margin="0,16,0,6" Text="İstasyon kodu" />
                     <StackPanel Orientation="Horizontal">

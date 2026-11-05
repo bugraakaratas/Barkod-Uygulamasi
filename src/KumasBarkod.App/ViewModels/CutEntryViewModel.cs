@@ -77,7 +77,7 @@ public partial class CutEntryViewModel : ObservableObject
     [ObservableProperty]
     public partial string LengthText { get; set; } = "";
 
-    /// <summary>Metre kutusunun altındaki canlı açıklama: "= 25,50 m" ya da hata.</summary>
+    /// <summary>Uzunluk kutusunun altındaki canlı açıklama: "= 25,50 m" ya da hata. Yanlışlıkla metre yazılırsa ("25" = 25 cm) burada görünür.</summary>
     [ObservableProperty]
     public partial string LengthHint { get; set; } = "";
 
@@ -129,7 +129,7 @@ public partial class CutEntryViewModel : ObservableObject
             return;
         }
 
-        if (Length.TryParseMeters(value, _settings.GetMaxLengthCm(), out var cm, out var error))
+        if (Length.TryParseCentimeters(value, _settings.GetMaxLengthCm(), out var cm, out var error))
         {
             LengthHint = $"= {Length.Format(cm)} m";
             LengthHintIsError = false;
@@ -159,7 +159,7 @@ public partial class CutEntryViewModel : ObservableObject
             return;
         }
 
-        if (!Length.TryParseMeters(LengthText, _settings.GetMaxLengthCm(), out var cm, out var error))
+        if (!Length.TryParseCentimeters(LengthText, _settings.GetMaxLengthCm(), out var cm, out var error))
         {
             ShowError(error, EntryField.Length);
             return;

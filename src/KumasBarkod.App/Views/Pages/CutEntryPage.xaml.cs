@@ -6,7 +6,7 @@ using KumasBarkod.App.ViewModels;
 namespace KumasBarkod.App.Views.Pages;
 
 /// <summary>
-/// Klavye akışı: Lot → Enter → Metre → Enter → Kaydet → odak tekrar Metre'de, lot aynı kalır.
+/// Klavye akışı: Lot → Enter → Uzunluk (cm) → Enter → Kaydet → odak tekrar uzunlukta, lot aynı kalır.
 /// Lot kutusunda ↑ ↓ son lotlar arasında gezer. Açılır liste kullanılmaz: odak hep tahmin edilebilir.
 /// Odak yönetimi görünümün işi olduğu için burada; iş mantığı ViewModel'de.
 /// </summary>
