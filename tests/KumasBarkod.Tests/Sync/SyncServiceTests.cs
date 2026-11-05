@@ -179,7 +179,7 @@ public class SyncServiceTests : IDisposable
         var r2 = await Run();
         Assert.Equal(250, r2.SentCuts);
         Assert.Equal(450, _sheet.Sheet.Count);
-        Assert.Equal(Enumerable.Range(1, 450).Select(i => $"K1-{i:D6}"), _sheet.Sheet.Select(r => r["cut_id"].GetString()));
+        Assert.Equal(Enumerable.Range(1, 450).Reverse().Select(i => $"K1-{i:D6}"), _sheet.Sheet.Select(r => r["cut_id"].GetString()));
     }
 
     // ---------- Değişiklikler ----------

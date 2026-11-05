@@ -9,7 +9,7 @@ namespace KumasBarkod.Tests.Sync;
 /// <summary>
 /// Aynı Google tablosuna yazan birden çok veritabanı (yeniden kurulum, test veritabanı, aynı
 /// istasyon kodlu ikinci bilgisayar). Kural: tablodaki her ID tek bir kesime aittir, hiçbir kesim
-/// başkasının üzerine yazılmaz ve satırlar kayıt zamanına göre sıralıdır (en yeni en altta).
+/// başkasının üzerine yazılmaz ve satırlar kayıt zamanına göre sıralıdır (en yeni en üstte).
 /// </summary>
 public class IdUniquenessTests : IDisposable
 {
@@ -52,7 +52,7 @@ public class IdUniquenessTests : IDisposable
         var ids = SheetIds();
         Assert.Equal(ids.Count, ids.Distinct().Count());
         var created = _sheet.Sheet.Select(r => r["created_at"].GetString()!).ToList();
-        Assert.Equal(created.OrderBy(c => c, StringComparer.Ordinal), created);
+        Assert.Equal(created.OrderDescending(StringComparer.Ordinal), created);
     }
 
     /// <summary>
@@ -74,9 +74,9 @@ public class IdUniquenessTests : IDisposable
         Assert.Equal("K1-000004", id);
         Assert.True((await real.Sync.RunOnceAsync()).Succeeded);
 
-        Assert.Equal(["K1-000001", "K1-000002", "K1-000003", "K1-000004"], SheetIds());
-        Assert.Equal("TEST-1", Lot("K1-000001"));                  // eski kayıt yerinde
-        Assert.Equal("Lot 31", Lot("K1-000004"));                  // yeni kayıt en altta
+        Assert.Equal(["K1-000004", "K1-000003", "K1-000002", "K1-000001"], SheetIds());   // yeni kayıt en üstte
+        Assert.Equal("TEST-1", Lot("K1-000001"));                  // eski kayıt korundu
+        Assert.Equal("Lot 31", Lot("K1-000004"));
         AssertUniqueAndChronological();
     }
 
@@ -156,7 +156,7 @@ public class IdUniquenessTests : IDisposable
 
     /// <summary>
     /// Başka istasyonun internetsiz biriken eski kayıtları sonradan gelirse araya, kayıt zamanına
-    /// göre yerleşir; tablo her zaman eskiden yeniye sıralıdır.
+    /// göre yerleşir; tablo her zaman yeniden eskiye sıralıdır.
     /// </summary>
     [Fact]
     public async Task Rows_are_ordered_by_creation_time_across_stations()
@@ -171,12 +171,12 @@ public class IdUniquenessTests : IDisposable
         Cut(k2, "K2-YENI");          // en yeni
         await k2.Sync.RunOnceAsync();
 
-        Assert.Equal(["K2-000001", "K1-000001", "K1-000002", "K2-000002"], SheetIds());
+        Assert.Equal(["K2-000002", "K1-000002", "K1-000001", "K2-000001"], SheetIds());
         AssertUniqueAndChronological();
     }
 
     [Fact]
-    public async Task Many_cuts_end_up_in_save_order_newest_last()
+    public async Task Many_cuts_end_up_newest_first()
     {
         var i = NewInstall();
         var ids = new List<string>();
@@ -187,8 +187,9 @@ public class IdUniquenessTests : IDisposable
         }
         await i.Sync.RunOnceAsync();
 
+        ids.Reverse();
         Assert.Equal(ids, SheetIds());
-        Assert.Equal("K1-000450", SheetIds()[^1]);
+        Assert.Equal("K1-000450", SheetIds()[0]);
         AssertUniqueAndChronological();
     }
 

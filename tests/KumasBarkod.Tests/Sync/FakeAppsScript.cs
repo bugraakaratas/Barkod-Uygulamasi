@@ -7,7 +7,7 @@ namespace KumasBarkod.Tests.Sync;
 /// <summary>
 /// Apps Script web uygulamasının (tools/sheets/Code.gs) davranışını taklit eden HTTP işleyici:
 /// anahtar kontrolü, cut_id'ye göre upsert, v3 çakışma reddi (aynı ID + farklı created_at),
-/// created_at sırası, max_sequences. Kesinti ve hata senaryoları için düğmeler.
+/// v5 sırası (en yeni en üstte, export eskiden yeniye), max_sequences. Kesinti ve hata senaryoları için düğmeler.
 /// </summary>
 public sealed class FakeAppsScript : HttpMessageHandler
 {
@@ -27,7 +27,7 @@ public sealed class FakeAppsScript : HttpMessageHandler
     public int LoseNextResponse { get; set; }
 
     /// <summary>Script sürümü (gönderim yanıtında). 3'ten küçükse eski script gibi davranır: çakışmayı ezer.</summary>
-    public int Version { get; set; } = 3;
+    public int Version { get; set; } = 5;
 
     /// <summary>Eski (v1) script gibi davran: okuma eylemini tanıma.</summary>
     public bool ExportUnsupported { get; set; }
@@ -76,7 +76,7 @@ public sealed class FakeAppsScript : HttpMessageHandler
             var offset = root.GetProperty("offset").GetInt32();
             var limit = root.GetProperty("limit").GetInt32();
             ExportRequests++;
-            return Reply(new { ok = true, total = Sheet.Count, rows = Sheet.Skip(offset).Take(limit).ToList(), version = 2 });
+            return Reply(new { ok = true, total = Sheet.Count, rows = Enumerable.Reverse(Sheet).Skip(offset).Take(limit).ToList(), version = 5 });
         }
 
         var rows = root.GetProperty("rows").EnumerateArray().ToList();
@@ -109,8 +109,8 @@ public sealed class FakeAppsScript : HttpMessageHandler
 
         if (Version >= 3 && appended)   // kayıt zamanına göre, eşitse ID'ye göre (Code.gs ile aynı)
         {
-            var sorted = Sheet.OrderBy(Created, StringComparer.Ordinal)
-                .ThenBy(r => r["cut_id"].GetString(), StringComparer.Ordinal).ToList();
+            var sorted = Sheet.OrderByDescending(Created, StringComparer.Ordinal)
+                .ThenByDescending(r => r["cut_id"].GetString(), StringComparer.Ordinal).ToList();
             Sheet.Clear();
             Sheet.AddRange(sorted);
         }

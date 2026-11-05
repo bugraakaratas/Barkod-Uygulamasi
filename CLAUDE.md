@@ -61,7 +61,7 @@ src/KumasBarkod.App      (net10.0-windows, WPF; çıktı adı KumasBarkod.exe)
   ViewModels/    MainWindow, CutEntry, Scan, History, Settings
   Views/         MainWindow (FluentWindow + NavigationView + durum çubuğu), Pages/ (CutEntry, Scan, History, Settings)
 tests/KumasBarkod.Tests  (xUnit, 250 test) Data/, Domain/, Services/, Printing/, Scanning/, Sync/ (FakeAppsScript)
-tools/sheets/            Code.gs (Apps Script v3), Code.test.js (node --test), KURULUM.md
+tools/sheets/            Code.gs (Apps Script v5), Code.test.js (node --test), KURULUM.md
 tools/installer/         KumasBarkod.iss, build-installer.ps1, generate-icon.ps1
 docs/                    SUNUM.md (donanımsız sunum akışı), PILOT.md (fabrika pilotu)
 ```
@@ -243,6 +243,13 @@ docs/                    SUNUM.md (donanımsız sunum akışı), PILOT.md (fabri
 - **Arayüz testi (2026-11-05, geçici veri, SendKeys + gerçek fare):** 24/24: cm ve virgül reddi, F5 sonraki ID, F5 basılı tek kayıt, F6 Esc/Enter, panelde F5, fareyle lot, baskı hatası (labels klasörü dosyayla değiştirilerek) F5 engeli + F6 onaysız, Okutma düğmeleri, iptal sonrası F5/F6 pasif. Son test betiği scratchpad'de `uitest.ps1` (oturuma özel).
 - 1366×768'de "Son kayıtlar" yaklaşık 3 satıra düştü; F6 paneli açıkken liste geçici olarak kapanır.
 
+### Sheets v5 notları (2026-11-06)
+- **Başlıklar:** `COLUMNS` iç anahtar olarak İngilizce kaldı, `HEADERS` görünen Türkçe adlar. `upgradeHeader_` her POST'ta eski başlığı çevirir. `export_` iki adı da tanır; hücre değerleri değişmedi.
+- **Sıra:** yeni satırlar `insertRowsAfter(1, n)` ile başlığın altına girer. Güncellemeler eklemeden ÖNCE yapılır (satır numaraları kayar). Eklenen satır biçimi kalın başlıktan gelmesin diye `setFontWeight('normal')`. Sırasızlık kontrolü ters döndü; eski artan tablolar açılıştaki boş pakette yeniden eskiye döner.
+- **`export` eskiden yeniye verir:** offset tablonun altından sayılır. Yoksa geri kurma sırasında üste eklenen satır sayfaları kaydırırdı. Bu yüzden `RestoreService` satır numarası yerine ID bildirir.
+- **1000 satır:** eski kod sayfa sonuna `getRange` ile yazıyordu; varsayılan 1000 satırlık sayfa dolunca hata vermesi beklenir (gerçek tabloda denenmedi). `insertRowsAfter` sayfayı büyütür.
+- `RequiredScriptVersion` 3 kaldı: sıra ve başlık yalnızca görünümdür, eski script veri bozmaz. `FakeAppsScript` varsayılanı v5.
+
 ## ⚠️ EN SON YAPILACAK — Sheets (2026-11-05, kullanıcı isteği)
 
 Revizeler bu iki iş yapılmadan **tamamlandı sayılmaz**. Diğer revizeler bitince kullanıcıya hatırlat, onay alıp başla.
@@ -260,6 +267,7 @@ Code.gs değişince kullanıcı script'i yeniden dağıtmalı.
 - **Karar (2026-11-01): ID 6 hane kalır** (seçenek a). Bir istasyon en fazla 999.999 ID üretir (günde 500 kesimle ~6,7 yıl); dolunca uygulama uyarır, Ayarlar'dan yeni istasyon kodu verilir. 7 haneye çıkarma önerilmişti, kullanıcı istemedi — tekrar önerme.
 - **Kalan (donanım/fabrika gerektiren):** Adım 10'un kalanı (etiket yazıcısı seçimi/satın alma, etiket yazıcısına ham ZPL — `RawWindowsPrinter`/winspool, şablonu gerçek etikete uydurma, Türkçe karakter ve kumaş denemesi); fabrika pilotu (temiz PC + bir vardiya kağıtla paralel). Fabrika için yeni Google tablosu + anahtar.
 - **2026-11-02:** ID benzersizliği düzeltmesi tamamlandı ve gerçek Google ile doğrulandı (test tablosunda script v4). Fabrika tablosu kurulurken v4 Code.gs kullanılmalı.
+- **Code.gs v5 (2026-11-06):** kod ve testler hazır, gerçek tabloda dağıtım/doğrulama bekliyor (bkz. Sheets v5 notları).
 - **Sıradaki:** Kullanıcıya sorulacak. Seçenek: yazıcı modeli belli olmadan da yazılabilecek ham ZPL gönderimi (winspool) — gerçek yazıcıda denenene kadar "denenmedi" olarak işaretlenir.
 - Gerçek USB okuyucu testi hâlâ açık (Adım 6) — gösterim modunda elle giriş/"Okut (gösterim)" ile ikame edildi.
 - **GitHub:** 2026-11-02 itibarıyla her şey gönderildi; **v1.0.2 yayında** (Releases, sabit indirme linki).

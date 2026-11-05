@@ -57,7 +57,7 @@ public sealed class RestoreService(SqliteConnectionFactory db, ISyncTransport tr
         {
             var error = Validate(rows[i]);
             if (error is null && !seen.Add(rows[i].CutId)) error = "aynı ID tabloda birden fazla";
-            if (error is not null) errors.Add($"Tablo satırı {i + 2} ({rows[i].CutId ?? "ID yok"}): {error}");
+            if (error is not null) errors.Add($"{rows[i].CutId ?? $"ID'siz kayıt {i + 1}"}: {error}");
         }
         if (errors.Count > 0)
         {

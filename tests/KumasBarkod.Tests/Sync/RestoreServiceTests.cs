@@ -172,7 +172,7 @@ public class RestoreServiceTests : IDisposable
 
         var ex = await Assert.ThrowsAsync<CutValidationException>(() => _restore.RestoreAsync(Target));
 
-        Assert.Contains("satırı 3", ex.Message);   // başlık + 2. veri satırı
+        Assert.Contains(column == "cut_id" ? "K1-000099" : "K1-000002", ex.Message);   // hatalı kayıt ID ile bildirilir
         Assert.Empty(AllCuts(_newDb.Factory));
     }
 

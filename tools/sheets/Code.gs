@@ -9,9 +9,16 @@
  *  - Bir kesimin kimliği cut_id + created_at'tir. Tabloda aynı cut_id BAŞKA bir created_at ile
  *    varsa (başka veritabanı aynı ID'yi üretmiş) eski satırın üzerine YAZILMAZ; satır
  *    "conflicts" listesinde döner ve uygulama hata gösterir.
- *  - Yeni satırlar created_at (kayıt zamanı) sırasına göre yerleşir: en yeni kesim en altta.
+ *  - Yeni satırlar created_at (kayıt zamanı) sırasına göre yerleşir.
  *  - Yanıtta "max_sequences": tablodaki istasyon başına en büyük sıra numarası. Uygulama
  *    sayacını bunun altında tutmaz (yeni kurulum eski ID'leri tekrar üretmesin).
+ *
+ * v5 — okunabilirlik:
+ *  - En yeni kesim EN ÜSTTE: yeni satır başlığın hemen altına girer, sıralama yeniden eskiye.
+ *    Binlerce satırda tabloya bakan kişi en son kaydı aramak için aşağı inmez.
+ *  - Görünen başlıklar Türkçe. Uygulamayla konuşulan JSON anahtarları İngilizce kalır.
+ *  - Eski tablolar elle müdahale gerektirmez: uygulamanın ilk bağlantısında başlıklar çevrilir,
+ *    satırlar yeniden eskiye dizilir.
  *
  * Kurulum: tools/sheets/KURULUM.md
  * Asıl veri uygulamadaki SQLite'tadır; bu tablo yalnızca kopyadır. Elle değişiklik
@@ -21,16 +28,25 @@
 // v2: "export" eylemi (geri kurma için satırları sayfa sayfa okur; anahtar gerekir).
 // v3: çakışan ID'nin üzerine yazmaz, kayıt zamanına göre sıralar, max_sequences döner.
 // v4: tablo herhangi bir sebeple sırasızsa (eski hata, elle sıralama) kendiliğinden yeniden sıralar.
-const VERSION = 4;
+// v5: en yeni kayıt en üstte, Türkçe başlıklar; "export" yine eskiden yeniye verir.
+const VERSION = 5;
 const EXPORT_MAX_LIMIT = 2000;
 const SHEET_NAME = 'Kesimler';
 
-// Sütun sırası sabittir. Geri kurma (Adım 9) sütunları başlık adına göre okur.
+// İç anahtarlar (JSON ile aynı). Sütun sırası sabittir. Geri kurma sütunları başlık adına göre okur.
 const COLUMNS = [
   'cut_id', 'station_code', 'sequence_no', 'lot_code', 'length_cm', 'operator',
   'status', 'void_reason', 'voided_at', 'created_at', 'print_count', 'last_printed_at',
   'metre', // rapor kolaylığı: length_cm / 100 (geri kurmada kullanılmaz)
 ];
+
+// Tabloda görünen başlıklar.
+const HEADERS = {
+  cut_id: 'ID', station_code: 'İstasyon', sequence_no: 'Sıra No', lot_code: 'Lot',
+  length_cm: 'Uzunluk (cm)', operator: 'Operatör', status: 'Durum', void_reason: 'İptal Sebebi',
+  voided_at: 'İptal Zamanı', created_at: 'Kayıt Zamanı', print_count: 'Baskı Sayısı',
+  last_printed_at: 'Son Baskı', metre: 'Metre',
+};
 
 // Sheets'in kendi kafasına göre tarihe/sayıya çevirmemesi için düz metin tutulan sütunlar.
 const TEXT_COLUMNS = new Set([
@@ -87,19 +103,28 @@ function sheet_() {
   let sh = ss.getSheetByName(SHEET_NAME);
   if (!sh) sh = ss.insertSheet(SHEET_NAME);
   if (sh.getLastRow() === 0) {
-    sh.getRange(1, 1, 1, COLUMNS.length).setValues([COLUMNS]).setFontWeight('bold');
+    sh.getRange(1, 1, 1, COLUMNS.length).setValues([COLUMNS.map((c) => HEADERS[c])]).setFontWeight('bold');
     sh.setFrozenRows(1);
   }
   return sh;
 }
 
+/** Eski (İngilizce) başlıkları Türkçeye çevirir; veri satırlarına dokunmaz. */
+function upgradeHeader_(sh) {
+  const range = sh.getRange(1, 1, 1, COLUMNS.length);
+  const current = range.getValues()[0].map(String);
+  const upgraded = current.map((h) => (COLUMNS.includes(h) ? HEADERS[h] : h));
+  if (upgraded.some((h, i) => h !== current[i])) range.setValues([upgraded]);
+}
+
 function upsert_(rows) {
   const sh = sheet_();
   rows.forEach(validate_);
+  upgradeHeader_(sh);
 
   // Mevcut satırlar: cut_id → { satır numarası, created_at }
   const index = new Map();
-  let lastCreated = '';
+  let newest = null;      // tablodaki en yeni satır
   let previous = null;
   let unsorted = false;   // tablo şu an kayıt zamanı sırasında değil
   const last = sh.getLastRow();
@@ -107,8 +132,8 @@ function upsert_(rows) {
     sh.getRange(2, 1, last - 1, COLUMNS.length).getValues().forEach((v, i) => {
       const created = String(v[COL_CREATED_AT - 1]);
       index.set(String(v[COL_CUT_ID - 1]), { row: i + 2, created: created });
-      if (created > lastCreated) lastCreated = created;
-      if (previous !== null && compare_(previous, v) > 0) unsorted = true;
+      if (newest === null || compare_(v, newest) > 0) newest = v;
+      if (previous !== null && compare_(previous, v) < 0) unsorted = true;
       previous = v;
     });
   }
@@ -143,23 +168,27 @@ function upsert_(rows) {
   });
 
   if (appends.length > 0) {
-    // Kayıt zamanına göre (eşitse ID'ye göre) sırala; created_at sabit uzunluklu ISO metin.
-    appends.sort((a, b) => compare_(a, b));
-    const first = sh.getLastRow() + 1;
-    const range = sh.getRange(first, 1, appends.length, COLUMNS.length);
+    // Yeniden eskiye (eşitse ID'ye göre); created_at sabit uzunluklu ISO metin.
+    appends.sort((a, b) => compare_(b, a));
+    // Başlığın hemen altına. Mevcut satırlar kayar, bu yüzden güncellemeler yukarıda yapıldı.
+    // insertRowsAfter sayfayı da büyütür: sayfa sonuna getRange ile yazmak 1000 satırda hata verirdi.
+    sh.insertRowsAfter(1, appends.length);
+    const range = sh.getRange(2, 1, appends.length, COLUMNS.length);
     const formats = appends.map(() => COLUMNS.map((c) =>
       TEXT_COLUMNS.has(c) ? '@' : (c === 'metre' ? '0.00' : '0')));
     range.setNumberFormats(formats);
+    range.setFontWeight('normal');   // eklenen satır biçimini kalın başlıktan alır
     range.setValues(appends);
   }
 
-  // Yeni satırlardan biri tablodaki son kayıttan eskiyse (ör. başka istasyonun internetsiz
-  // birikmiş kayıtları) ya da tablo zaten sırasızsa tüm veri satırlarını kayıt zamanına göre diz.
-  // Uygulama her açılışta boş paket gönderdiği için sırasız tablo kendiliğinden düzelir.
-  const olderAppended = appends.length > 0 && String(appends[0][COL_CREATED_AT - 1]) < lastCreated;
+  // Yeni satırlardan biri tablodaki en yeni kayıttan eskiyse (ör. başka istasyonun internetsiz
+  // birikmiş kayıtları) ya da tablo zaten sırasızsa tüm veri satırlarını yeniden eskiye diz.
+  // Uygulama her açılışta boş paket gönderdiği için sırasız (eski düzendeki) tablo kendiliğinden düzelir.
+  const olderAppended = appends.length > 0 && newest !== null
+    && compare_(appends[appends.length - 1], newest) < 0;
   if ((olderAppended || unsorted) && sh.getLastRow() > 2) {
     sh.getRange(2, 1, sh.getLastRow() - 1, sh.getLastColumn())
-      .sort([{ column: COL_CREATED_AT, ascending: true }, { column: COL_CUT_ID, ascending: true }]);
+      .sort([{ column: COL_CREATED_AT, ascending: false }, { column: COL_CUT_ID, ascending: false }]);
   }
 
   // İstasyon başına en büyük sıra numarası (tablodaki + bu paketteki)
@@ -183,8 +212,10 @@ function compare_(a, b) {
 }
 
 /**
- * Geri kurma: veri satırlarını [offset, offset+limit) aralığında döndürür. Sütunlar başlık
- * adına göre okunur (sıra değişse de çalışır). Boş hücre → null. Okuma kilit gerektirmez.
+ * Geri kurma: satırları ESKİDEN YENİYE, [offset, offset+limit) aralığında döndürür (offset tablonun
+ * altından sayılır). Yeni satırlar üste girdiği için okuma sürerken kesim gönderilse de sayfalar
+ * kaymaz. Sütunlar başlık adına göre okunur (sıra değişse de çalışır; eski İngilizce başlıklar da
+ * tanınır). Boş hücre → null. Okuma kilit gerektirmez.
  */
 function export_(offset, limit) {
   const sh = sheet_();
@@ -195,13 +226,14 @@ function export_(offset, limit) {
   const width = sh.getLastColumn();
   const header = sh.getRange(1, 1, 1, width).getValues()[0].map(String);
   const count = Math.min(limit, total - offset);
-  const values = sh.getRange(2 + offset, 1, count, width).getValues();
+  const values = sh.getRange(2 + total - offset - count, 1, count, width).getValues().reverse();
 
   const rows = values.map((v) => {
     const row = {};
     COLUMNS.forEach((c) => {
       if (c === 'metre') return;
-      const i = header.indexOf(c);
+      const turkish = header.indexOf(HEADERS[c]);
+      const i = turkish >= 0 ? turkish : header.indexOf(c);
       const cell = i < 0 ? '' : v[i];
       row[c] = cell === '' || cell === null ? null : cell;
     });
