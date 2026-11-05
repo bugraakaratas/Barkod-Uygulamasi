@@ -254,7 +254,7 @@ Code.gs değişince kullanıcı script'i yeniden dağıtmalı.
 
 ## Şu anki durum
 
-- **Revizeler (2026-11-05):** cm girişi, fareyle lot, Okutma sadeleştirme, F5/F6 tamam ve test edildi, **commit edildi ama push ve sürüm yok** (sürüm hâlâ 1.0.2). **Revizeler tamamlanmış sayılmaz:** yukarıdaki iki Sheets işi açık.
+- **Revizeler (2026-11-05):** cm girişi, fareyle lot, Okutma sadeleştirme, F5/F6 tamam ve test edildi, **GitHub'a gönderildi** (2026-11-06). **Sürüm 1.0.3 bu bilgisayara kuruldu, kurulum dosyası masaüstünde; GitHub Release YOK:** sabit indirme linki hâlâ 1.0.2 verir, Release kullanıcı isteyince yapılır. **Revizeler tamamlanmış sayılmaz:** yukarıdaki iki Sheets işi açık.
 
 - **Adım 11 kurulum paketi tamamlandı** (2026-11-01): `KumasBarkod-Kurulum-1.0.0.exe` üretildi ve kur/çalıştır/kaldır testi geçti. Adım 9 ve Adım 10'un donanımsız kısmı (gösterim modu) da tamam. Sunum: `docs/SUNUM.md`, pilot: `docs/PILOT.md`.
 - **Karar (2026-11-01): ID 6 hane kalır** (seçenek a). Bir istasyon en fazla 999.999 ID üretir (günde 500 kesimle ~6,7 yıl); dolunca uygulama uyarır, Ayarlar'dan yeni istasyon kodu verilir. 7 haneye çıkarma önerilmişti, kullanıcı istemedi — tekrar önerme.
