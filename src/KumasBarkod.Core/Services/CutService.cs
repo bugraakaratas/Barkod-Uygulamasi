@@ -110,6 +110,24 @@ public sealed class CutService(SqliteConnectionFactory db, SettingsRepository se
         return FindById(cutId)!;
     }
 
+    /// <summary>
+    /// Sıradaki parça: kaynak kesimle aynı lot ve uzunlukta YENİ kesim (yeni ID, sayaç, kuyruk).
+    /// İptal edilmiş kesim kopyalanmaz (yanlış veri çoğalmasın); etiketi çıkmamış kesimin ardına
+    /// yenisi açılmaz (etiketsiz ama aktif kayıt kalmasın).
+    /// </summary>
+    public Cut CreateNextPiece(string sourceCutId)
+    {
+        var source = FindById(sourceCutId)
+            ?? throw new CutValidationException($"{sourceCutId} kaydı bulunamadı.");
+        if (source.IsVoided)
+            throw new CutValidationException(
+                $"{source.CutId} iptal edildi; sıradaki parça oluşturulamaz. Lot ve uzunluğu elle girin.");
+        if (source.PrintCount == 0)
+            throw new CutValidationException($"Önce {source.CutId} etiketini basın (F6).");
+
+        return CreateCut(source.LotCode, source.LengthCm, source.Operator);
+    }
+
     public Cut? FindById(string cutId)
     {
         using var c = db.Open();

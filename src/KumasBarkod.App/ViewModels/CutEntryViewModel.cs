@@ -10,7 +10,7 @@ using Wpf.Ui.Controls;
 
 namespace KumasBarkod.App.ViewModels;
 
-public enum EntryField { Lot, Length }
+public enum EntryField { Lot, Length, ReprintPanel }
 
 public sealed record RecentCutItem(string CutId, string LotCode, string Meters, string Time, bool IsVoided, long PrintCount);
 
@@ -20,6 +20,7 @@ public partial class CutEntryViewModel : ObservableObject
     private readonly CutRepository _cuts;
     private readonly SettingsRepository _settings;
     private readonly PrintService _printService;
+    private bool _busy;
 
     public CutEntryViewModel(CutService cutService, CutRepository cuts, SettingsRepository settings, PrintService printService)
     {
@@ -30,15 +31,36 @@ public partial class CutEntryViewModel : ObservableObject
 
         // Başka ekranda iptal/baskı olunca son kayıtlar listesi güncel kalsın.
         WeakReferenceMessenger.Default.Register<CutEntryViewModel, CutChangedMessage>(
-            this, static (vm, _) => vm.ReloadLists());
+            this, static (vm, m) => vm.OnCutChanged(m.Cut));
         WeakReferenceMessenger.Default.Register<CutEntryViewModel, DatabaseRestoredMessage>(
             this, static (vm, _) => vm.ReloadLists());
     }
 
-    /// <summary>Bu oturumda en son kaydedilen kesim; F5 bunun etiketini tekrar basar.</summary>
+    /// <summary>
+    /// Bu oturumda en son kaydedilen kesim. F5 (sıradaki parça) ve F6 (bozulan etiket) bunun
+    /// üzerinde çalışır; uygulama yeni açıldığında boştur, ilk kayıt elle girilir.
+    /// </summary>
     [ObservableProperty]
-    [NotifyCanExecuteChangedFor(nameof(ReprintLastCommand), nameof(DemoScanCommand))]
-    public partial string? LastCutId { get; set; }
+    [NotifyPropertyChangedFor(nameof(LastCutId), nameof(HasLastCut), nameof(NextPieceHint))]
+    [NotifyCanExecuteChangedFor(nameof(NextPieceCommand), nameof(BeginReprintCommand), nameof(DemoScanCommand))]
+    public partial Cut? LastCut { get; set; }
+
+    public string? LastCutId => LastCut?.CutId;
+
+    public bool HasLastCut => LastCut is not null;
+
+    /// <summary>Sıradaki parça düğmesinin altındaki açıklama: ne basılacağı ya da neden basılamayacağı.</summary>
+    public string NextPieceHint => LastCut switch
+    {
+        null => "İlk kaydı elle girin",
+        { IsVoided: true } c => $"{c.CutId} iptal edildi: lot ve uzunluğu elle girin",
+        { PrintCount: 0 } c when !_busy => $"Önce {c.CutId} etiketini basın (F6)",
+        var c => $"{c.LotCode} · {Length.FormatCm(c.LengthCm)} cm · yeni ID",
+    };
+
+    /// <summary>"Bozulan etiket" onayı açık mı? Yeni parça için kullanılmasın diye tek tuşla basmaz.</summary>
+    [ObservableProperty]
+    public partial bool IsReprintPanelOpen { get; set; }
 
     /// <summary>Son kaydın etiket önizlemesi (yazıcı türünden bağımsız her zaman gösterilir).</summary>
     [ObservableProperty]
@@ -48,7 +70,7 @@ public partial class CutEntryViewModel : ObservableObject
     /// Gösterim: son etiketi "okut". Okuyucunun yaptığının sonucunu üretir: kayıt okutma ekranında açılır.
     /// (Gerçek okuyucu da aynı yoldan gelir: <see cref="OpenCutMessage"/>.)
     /// </summary>
-    [RelayCommand(CanExecute = nameof(CanReprintLast))]
+    [RelayCommand(CanExecute = nameof(HasLastCut))]
     private void DemoScan() => WeakReferenceMessenger.Default.Send(new OpenCutMessage(LastCutId!));
 
     /// <summary>Görünüme hangi alana odaklanacağını söyler (odak bir görünüm işidir).</summary>
@@ -136,7 +158,7 @@ public partial class CutEntryViewModel : ObservableObject
     /// ikinci kayıt açılmaz.
     /// </summary>
     [RelayCommand]
-    private async Task SaveAsync()
+    private Task SaveAsync() => RunExclusiveAsync(async () =>
     {
         string lot;
         try
@@ -155,27 +177,106 @@ public partial class CutEntryViewModel : ObservableObject
             return;
         }
 
-        Cut cut;
+        var cut = await TryCreateAsync(() => _cutService.CreateCut(lot, cm));
+        if (cut is null) return;
+
+        LengthText = "";
+        LotText = cut.LotCode;      // Son lot seçili kalır
+        await ShowAndPrintAsync(cut);
+    });
+
+    /// <summary>
+    /// Sıradaki parça: son kaydın lotu ve uzunluğuyla yeni ID'li kesim + etiket. Değerler son
+    /// kayıttan alınır; kutulardaki yarım yazılar kullanılmaz ve değiştirilmez.
+    /// </summary>
+    [RelayCommand(CanExecute = nameof(CanNextPiece))]
+    private Task NextPieceAsync() => RunExclusiveAsync(async () =>
+    {
+        CloseReprintPanel();
+        var sourceId = LastCut!.CutId;
+        var cut = await TryCreateAsync(() => _cutService.CreateNextPiece(sourceId));
+        if (cut is not null)
+            await ShowAndPrintAsync(cut);
+    });
+
+    private bool CanNextPiece() => LastCut is { IsVoided: false };
+
+    /// <summary>
+    /// Bozulan etiket: onay ister. Hiç etiket çıkmamışsa (baskı hatası) onay gerekmez, doğrudan basar.
+    /// </summary>
+    [RelayCommand(CanExecute = nameof(CanReprint))]
+    private async Task BeginReprintAsync()
+    {
+        if (LastCut!.PrintCount == 0)
+        {
+            await RunExclusiveAsync(ReprintLastAsync);
+            return;
+        }
+        IsReprintPanelOpen = true;
+        FocusRequested?.Invoke(EntryField.ReprintPanel);
+    }
+
+    private bool CanReprint() => LastCut is { IsVoided: false };
+
+    [RelayCommand]
+    private Task ConfirmReprintAsync() => RunExclusiveAsync(async () =>
+    {
+        if (!IsReprintPanelOpen) return;
+        CloseReprintPanel();
+        await ReprintLastAsync();
+    });
+
+    [RelayCommand]
+    private void CancelReprint()
+    {
+        CloseReprintPanel();
+        FocusRequested?.Invoke(EntryField.Length);
+    }
+
+    public void CloseReprintPanel() => IsReprintPanelOpen = false;
+
+    /// <summary>
+    /// Enter ve F5 farklı komutlardır, komutun kendi kilidi ikisini birlikte durdurmaz: aynı anda
+    /// iki kayıt açılmasın, baskı sürerken ikinci işlem başlamasın.
+    /// </summary>
+    private async Task RunExclusiveAsync(Func<Task> work)
+    {
+        if (_busy) return;
+        _busy = true;
         try
         {
-            cut = await Task.Run(() => _cutService.CreateCut(lot, cm));
+            await work();
+        }
+        finally
+        {
+            _busy = false;
+            OnPropertyChanged(nameof(NextPieceHint));
+        }
+    }
+
+    /// <returns>Oluşan kesim; hata gösterildiyse null.</returns>
+    private async Task<Cut?> TryCreateAsync(Func<Cut> create)
+    {
+        try
+        {
+            return await Task.Run(create);
         }
         catch (CutValidationException ex)
         {
             ShowError(ex.Message, EntryField.Length);
-            return;
         }
         catch (Exception ex)
         {
             ShowError($"Kayıt yapılamadı: {ex.Message}", EntryField.Length);
-            return;
         }
+        return null;
+    }
 
-        // Kayıt tamam: ekranı hemen hazırla, sonra etiketi bas.
-        LastCutId = cut.CutId;
+    /// <summary>Kayıt tamam: ekranı hemen hazırlar, sonra etiketi basar.</summary>
+    private async Task ShowAndPrintAsync(Cut cut)
+    {
+        LastCut = cut;
         LastLabel = LabelData.FromCut(cut, TimeZoneInfo.Local);
-        LengthText = "";
-        LotText = cut.LotCode;      // Son lot seçili kalır
         ReloadLists();
         WeakReferenceMessenger.Default.Send(new CutChangedMessage(cut));
 
@@ -185,26 +286,23 @@ public partial class CutEntryViewModel : ObservableObject
             ShowResult(InfoBarSeverity.Success, $"{cut.CutId} kaydedildi", $"{summary} · {PrintedText()}");
         else
             ShowResult(InfoBarSeverity.Warning, $"{cut.CutId} kaydedildi, etiket basılamadı",
-                $"{printError}  F5 ile tekrar deneyin.");
+                $"{printError}  F6 ile tekrar deneyin.");
 
         FocusRequested?.Invoke(EntryField.Length);
     }
 
-    /// <summary>Son kaydın etiketini aynı ID ile tekrar basar (baskı hatası veya yıpranmış etiket).</summary>
-    [RelayCommand(CanExecute = nameof(CanReprintLast))]
+    /// <summary>Son kaydı AYNI ID ile basar. Yeni parça için değildir; o iş F5'tir.</summary>
     private async Task ReprintLastAsync()
     {
-        var cutId = LastCutId!;
+        var cutId = LastCut!.CutId;
         var error = await PrintAsync(cutId);
         if (error is null)
-            ShowResult(InfoBarSeverity.Success, $"{cutId} etiketi tekrar basıldı", PrintedText());
+            ShowResult(InfoBarSeverity.Success, $"{cutId} etiketi yeniden basıldı", PrintedText());
         else
-            ShowResult(InfoBarSeverity.Warning, $"{cutId} etiketi basılamadı", $"{error}  F5 ile tekrar deneyin.");
+            ShowResult(InfoBarSeverity.Warning, $"{cutId} etiketi basılamadı", $"{error}  F6 ile tekrar deneyin.");
 
         FocusRequested?.Invoke(EntryField.Length);
     }
-
-    private bool CanReprintLast() => LastCutId is not null;
 
     /// <returns>Hata mesajı; başarılıysa null.</returns>
     private async Task<string?> PrintAsync(string cutId)
@@ -247,6 +345,14 @@ public partial class CutEntryViewModel : ObservableObject
     {
         ShowResult(InfoBarSeverity.Error, "Kaydedilmedi", message);
         FocusRequested?.Invoke(field);
+    }
+
+    private void OnCutChanged(Cut cut)
+    {
+        ReloadLists();
+        // Başka ekrandaki iptal veya baskı düğmelere ve açıklamaya yansısın.
+        if (cut.CutId == LastCut?.CutId)
+            LastCut = cut;
     }
 
     private void ReloadLists()

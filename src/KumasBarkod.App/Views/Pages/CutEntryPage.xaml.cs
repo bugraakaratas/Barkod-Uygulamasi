@@ -38,6 +38,14 @@ public partial class CutEntryPage : Page
     /// </summary>
     private void FocusNow(EntryField field)
     {
+        if (field == EntryField.ReprintPanel)
+        {
+            ReprintPanel.Focus();
+            ReprintPanel.UpdateLayout();
+            ReprintPanel.BringIntoView();
+            return;
+        }
+
         var box = field == EntryField.Lot ? LotBox : LengthBox;
         box.Focus();
         box.SelectAll();
@@ -55,6 +63,14 @@ public partial class CutEntryPage : Page
     /// </summary>
     private void Page_PreviewKeyDown(object sender, KeyEventArgs e)
     {
+        // Okutmanın Enter'ı ScanCapture'da işlenmiş gelir: onaylamaz.
+        if (e.Key == Key.Enter && !e.Handled && ReprintPanel.IsKeyboardFocusWithin)
+        {
+            _viewModel.ConfirmReprintCommand.Execute(null);
+            e.Handled = true;
+            return;
+        }
+
         switch (e.Key)
         {
             case Key.F2:
@@ -62,16 +78,32 @@ public partial class CutEntryPage : Page
                 e.Handled = true;
                 break;
             case Key.F5:
-                if (_viewModel.ReprintLastCommand.CanExecute(null))
-                    _viewModel.ReprintLastCommand.Execute(null);
-                e.Handled = true;
+                // Basılı tutmak tekrar üretmez: F5 gerçek kayıt açar, her parça ayrı basış ister.
+                RunOnce(_viewModel.NextPieceCommand, e);
+                break;
+            case Key.F6:
+                RunOnce(_viewModel.BeginReprintCommand, e);
                 break;
             case Key.Escape:
-                _viewModel.ClearLengthCommand.Execute(null);
+                if (_viewModel.IsReprintPanelOpen)
+                    _viewModel.CancelReprintCommand.Execute(null);
+                else
+                    _viewModel.ClearLengthCommand.Execute(null);
                 e.Handled = true;
                 break;
         }
     }
+
+    private static void RunOnce(ICommand command, KeyEventArgs e)
+    {
+        if (!e.IsRepeat && command.CanExecute(null))
+            command.Execute(null);
+        e.Handled = true;
+    }
+
+    /// <summary>Başka yere tıklanınca veya ekran değişince onay açık kalmasın.</summary>
+    private void ReprintPanel_LostKeyboardFocus(object sender, KeyboardFocusChangedEventArgs e) =>
+        _viewModel.CloseReprintPanel();
 
     private void LotBox_PreviewKeyDown(object sender, KeyEventArgs e)
     {

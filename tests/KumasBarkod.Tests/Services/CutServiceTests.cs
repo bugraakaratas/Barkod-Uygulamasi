@@ -24,6 +24,79 @@ public class CutServiceTests : IDisposable
 
     public void Dispose() => _db.Dispose();
 
+    // ---------- Sıradaki parça ----------
+
+    private void MarkPrinted(string cutId)
+    {
+        using var c = _db.Factory.Open();
+        c.Execute("UPDATE cuts SET print_count = print_count + 1 WHERE cut_id = @cutId", new { cutId });
+    }
+
+    private long OutboxRows(string cutId)
+    {
+        using var c = _db.Factory.Open();
+        return c.ExecuteScalar<long>("SELECT count(*) FROM sync_outbox WHERE cut_id = @cutId", new { cutId });
+    }
+
+    [Fact]
+    public void Next_piece_copies_lot_and_length_with_next_id()
+    {
+        var first = _service.CreateCut("LOT-A", 2550, "Ayşe");
+        MarkPrinted(first.CutId);
+
+        var next = _service.CreateNextPiece(first.CutId);
+
+        Assert.Equal("K1-000002", next.CutId);
+        Assert.Equal("LOT-A", next.LotCode);
+        Assert.Equal(2550, next.LengthCm);
+        Assert.Equal("Ayşe", next.Operator);
+        Assert.Equal(0, next.PrintCount);
+        Assert.Equal(1, OutboxRows(next.CutId));
+    }
+
+    [Fact]
+    public void Next_piece_can_chain_from_each_new_cut()
+    {
+        var cut = _service.CreateCut("LOT-A", 2550);
+        for (var i = 0; i < 3; i++)
+        {
+            MarkPrinted(cut.CutId);
+            cut = _service.CreateNextPiece(cut.CutId);
+        }
+
+        Assert.Equal("K1-000004", cut.CutId);
+    }
+
+    [Fact]
+    public void Next_piece_refuses_voided_source_without_using_a_sequence()
+    {
+        var first = _service.CreateCut("LOT-A", 2550);
+        MarkPrinted(first.CutId);
+        _service.VoidCut(first.CutId, VoidReasons.WrongLength);
+
+        var ex = Assert.Throws<CutValidationException>(() => _service.CreateNextPiece(first.CutId));
+
+        Assert.Contains("iptal", ex.Message);
+        Assert.Equal("K1-000002", _service.CreateCut("LOT-A", 100).CutId);
+    }
+
+    [Fact]
+    public void Next_piece_refuses_source_whose_label_was_never_printed()
+    {
+        var first = _service.CreateCut("LOT-A", 2550);
+
+        var ex = Assert.Throws<CutValidationException>(() => _service.CreateNextPiece(first.CutId));
+
+        Assert.Contains("F6", ex.Message);
+        Assert.Equal("K1-000002", _service.CreateCut("LOT-A", 100).CutId);
+    }
+
+    [Fact]
+    public void Next_piece_refuses_unknown_source()
+    {
+        Assert.Throws<CutValidationException>(() => _service.CreateNextPiece("K1-999999"));
+    }
+
     // ---------- Sıralı ID ----------
 
     [Fact]
