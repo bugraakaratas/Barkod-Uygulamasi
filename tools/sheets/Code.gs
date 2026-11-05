@@ -20,6 +20,16 @@
  *  - Eski tablolar elle müdahale gerektirmez: uygulamanın ilk bağlantısında başlıklar çevrilir,
  *    satırlar yeniden eskiye dizilir.
  *
+ * v6 — büyük tablo hızı (ölçüm: 50.000 satırda uzun sütunu okumak 7 sn, üste eklemek 0,2 sn):
+ *  - Tüm tablo okunmaz: üstteki SCAN_WINDOW satır okunur, daha eski ID'ler TextFinder ile bulunur.
+ *  - max_sequences script özelliğinde tutulur; yalnızca ilk seferde tablo baştan sona okunur.
+ *  - Geç gelen kayıt üst bölüme düşüyorsa yalnızca o bölüm sıralanır.
+ *
+ * v7 — metin güvenliği (gerçek tabloda bulundu):
+ *  - "=" ile başlayan metin Sheets'te formül olarak çalışıyordu, düz metin biçimi bunu engellemiyor.
+ *    Metin hücreleri başına görünmez tırnak (') konarak yazılır; okurken tırnak gelmez.
+ *  - Geri kurmada metin sütunları her zaman metin döner: tek bir sayısal hücre tüm yanıtı bozmasın.
+ *
  * Kurulum: tools/sheets/KURULUM.md
  * Asıl veri uygulamadaki SQLite'tadır; bu tablo yalnızca kopyadır. Elle değişiklik
  * bir sonraki gönderimde üzerine yazılır.
@@ -29,8 +39,12 @@
 // v3: çakışan ID'nin üzerine yazmaz, kayıt zamanına göre sıralar, max_sequences döner.
 // v4: tablo herhangi bir sebeple sırasızsa (eski hata, elle sıralama) kendiliğinden yeniden sıralar.
 // v5: en yeni kayıt en üstte, Türkçe başlıklar; "export" yine eskiden yeniye verir.
-const VERSION = 5;
+// v6: büyük tabloda her gönderimde tablo baştan sona okunmaz.
+// v7: metinler formül olarak yorumlanmaz; export metin sütunlarını metin döndürür.
+const VERSION = 7;
 const EXPORT_MAX_LIMIT = 2000;
+const SCAN_WINDOW = 2000;                  // her gönderimde üstten okunan satır
+const MAX_SEQ_KEY = 'MAX_SEQUENCES';       // istasyon → en büyük sıra (script özelliği)
 const SHEET_NAME = 'Kesimler';
 
 // İç anahtarlar (JSON ile aynı). Sütun sırası sabittir. Geri kurma sütunları başlık adına göre okur.
@@ -122,20 +136,29 @@ function upsert_(rows) {
   rows.forEach(validate_);
   upgradeHeader_(sh);
 
-  // Mevcut satırlar: cut_id → { satır numarası, created_at }
+  const total = Math.max(0, sh.getLastRow() - 1);
+  const maxSequences = loadMaxSequences_(sh, total);   // satırlar kaymadan önce
+
+  // Üst bölümdeki satırlar: cut_id → { satır numarası, created_at }
   const index = new Map();
-  let newest = null;      // tablodaki en yeni satır
-  let previous = null;
-  let unsorted = false;   // tablo şu an kayıt zamanı sırasında değil
-  const last = sh.getLastRow();
-  if (last > 1) {
-    sh.getRange(2, 1, last - 1, COLUMNS.length).getValues().forEach((v, i) => {
-      const created = String(v[COL_CREATED_AT - 1]);
-      index.set(String(v[COL_CUT_ID - 1]), { row: i + 2, created: created });
+  const scanned = Math.min(total, SCAN_WINDOW);
+  let newest = null;        // okunan bölümdeki en yeni satır
+  let previous = null;      // okunan bölümün son (en eski) satırı
+  let unsorted = false;     // tablo yeniden eskiye sıralı değil
+  if (scanned > 0) {
+    sh.getRange(2, 1, scanned, COL_CREATED_AT).getValues().forEach((v, i) => {
+      index.set(String(v[COL_CUT_ID - 1]), { row: i + 2, created: String(v[COL_CREATED_AT - 1]) });
       if (newest === null || compare_(v, newest) > 0) newest = v;
       if (previous !== null && compare_(previous, v) < 0) unsorted = true;
       previous = v;
     });
+  }
+  const scannedOldest = previous;
+  if (total > scanned) {
+    // En alttaki satır üst bölümden yeniyse tablo eski düzende (eskiden yeniye) ya da elle sıralanmış.
+    const bottom = sh.getRange(total + 1, 1, 1, COL_CREATED_AT).getValues()[0];
+    if (compare_(bottom, scannedOldest) > 0) unsorted = true;
+    findBelowWindow_(sh, rows, scanned, total, index);
   }
 
   const conflicts = [];
@@ -181,27 +204,65 @@ function upsert_(rows) {
     range.setValues(appends);
   }
 
-  // Yeni satırlardan biri tablodaki en yeni kayıttan eskiyse (ör. başka istasyonun internetsiz
-  // birikmiş kayıtları) ya da tablo zaten sırasızsa tüm veri satırlarını yeniden eskiye diz.
-  // Uygulama her açılışta boş paket gönderdiği için sırasız (eski düzendeki) tablo kendiliğinden düzelir.
-  const olderAppended = appends.length > 0 && newest !== null
-    && compare_(appends[appends.length - 1], newest) < 0;
-  if ((olderAppended || unsorted) && sh.getLastRow() > 2) {
-    sh.getRange(2, 1, sh.getLastRow() - 1, sh.getLastColumn())
-      .sort([{ column: COL_CREATED_AT, ascending: false }, { column: COL_CUT_ID, ascending: false }]);
+  // Geç gelen kayıtlar (başka istasyon, internetsiz birikmiş kayıtlar) araya yerleşir: üst bölüme
+  // düşüyorsa yalnızca o bölüm, daha eskiyse ya da tablo sırasızsa tümü sıralanır. Uygulama her
+  // açılışta boş paket gönderdiği için sırasız (eski düzendeki) tablo kendiliğinden düzelir.
+  const oldestNew = appends.length > 0 ? appends[appends.length - 1] : null;
+  const olderAppended = oldestNew !== null && newest !== null && compare_(oldestNew, newest) < 0;
+  if (unsorted) {
+    sortRows_(sh, sh.getLastRow() - 1);
+  } else if (olderAppended) {
+    const inWindow = total === scanned || compare_(oldestNew, scannedOldest) > 0;
+    sortRows_(sh, inWindow ? scanned + appends.length : sh.getLastRow() - 1);
   }
 
-  // İstasyon başına en büyük sıra numarası (tablodaki + bu paketteki)
-  const maxSequences = {};
-  const note = (id) => {
-    const station = id.substring(0, 2);
-    const seq = Number(id.substring(3));
-    if (!(maxSequences[station] >= seq)) maxSequences[station] = seq;
-  };
-  index.forEach((_, id) => { if (CUT_ID_PATTERN.test(id)) note(id); });
-  appendIndex.forEach((_, id) => note(id));
+  appendIndex.forEach((_, id) => noteSequence_(maxSequences, id));
+  saveMaxSequences_(maxSequences);
 
   return { upserted: upserted, conflicts: conflicts, maxSequences: maxSequences };
+}
+
+/** Pakette olup üst bölümde bulunmayan ID'leri tablonun geri kalanında arar (okumaktan çok hızlı). */
+function findBelowWindow_(sh, rows, scanned, total, index) {
+  const wanted = Array.from(new Set(rows.map((r) => r.cut_id))).filter((id) => !index.has(id));
+  if (wanted.length === 0) return;
+  // ID'ler validate_ ile doğrulandı: yalnızca harf, rakam ve tire içerir.
+  sh.getRange(2 + scanned, COL_CUT_ID, total - scanned, 1)
+    .createTextFinder('^(' + wanted.join('|') + ')$')
+    .useRegularExpression(true).matchCase(true).findAll()
+    .forEach((cell) => {
+      const row = cell.getRow();
+      index.set(String(cell.getValue()), { row: row, created: String(sh.getRange(row, COL_CREATED_AT).getValue()) });
+    });
+}
+
+function sortRows_(sh, count) {
+  if (count < 2) return;
+  sh.getRange(2, 1, count, sh.getLastColumn())
+    .sort([{ column: COL_CREATED_AT, ascending: false }, { column: COL_CUT_ID, ascending: false }]);
+}
+
+/** İstasyon başına en büyük sıra. Özellik yoksa (ilk çalışma) tablo bir kez baştan sona okunur. */
+function loadMaxSequences_(sh, total) {
+  if (total === 0) return {};
+  const saved = PropertiesService.getScriptProperties().getProperty(MAX_SEQ_KEY);
+  if (saved) return JSON.parse(saved);
+  const result = {};
+  sh.getRange(2, COL_CUT_ID, total, 1).getValues().forEach((cell) => noteSequence_(result, String(cell[0])));
+  return result;
+}
+
+function saveMaxSequences_(maxSequences) {
+  const props = PropertiesService.getScriptProperties();
+  const text = JSON.stringify(maxSequences);
+  if (props.getProperty(MAX_SEQ_KEY) !== text) props.setProperty(MAX_SEQ_KEY, text);
+}
+
+function noteSequence_(maxSequences, id) {
+  if (!CUT_ID_PATTERN.test(id)) return;
+  const station = id.substring(0, 2);
+  const seq = Number(id.substring(3));
+  if (!(maxSequences[station] >= seq)) maxSequences[station] = seq;
 }
 
 function compare_(a, b) {
@@ -235,7 +296,8 @@ function export_(offset, limit) {
       const turkish = header.indexOf(HEADERS[c]);
       const i = turkish >= 0 ? turkish : header.indexOf(c);
       const cell = i < 0 ? '' : v[i];
-      row[c] = cell === '' || cell === null ? null : cell;
+      if (cell === '' || cell === null) row[c] = null;
+      else row[c] = TEXT_COLUMNS.has(c) ? String(cell) : cell;
     });
     return row;
   });
@@ -255,7 +317,10 @@ function toValues_(r) {
   return COLUMNS.map((c) => {
     if (c === 'metre') return r.length_cm / 100;
     const v = r[c];
-    return v === null || v === undefined ? '' : v;
+    if (v === null || v === undefined) return '';
+    // Baştaki ' Sheets'te "bu metindir" demektir ve görünmez; hem formülü hem de metnin kendi
+    // baştaki tırnağını korur. Düz metin hücre biçimi tek başına "=" ile başlayan metni korumuyor.
+    return TEXT_COLUMNS.has(c) && /^[=+\-@']/.test(String(v)) ? "'" + v : v;
   });
 }
 

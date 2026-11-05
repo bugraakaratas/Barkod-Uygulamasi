@@ -31,7 +31,7 @@ public sealed record CutDetails(
         Length.Format(c.LengthCm) + " m",
         Local(c.CreatedAt),
         c.StationCode,
-        c.PrintCount == 0 ? "Basılmadı" : $"{c.PrintCount} kez · son {Local(c.LastPrintedAt!)}",
+        c.PrintCount == 0 ? "Basılmadı" : c.LastPrintedAt is null ? $"{c.PrintCount} kez" : $"{c.PrintCount} kez · son {Local(c.LastPrintedAt)}",
         c.PrintCount > 0,
         c.Operator,
         c.IsVoided,

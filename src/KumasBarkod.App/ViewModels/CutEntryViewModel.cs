@@ -277,8 +277,7 @@ public partial class CutEntryViewModel : ObservableObject
     {
         LastCut = cut;
         LastLabel = LabelData.FromCut(cut, TimeZoneInfo.Local);
-        ReloadLists();
-        WeakReferenceMessenger.Default.Send(new CutChangedMessage(cut));
+        WeakReferenceMessenger.Default.Send(new CutChangedMessage(cut));   // listeler de bununla yenilenir
 
         var summary = $"Lot {cut.LotCode} · {Length.Format(cut.LengthCm)} m";
         var printError = await PrintAsync(cut.CutId);

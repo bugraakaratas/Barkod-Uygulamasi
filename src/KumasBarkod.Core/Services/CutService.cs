@@ -1,3 +1,4 @@
+using System.Globalization;
 using Dapper;
 using KumasBarkod.Core.Data;
 using KumasBarkod.Core.Domain;
@@ -143,7 +144,7 @@ public sealed class CutService(SqliteConnectionFactory db, SettingsRepository se
             throw new CutValidationException("Lot girin.");
         if (lot.Length > MaxLotLength)
             throw new CutValidationException($"Lot en fazla {MaxLotLength} karakter olabilir.");
-        if (lot.Any(char.IsControl))
+        if (lot.Any(c => char.IsControl(c) || char.GetUnicodeCategory(c) == UnicodeCategory.Format))
             throw new CutValidationException("Lot görünmeyen karakter içeremez.");
         return lot;
     }

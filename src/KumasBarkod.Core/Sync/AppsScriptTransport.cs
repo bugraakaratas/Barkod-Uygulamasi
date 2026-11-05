@@ -72,6 +72,12 @@ public sealed class AppsScriptTransport(HttpClient http) : ISyncTransport
             var text = await response.Content.ReadAsStringAsync(cancellationToken);
             T? reply = null;
             try { reply = JsonSerializer.Deserialize<T>(text, Json); }
+            catch (JsonException ex) when (text.TrimStart().StartsWith('{'))
+            {
+                // JSON geldi ama bir değerin tipi uymuyor: erişim sorunu değil, tablodaki veri sorunu.
+                throw new SyncException(SyncFailureKind.Rejected,
+                    $"Sheets yanıtındaki bir değer okunamadı ({ex.Path}). Tabloda elle değiştirilmiş hücre olabilir; Apps Script'i son sürüme güncelleyin.", ex);
+            }
             catch (JsonException) { }
 
             if (reply is null)

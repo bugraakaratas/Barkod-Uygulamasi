@@ -177,6 +177,19 @@ public class RestoreServiceTests : IDisposable
     }
 
     [Fact]
+    public async Task Unreadable_value_in_reply_names_data_problem_not_access_problem()
+    {
+        _sheet.ForceStatus = System.Net.HttpStatusCode.OK;
+        _sheet.ForceBody = """{"ok":true,"total":1,"version":7,"rows":[{"cut_id":"K1-000001","lot_code":2}]}""";
+
+        var ex = await Assert.ThrowsAsync<SyncException>(() => _restore.RestoreAsync(Target));
+
+        Assert.Contains("lot_code", ex.Message);
+        Assert.DoesNotContain("Herkes", ex.Message);
+        Assert.Empty(AllCuts(_newDb.Factory));
+    }
+
+    [Fact]
     public async Task Duplicate_row_in_sheet_writes_nothing()
     {
         _oldCuts.CreateCut("LOT-A", 100);

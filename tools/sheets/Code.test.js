@@ -11,6 +11,8 @@ const KEY = 'gizli';
 function load(maxRows = 1000) {
   const data = []; // 2B dizi: tablo hücreleri (1. satır başlık)
   const formats = { insertedAfterHeaderBold: false, fontWeights: [] };
+  const props = new Map([['API_KEY', KEY]]);
+  const reads = { fullColumn: 0 };   // tablo baştan sona okundu mu
   const sheet = {
     getLastRow: () => data.length,
     // Gerçek sayfa gibi: eklenen satırlar sayfayı büyütür, boyutun dışına getRange hata verir.
@@ -21,14 +23,41 @@ function load(maxRows = 1000) {
     getLastColumn: () => Math.max(0, ...data.map((r) => r.length)),
     setFrozenRows: () => {},
     getRange(row, col, nr = 1, nc = 1) {
+      if (row < 1 || nr < 1) throw new Error('Geçersiz aralık');
       if (row + nr - 1 > maxRows) throw new Error('The coordinates of the range are outside the dimensions of the sheet.');
       return {
-        getValues: () => Array.from({ length: nr }, (_, i) =>
-          Array.from({ length: nc }, (_, j) => ((data[row - 1 + i] || [])[col - 1 + j] ?? ''))),
+        getValues() {
+          if (nr > 2000) reads.fullColumn++;
+          return Array.from({ length: nr }, (_, i) =>
+            Array.from({ length: nc }, (_, j) => ((data[row - 1 + i] || [])[col - 1 + j] ?? '')));
+        },
+        getValue: () => (data[row - 1] || [])[col - 1] ?? '',
+        getRow: () => row,
+        createTextFinder(pattern) {
+          const re = new RegExp(pattern);
+          const finder = {
+            useRegularExpression: () => finder,
+            matchCase: () => finder,
+            findAll: () => {
+              const found = [];
+              for (let i = 0; i < nr; i++) {
+                if (re.test(String((data[row - 1 + i] || [])[col - 1] ?? ''))) found.push(sheet.getRange(row + i, col));
+              }
+              return found;
+            },
+          };
+          return finder;
+        },
         setValues(values) {
           values.forEach((v, i) => {
             data[row - 1 + i] = data[row - 1 + i] || [];
-            v.forEach((cell, j) => { data[row - 1 + i][col - 1 + j] = cell; });
+            v.forEach((cell, j) => {
+              // Gerçek Sheets gibi: baştaki ' görünmez, "=" ile başlayan metin formül olarak çalışır.
+              let stored = cell;
+              if (typeof cell === 'string' && cell.startsWith("'")) stored = cell.slice(1);
+              else if (typeof cell === 'string' && cell.startsWith('=')) stored = 2;
+              data[row - 1 + i][col - 1 + j] = stored;
+            });
           });
           return this;
         },
@@ -51,7 +80,9 @@ function load(maxRows = 1000) {
   };
   const ctx = {
     SpreadsheetApp: { getActiveSpreadsheet: () => ({ getSheetByName: () => sheet, insertSheet: () => sheet }) },
-    PropertiesService: { getScriptProperties: () => ({ getProperty: () => KEY }) },
+    PropertiesService: {
+      getScriptProperties: () => ({ getProperty: (k) => props.get(k) ?? null, setProperty: (k, v) => props.set(k, v) }),
+    },
     LockService: { getScriptLock: () => ({ tryLock: () => true, releaseLock: () => {} }) },
     ContentService: {
       MimeType: { JSON: 'json' },
@@ -63,7 +94,7 @@ function load(maxRows = 1000) {
   const post = (body) => JSON.parse(ctx.doPost({ postData: { contents: JSON.stringify({ key: KEY, ...body }) } }).text);
   const ids = () => data.slice(1).map((r) => r[0]);
   const lot = (id) => data.slice(1).find((r) => r[0] === id)[3];
-  return { post, ids, lot, data, formats };
+  return { post, ids, lot, data, formats, props, reads };
 }
 
 function row(cutId, createdAt, lot = 'LOT', extra = {}) {
@@ -75,11 +106,11 @@ function row(cutId, createdAt, lot = 'LOT', extra = {}) {
 }
 const t = (s) => `2026-11-02T09:00:${String(s).padStart(2, '0')}.000Z`;
 
-test('sürüm 5, boş paket sayaçları döndürür', () => {
+test('sürüm 7, boş paket sayaçları döndürür', () => {
   const s = load();
   const r = s.post({ rows: [] });
   assert.strictEqual(r.ok, true);
-  assert.strictEqual(r.version, 5);
+  assert.strictEqual(r.version, 7);
   assert.deepStrictEqual(r.max_sequences, {});
   s.post({ rows: [row('K1-000007', t(1)), row('K2-000003', t(2))] });
   assert.deepStrictEqual(s.post({ rows: [] }).max_sequences, { K1: 7, K2: 3 });
@@ -136,6 +167,7 @@ test('eski hatadan kalan sırasız tablo boş pakette (uygulama açılışı) ke
   // Gerçek tablodaki durum: üzerine yazılmış K1-000001..3 (sonra), test satırları K1-000004..5 (önce)
   const bad = [row('K1-000001', t(30)), row('K1-000002', t(40)), row('K1-000004', t(10)), row('K1-000005', t(11))];
   bad.forEach((r, i) => { s.data[i + 1] = Object.values(r).concat([r.length_cm / 100]); });
+  s.props.delete('MAX_SEQUENCES');   // elle/başka sürümle yazılmış tablo: sayaçlar yeniden hesaplanır
   const r = s.post({ rows: [] });
   assert.strictEqual(r.ok, true);
   assert.deepStrictEqual(s.ids(), ['K1-000002', 'K1-000001', 'K1-000005', 'K1-000004']);
@@ -216,6 +248,101 @@ test('geri kurma sürerken yeni kesim gelirse sayfalar kaymaz, kayıt atlanmaz v
   const third = s.post({ action: 'export', offset: 4, limit: 2 });
   assert.deepStrictEqual([...first.rows, ...second.rows, ...third.rows].map((x) => x.cut_id),
     ['K1-000001', 'K1-000002', 'K1-000003', 'K1-000004', 'K1-000005', 'K1-000006']);
+});
+
+// Büyük tablo: SCAN_WINDOW'dan (2000) uzun, yeniden eskiye sıralı K1-000001..n
+function bigSheet(n = 2500) {
+  const s = load(100000);
+  s.post({ rows: [] });
+  for (let i = n; i >= 1; i--) {
+    const r = row(`K1-${String(i).padStart(6, '0')}`, new Date(Date.UTC(2026, 0, 1) + i * 1000).toISOString());
+    s.data.push(Object.values(r).concat([r.length_cm / 100]));
+  }
+  s.props.delete('MAX_SEQUENCES');
+  s.post({ rows: [] });        // sayaçlar bir kez hesaplanır
+  s.reads.fullColumn = 0;
+  return s;
+}
+const bigAt = (i) => new Date(Date.UTC(2026, 0, 1) + i * 1000).toISOString();
+
+test('büyük tablo: yeni kayıt tabloyu baştan sona okumadan eklenir, sayaç doğru', () => {
+  const s = bigSheet();
+  const r = s.post({ rows: [row('K1-002501', t(1).replace('11-02', '11-03'))] });
+  assert.strictEqual(r.ok, true);
+  assert.strictEqual(s.ids()[0], 'K1-002501');
+  assert.deepStrictEqual(r.max_sequences, { K1: 2501 });
+  assert.strictEqual(s.reads.fullColumn, 0);
+});
+
+test('büyük tablo: üst bölümün altındaki eski kesim güncellenir, tekrar satır açılmaz', () => {
+  const s = bigSheet();
+  const r = s.post({ rows: [row('K1-000003', bigAt(3), 'LOT', { status: 'voided', void_reason: 'x', voided_at: t(9) })] });
+  assert.strictEqual(r.ok, true);
+  assert.strictEqual(s.data.length, 2501);
+  assert.strictEqual(s.data.find((d) => d[0] === 'K1-000003')[6], 'voided');
+});
+
+test('büyük tablo: üst bölümün altındaki ID başka kesimle gelirse EZİLMEZ, çakışma döner', () => {
+  const s = bigSheet();
+  const r = s.post({ rows: [row('K1-000003', t(50), 'BASKA')] });
+  assert.strictEqual(r.conflicts.length, 1);
+  assert.strictEqual(r.conflicts[0].existing_created_at, bigAt(3));
+  assert.strictEqual(s.data.length, 2501);
+  assert.strictEqual(s.lot('K1-000003'), 'LOT');
+});
+
+test('büyük tablo: geç gelen kayıt üst bölüme düşerse doğru yere girer', () => {
+  const s = bigSheet();
+  s.post({ rows: [row('K2-000001', bigAt(2400.5))] });
+  const i = s.ids().indexOf('K2-000001');
+  assert.deepStrictEqual(s.ids().slice(i - 1, i + 2), ['K1-002401', 'K2-000001', 'K1-002400']);
+});
+
+test('büyük tablo: geç gelen kayıt üst bölümden de eskiyse tüm tablo sıralanır', () => {
+  const s = bigSheet();
+  s.post({ rows: [row('K2-000001', bigAt(10.5))] });
+  const i = s.ids().indexOf('K2-000001');
+  assert.deepStrictEqual(s.ids().slice(i - 1, i + 2), ['K1-000011', 'K2-000001', 'K1-000010']);
+});
+
+test('büyük tablo: eski düzendeki (eskiden yeniye) tablo kendiliğinden döner', () => {
+  const s = bigSheet();
+  s.data.splice(1, s.data.length, ...s.data.slice(1).reverse());
+  assert.strictEqual(s.ids()[0], 'K1-000001');
+  s.post({ rows: [] });
+  assert.strictEqual(s.ids()[0], 'K1-002500');
+  assert.strictEqual(s.ids().at(-1), 'K1-000001');
+});
+
+test('sayaç önbelleği: yeni script ilk çalışmada tablodan hesaplar, sonra okumaz', () => {
+  const s = bigSheet(2500);
+  s.props.delete('MAX_SEQUENCES');
+  assert.deepStrictEqual(s.post({ rows: [] }).max_sequences, { K1: 2500 });
+  assert.strictEqual(s.reads.fullColumn, 1);
+  s.post({ rows: [] });
+  assert.strictEqual(s.reads.fullColumn, 1);
+});
+
+test('formül gibi görünen metinler çalıştırılmaz, tablodan aynen geri okunur', () => {
+  const s = load();
+  const lots = ['=1+1', '=IMPORTXML("http://x","//a")', "'TIRNAK", "''", '+1+1', '-1+1', '@SUM(1)', '=', 'NORMAL', '007'];
+  s.post({ rows: lots.map((lot, i) => row(`K1-${String(i + 1).padStart(6, '0')}`, t(i), lot)) });
+  const r = s.post({ action: 'export', offset: 0, limit: 100 });
+  assert.deepStrictEqual(r.rows.map((x) => x.lot_code), lots);
+});
+
+test('iptal sebebi de metin olarak korunur', () => {
+  const s = load();
+  s.post({ rows: [row('K1-000001', t(1), 'A', { status: 'voided', void_reason: '=HATA', voided_at: t(2) })] });
+  assert.strictEqual(s.post({ action: 'export', offset: 0, limit: 10 }).rows[0].void_reason, '=HATA');
+});
+
+test('tabloda sayıya dönmüş metin hücresi geri kurmayı bozmaz (eski sürümden kalan satır)', () => {
+  const s = load();
+  s.post({ rows: [row('K1-000001', t(1), 'A')] });
+  s.data[1][3] = 2;   // v6 ve öncesi "=1+1" lotunu böyle bırakmış olabilir
+  const r = s.post({ action: 'export', offset: 0, limit: 10 });
+  assert.strictEqual(r.rows[0].lot_code, '2');
 });
 
 test('sayfanın satır sınırı dolunca yeni kayıt yine eklenir', () => {

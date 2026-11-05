@@ -4,7 +4,7 @@
       xmlns:ui="http://schemas.lepo.co/wpfui/2022/xaml"
       Title="Ayarlar"
       ScrollViewer.CanContentScroll="False">
-    <ScrollViewer VerticalScrollBarVisibility="Auto">
+    <ScrollViewer x:Name="PageScroll" VerticalScrollBarVisibility="Auto">
         <StackPanel Margin="{StaticResource PageMargin}">
             <TextBlock Style="{StaticResource PageTitleStyle}" Text="Ayarlar" />
 

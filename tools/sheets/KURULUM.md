@@ -79,7 +79,7 @@ Script sizin adınıza çalıştığı için korumalı sayfaya yazmaya devam ede
 - **Elle değişiklik:** Tablodaki bir hücreyi değiştirirseniz o satır, kesim bir sonraki kez gönderildiğinde uygulamadaki değerle değişir. Düzeltme uygulamadan yapılır (iptal + yeni kayıt).
 - **Sütunlar:** `ID … Son Baskı` uygulamadaki veritabanının birebir kopyasıdır (geri kurma bunları başlık adıyla bulur, başlıkları değiştirmeyin). `Uzunluk (cm)` asıl değerdir; son sütun `Metre`, rapor kolaylığı içindir. `Durum` hücreleri `active` / `voided`, zamanlar UTC metindir.
 - **Script'i güncellemek:** `Code.gs` değişirse editöre yapıştırıp kaydedin, sonra **Dağıt → Dağıtımları yönet → (kalem) → Sürüm: Yeni sürüm → Dağıt**. URL aynı kalır, uygulamada değişiklik gerekmez.
-- **Uygulama script v3 veya üstünü ister** (güncel: `const VERSION = 5;`). Eski script kuruluysa uygulama göndermez, durum çubuğunda "Apps Script eski sürüm" yazar; kayıtlar kaybolmaz, script güncellenince hepsi gider.
+- **Uygulama script v3 veya üstünü ister** (güncel: `const VERSION = 7;`). Eski script kuruluysa uygulama göndermez, durum çubuğunda "Apps Script eski sürüm" yazar; kayıtlar kaybolmaz, script güncellenince hepsi gider.
 - **ID'ler benzersizdir:** Tablodaki her ID tek bir kesime aittir. Aynı ID ile *farklı* bir kesim gelirse (aynı istasyon kodu iki bilgisayarda/veritabanında kullanılmış) tablodaki satırın üzerine **yazılmaz**; uygulama o kesimi göndermez ve durum çubuğunda "… gönderilmedi: bu ID Sheets'te başka bir kesime ait" yazar. Çözüm: o bilgisayara Ayarlar'dan farklı bir istasyon kodu verin. Her bilgisayarın kendi istasyon kodu olmalı (K1, K2…).
 - **Yeni kurulum eski ID'leri tekrar vermez:** Uygulama tabloya ilk bağlandığında her istasyonun tablodaki en büyük numarasını öğrenir ve oradan devam eder. Bu yüzden yeni kurulumda **kesim yapmadan önce** Sheets ayarlarını girin.
 - **Sıra:** En yeni kesim **en üsttedir**: yeni satır başlığın hemen altına girer, aşağı indikçe kayıtlar eskir. İnternetsiz kalmış eski kayıtlar sonradan gelirse zamanına göre araya yerleşir. Tablo elle başka sütuna göre sıralanırsa uygulamanın bir sonraki bağlantısında kendiliğinden bu sıraya döner.
@@ -88,7 +88,7 @@ Script sizin adınıza çalıştığı için korumalı sayfaya yazmaya devam ede
 
 ## Disk arızası / yeni bilgisayar: Sheets'ten geri kurma
 
-Script **v3 veya üstü** gerekir (güncel `Code.gs`: `const VERSION = 5;`). Eski sürüm kuruluysa önce "Script'i güncellemek" adımını yapın.
+Script **v3 veya üstü** gerekir (güncel `Code.gs`: `const VERSION = 7;`). Eski sürüm kuruluysa önce "Script'i güncellemek" adımını yapın.
 
 1. Uygulamayı yeni bilgisayara kurun ve açın (veritabanı boş açılır).
 2. **Ayarlar** (Ctrl+4) → Sheets adresi ve anahtarı girin → **Kaydet**.

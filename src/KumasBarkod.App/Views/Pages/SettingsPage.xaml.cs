@@ -9,6 +9,15 @@ public partial class SettingsPage : Page
     {
         DataContext = viewModel;
         InitializeComponent();
+
+        // Mesaj sayfanın başında: alttaki düğmelerin (yedek, geri kurma) sonucu ekran dışında kalmasın.
+        viewModel.PropertyChanged += (_, e) =>
+        {
+            if (e.PropertyName is nameof(SettingsViewModel.MessageText) or nameof(SettingsViewModel.MessageIsOpen)
+                && viewModel.MessageIsOpen)
+                PageScroll.ScrollToTop();
+        };
+
         Loaded += (_, _) =>
         {
             viewModel.Load();

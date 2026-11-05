@@ -69,7 +69,8 @@ public sealed class ZplLabelTemplate : ILabelTemplate
     {
         if (text.Length <= 20) return (30, text);
         if (text.Length <= 28) return (22, text);
-        return (22, text[..25] + "...");
+        var cut = char.IsHighSurrogate(text[24]) ? 24 : 25;     // emojiyi ikiye bölme
+        return (22, text[..cut] + "...");
     }
 
     /// <summary>
