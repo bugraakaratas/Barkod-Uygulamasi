@@ -7,7 +7,7 @@ namespace KumasBarkod.App.Views.Pages;
 
 /// <summary>
 /// Okutma ekranı. Odak hep okutma kutusundadır (iptal paneli açıkken panelde).
-/// Kısayollar handledEventsToo ile dinlenir (üst denetimler F5'i yutuyor).
+/// Kısayollar handledEventsToo ile dinlenir (üst denetimler işlev tuşlarını yutabiliyor).
 /// Tuşa bağlı odak değişimi anında yapılır; ertelenirse hızlı gelen karakter yanlış kutuya düşer.
 /// </summary>
 public partial class ScanPage : Page
@@ -53,10 +53,6 @@ public partial class ScanPage : Page
 
         switch (e.Key)
         {
-            case Key.F5:
-                Run(_viewModel.ReprintCommand);
-                e.Handled = true;
-                break;
             case Key.F8:
                 Run(_viewModel.BeginVoidCommand);
                 e.Handled = true;

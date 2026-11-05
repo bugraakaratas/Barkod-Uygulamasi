@@ -60,12 +60,10 @@ public sealed partial class VoidReasonOption(int number, string text, Action<Voi
 public partial class ScanViewModel : ObservableObject
 {
     private readonly CutService _cutService;
-    private readonly PrintService _printService;
 
-    public ScanViewModel(CutService cutService, PrintService printService)
+    public ScanViewModel(CutService cutService)
     {
         _cutService = cutService;
-        _printService = printService;
         VoidReasonOptions = VoidReasons.All
             .Select((text, i) => new VoidReasonOption(i + 1, text, OnVoidReasonSelected))
             .ToList();
@@ -124,7 +122,7 @@ public partial class ScanViewModel : ObservableObject
 
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(HasCurrent))]
-    [NotifyCanExecuteChangedFor(nameof(ReprintCommand), nameof(BeginVoidCommand))]
+    [NotifyCanExecuteChangedFor(nameof(BeginVoidCommand))]
     public partial CutDetails? Current { get; set; }
 
     public bool HasCurrent => Current is not null;
@@ -191,25 +189,6 @@ public partial class ScanViewModel : ObservableObject
         Open(InputText);
     }
 
-    [RelayCommand(CanExecute = nameof(CanActOnActive))]
-    private async Task ReprintAsync()
-    {
-        var cutId = Current!.CutId;
-        try
-        {
-            var cut = await Task.Run(() => _printService.Print(cutId));
-            Current = CutDetails.From(cut);
-            ShowMessage(InfoBarSeverity.Success, $"{cutId} etiketi tekrar basıldı",
-                _printService.Printer.IsPhysical ? "" : "Test yazıcısı: etiket dosyaya yazıldı.");
-            WeakReferenceMessenger.Default.Send(new CutChangedMessage(cut));
-        }
-        catch (Exception ex) when (ex is PrinterException or CutValidationException)
-        {
-            ShowMessage(InfoBarSeverity.Warning, $"{cutId} etiketi basılamadı", ex.Message);
-        }
-        FocusRequested?.Invoke(ScanField.Input);
-    }
-
     [RelayCommand(CanExecute = nameof(CanBeginVoid))]
     private void BeginVoid()
     {
@@ -253,7 +232,6 @@ public partial class ScanViewModel : ObservableObject
         FocusRequested?.Invoke(ScanField.Input);
     }
 
-    private bool CanActOnActive() => Current is { IsVoided: false };
     private bool CanBeginVoid() => Current is { IsVoided: false } && !IsVoidPanelOpen;
 
     private void ShowMessage(InfoBarSeverity severity, string title, string text)

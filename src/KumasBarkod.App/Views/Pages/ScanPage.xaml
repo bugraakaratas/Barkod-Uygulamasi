@@ -147,10 +147,6 @@
             <WrapPanel Margin="0,16,0,0"
                        Visibility="{Binding HasCurrent, Converter={StaticResource BoolToVisibility}}">
                 <ui:Button Margin="0,0,10,10" MinHeight="48" Padding="18,0" FontSize="16"
-                           Focusable="False" Appearance="Secondary"
-                           Command="{Binding ReprintCommand}"
-                           Icon="{ui:SymbolIcon Print24}" Content="Etiketi tekrar bas  (F5)" />
-                <ui:Button Margin="0,0,10,10" MinHeight="48" Padding="18,0" FontSize="16"
                            Focusable="False" Appearance="Danger"
                            Command="{Binding BeginVoidCommand}"
                            Icon="{ui:SymbolIcon DismissCircle24}" Content="İptal et  (F8)" />
@@ -204,7 +200,7 @@
 
             <TextBlock Margin="4,16,0,0" Style="{StaticResource FieldHintStyle}" TextWrapping="Wrap">
                 <Run FontWeight="SemiBold" Text="Kısayollar:" />
-                <Run Text="F5 → etiketi tekrar bas   ·   F8 → iptal et   ·   Esc → vazgeç / temizle" />
+                <Run Text="F8 → iptal et   ·   Esc → vazgeç / temizle" />
             </TextBlock>
         </StackPanel>
     </ScrollViewer>
