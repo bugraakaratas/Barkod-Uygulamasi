@@ -60,7 +60,7 @@ src/KumasBarkod.App      (net10.0-windows, WPF; çıktı adı KumasBarkod.exe)
   Themes/Styles.xaml, Converters.cs
   ViewModels/    MainWindow, CutEntry, Scan, History, Settings
   Views/         MainWindow (FluentWindow + NavigationView + durum çubuğu), Pages/ (CutEntry, Scan, History, Settings)
-tests/KumasBarkod.Tests  (xUnit, 247 test) Data/, Domain/, Services/, Printing/, Scanning/, Sync/ (FakeAppsScript)
+tests/KumasBarkod.Tests  (xUnit, 250 test) Data/, Domain/, Services/, Printing/, Scanning/, Sync/ (FakeAppsScript)
 tools/sheets/            Code.gs (Apps Script v3), Code.test.js (node --test), KURULUM.md
 tools/installer/         KumasBarkod.iss, build-installer.ps1, generate-icon.ps1
 docs/                    SUNUM.md (donanımsız sunum akışı), PILOT.md (fabrika pilotu)
@@ -73,16 +73,16 @@ docs/                    SUNUM.md (donanımsız sunum akışı), PILOT.md (fabri
 - **Şema v1:** `cuts` (STRICT, CHECK'ler: ID = istasyon + '-' + 6 hane, lot kırpılmış/boş değil, length_cm > 0, durum active/voided, iptal bilgisi tutarlılığı), `sync_outbox` (FK → cuts), `station_counter`, `settings` (anahtar/değer).
 - **ID:** `K1-000123` saklanır/görünür; barkodda tiresiz `K1000123` (Türkçe klavye tire sorunu). İstasyon kodu `^[A-Z][A-Z0-9]$`, varsayılan `K1`. Sıra 1–999999.
 - **Kayıt:** `CutService.CreateCut` tek işlemde (BEGIN IMMEDIATE) sayaç + cuts + sync_outbox. Hatalı giriş sıra numarası harcamaz.
-- **Metre:** santim tam sayı. Virgül/nokta kabul, en fazla 2 ondalık (fazlası reddedilir, yuvarlanmaz), binlik ayırıcı reddedilir. Üst sınır ayardan, varsayılan 300 m (`max_length_cm`).
+- **Uzunluk:** personel tam sayı **cm** girer (`Length.TryParseCentimeters`), virgül/nokta reddedilir; veritabanı zaten cm tutar. Canlı ipucu "= 25,50 m" bilerek kalır (metre alışkanlığıyla yazılan "25", 25 cm'dir). Etiket, listeler, Geçmiş toplamları ve tablodaki Metre sütunu **metre gösterir**. Üst sınır Ayarlar'dan cm, varsayılan 30000 (`max_length_cm`).
 - **Lot:** kırpılır, en fazla 50 karakter, büyük/küçük harf korunur (Türkçe i/İ).
 - **Zaman:** UTC, `yyyy-MM-ddTHH:mm:ss.fffZ` (sabit uzunluk, metin sıralaması = zaman sırası). `TimeProvider` enjekte edilir (testte sabit saat).
 - **Giriş ekranı:** açılır liste (ComboBox) KULLANILMAZ — odak sorunları çıkardı. Lot = TextBox; ↑↓ son lotlarda gezer; son lotlar altta düğme (chip) olarak görünür.
-- **Kısayollar:** sayfa kısayolları code-behind'da `AddHandler(PreviewKeyDownEvent, ..., handledEventsToo: true)` ile; KeyBinding kullanma (F5 üst denetimde yutuluyor). Giriş ekranı: Enter, F2 (lot), ↑↓ (son lotlar), F5 (son etiketi tekrar bas), Esc (metreyi temizle).
+- **Kısayollar:** sayfa kısayolları code-behind'da `AddHandler(PreviewKeyDownEvent, ..., handledEventsToo: true)` ile; KeyBinding kullanma (F5 üst denetimde yutuluyor). Giriş ekranı: Enter, F2 (lot), ↑↓ (son lotlar), F5 (sıradaki parça), F6 (bozulan etiket), Esc (uzunluğu temizle / onaydan vazgeç). Okutma: F8 (iptal), Esc. Geçmiş: F5 (aynı ID ile baskı).
 - **Odak:** Tuşa bağlı odak değişimi anında yapılır (`FocusNow`); ertelenirse hızlı yazılan karakter yanlış kutuya düşer.
 - **Ekran kısayolları (MainWindow):** Ctrl+1 Kesim Girişi, Ctrl+2 Okutma, Ctrl+3 Geçmiş, Ctrl+4 Ayarlar. Okutma her ekranda yakalanır (bkz. Adım 6 notları).
 - **Sayfalar:** her `Page`'de `ScrollViewer.CanContentScroll="False"` (WPF-UI'nin dış kaydırma alanını kapatır; yoksa sanallaştırma bozulur). Kaydırma sayfanın içinde yönetilir.
 - **Arayüz testi düğmeleri:** odaklanamayan düğmeler (Focusable=False) testte UI Automation `InvokePattern` ile, ComboBox `ExpandCollapsePattern`/`SelectionItemPattern` ile kullanılır.
-- **Baskı:** Kayıt önce yazılır, sonra basılır. Başarılı baskı `print_count+1`, `last_printed_at` yazar ve kuyruğa `upsert` ekler. Baskı hatası kaydı bozmaz; F5 aynı ID ile tekrar basar. İptal edilmiş kesim basılmaz.
+- **Baskı:** Kayıt önce yazılır, sonra basılır. Başarılı baskı `print_count+1`, `last_printed_at` yazar ve kuyruğa `upsert` ekler. Baskı hatası kaydı bozmaz; F6 aynı ID ile basar. İptal edilmiş kesim basılmaz.
 - **Etiket (ZPL):** 50×30 mm, 203 dpi, `^CI28` (UTF-8), Code128 `^BCN,80,N,N,N,A` (otomatik mod), lot `^FH_` ile kaçışlı (`^ ~ _`). Yazıcı Ayarlar'dan seçilir (`SelectablePrinter`): **Gösterim (yalnızca ekran) varsayılan**, Kağıt (Windows yazıcısı/PDF), Test (`FileLabelPrinter` → `<veri>\labels\*.zpl`). Fiziksel olmayan yazıcı durum çubuğunda turuncu görünür. Etiket yazıcısına ham ZPL henüz yok (Adım 10 kalanı).
 - **Bekleyen kayıt sayısı:** `count(DISTINCT cut_id)` gönderilmemiş kuyruk satırları.
 
@@ -220,16 +220,41 @@ docs/                    SUNUM.md (donanımsız sunum akışı), PILOT.md (fabri
 - Hız testi (`CutSearchTests`) artık paralel olmayan koleksiyonda (`TimingCollection`): paralel koşuda 1 sn sınırını aşıp kurulum derlemesini durdurmuştu.
 
 | İptal sebepleri | ✅ | `eb9d025` | Okutma ekranında serbest metin yerine sabit 4 sebep (tek seçim, 1–4 / ↑↓ / Enter). 247 test |
+| Revize: cm girişi | ✅ (henüz yayında değil) | `e5e3ae8` | Personel tam sayı cm girer. 2026-11-05 |
+| Revize: fareyle lot | ✅ (henüz yayında değil) | `578f9f7` | Son lot önerileri tıklanarak seçilir |
+| Revize: Okutma sadeleşti | ✅ (henüz yayında değil) | `75da294`, `b69e608` | "Yerine yeni kayıt" (F9) ve "Etiketi tekrar bas" kalktı; yalnızca İptal et |
+| Revize: F5/F6 | ✅ (henüz yayında değil) | `067bdcc` | Sıradaki parça ve bozulan etiket ayrıldı. 250 test |
 
 ### İptal sebepleri notları (kullanıcı isteği, 2026-11-02)
-- **Karar:** tek seçim, liste sabit (Ayarlar'dan düzenlenmez), "Diğer"/ek not YOK. Sebepler `Core/Domain/VoidReasons.cs`: 1 Yanlış metre girildi · 2 Yanlış lot girildi · 3 Çift kayıt · 4 Kesim yapılmadı / vazgeçildi. "Etiket bozuk/okunmuyor" bilerek yok (çözüm F5 tekrar baskı, iptal değil). **Metinleri değiştirme** — raporlardaki sayım bölünür; yeni sebep eklenecekse sona ekle.
+- **Karar:** tek seçim, liste sabit (Ayarlar'dan düzenlenmez), "Diğer"/ek not YOK. Sebepler `Core/Domain/VoidReasons.cs`: 1 Yanlış metre girildi · 2 Yanlış lot girildi · 3 Çift kayıt · 4 Kesim yapılmadı / vazgeçildi. "Etiket bozuk/okunmuyor" bilerek yok (çözüm Kesim Girişi'nde F6 veya Geçmiş'ten aynı ID ile baskı, iptal değil). **Metinleri değiştirme** — raporlardaki sayım bölünür; yeni sebep eklenecekse sona ekle.
 - Seçilen metin `void_reason`'a aynen yazılır → şema, Sheets, geri kurma değişmedi; eski serbest metinli iptaller geçerli. `VoidCut` hâlâ serbest metin kabul eder (liste kuralı arayüzde).
 - Arayüz: F8 → panel seçeneklerle açılır, seçim boş; odak `VoidPanel` kartında (seçenekler `Focusable=False`), panel `BringIntoView` ile ekrana kaydırılır (1366×768'de onay düğmeleri altta kalıyordu). Tuşlar sayfa işleyicisinde, yalnızca panel açık + okutma kutusunda odak yok + değiştirici tuş yok + olay işlenmemişse: 1–4 (NumPad dahil) seçer, ↑↓ kaydırır, Enter onaylar, Esc vazgeçer. Seçimsiz Enter → panel içinde kırmızı uyarı (üstteki InfoBar ekran dışında kalıyordu).
 - **Rakam tuşları `Handled` işaretlenmez:** işaretlenirse TextInput üretilmez ve panel açıkken yapılan okutma `ScanCapture`'a ulaşmaz. Okutmanın Enter'ı `ScanCapture`'da işlenir ve `Open` eşzamanlı paneli kapatır → iptal tetiklenmez. Ctrl+1–4 ekran kısayolları sebep seçmez.
 - Arayüz testi (geçici veri, SendKeys, 2 koşu): seçimsiz Enter iptal etmiyor + uyarı görünüyor; 2 + ↓ → "Çift kayıt" iptali; seç + Esc → iptal yok; tekrar F8 seçim boş; panel açıkken hızlı okutma K1-000003'ü açtı, iptal etmedi; 1 + Enter → "Yanlış metre girildi". Veritabanı doğrulandı.
 - Test betiği notu: Windows PowerShell 5 BOM'suz UTF-8 betiği bozuk okuyor → `pwsh -STA` kullan; betikte `Type` adlı fonksiyon yazma (`Get-Content` takma adı).
 
+### F5/F6 notları (kullanıcı isteği, 2026-11-05)
+- **Sorun:** "Son etiketi tekrar bas" lot ve uzunluk girmeden etiket verdiği için personel onu sıradaki parça için de kullanıyordu; aynı ID iki parçaya gidiyordu, veri eksik kalıyordu. **Tasarım ilkesi: doğru yol yanlış yoldan kolay olmalı.** "Tekrar bas" sözü Kesim Girişi'nde F5 için kullanılmaz.
+- **F5 Sıradaki parça** (yeşil düğme, giriş kartı): son kaydın lotu ve uzunluğuyla YENİ kesim + etiket (`CutService.CreateNextPiece`). Kutulardaki yazılar kullanılmaz, değişmez.
+- **F6 Bozulan etiket** ("Son etiket" kartı): aynı ID, satır içi onay ister (Enter bas, Esc vazgeç; panelde F5 sıradaki parçaya geçer). Başka yere tıklanınca veya ekran değişince panel kapanır. Daha eski etiketler Geçmiş'ten basılır.
+- **Kurallar:** kaynak bu oturumun son kaydıdır, yeni açılışta ikisi de pasif. Son kayıt iptal edildiyse ikisi de pasif, gerekçe düğme altında (Okutma'daki iptal `CutChanged` ile yansır). `print_count = 0` ise F5 yeni kayıt açmaz ("Önce <ID> etiketini basın (F6)"), F6 onaysız basar: etiketsiz ama metresi toplama giren kayıt kalmasın.
+- **Kilitler:** F5'te `e.IsRepeat` yok sayılır (basılı tutmak çok kayıt açmasın). `RunExclusiveAsync`: Enter ve F5 farklı komut olduğu için ortak kilit gerekir.
+- **Fareyle lot:** `ListBoxItem` `Focusable=False` olduğu için ListBox fare seçimi yapmıyordu (öğe önce odak ister); tıklanan öğe `ContainerFromElement` ile bulunur.
+- **Arayüz testi (2026-11-05, geçici veri, SendKeys + gerçek fare):** 24/24: cm ve virgül reddi, F5 sonraki ID, F5 basılı tek kayıt, F6 Esc/Enter, panelde F5, fareyle lot, baskı hatası (labels klasörü dosyayla değiştirilerek) F5 engeli + F6 onaysız, Okutma düğmeleri, iptal sonrası F5/F6 pasif. Son test betiği scratchpad'de `uitest.ps1` (oturuma özel).
+- 1366×768'de "Son kayıtlar" yaklaşık 3 satıra düştü; F6 paneli açıkken liste geçici olarak kapanır.
+
+## ⚠️ EN SON YAPILACAK — Sheets (2026-11-05, kullanıcı isteği)
+
+Revizeler bu iki iş yapılmadan **tamamlandı sayılmaz**. Diğer revizeler bitince kullanıcıya hatırlat, onay alıp başla.
+
+- [ ] **Sütun adları Türkçe:** görünen başlıklar Türkçe; iç anahtarlar ve JSON sözleşmesi İngilizce kalır. Geri kurma başlık adıyla okuduğu için hem eski hem yeni başlıkları tanımalı.
+- [ ] **En yeni kayıt en üstte:** yeni satır başlığın hemen altına girer, sıralama yeniden eskiye. Amaç: 4 ay sonra binlerce satırda tabloya bakan kişi en alta inmesin. Dikkat: Code.gs bugün eskiden yeniye sıralıyor (yeni satır en altta, araya girme, eski tablo düzeltme); `exportRows`/geri kurma ve `Code.test.js`, `FakeAppsScript` bu sıraya göre gözden geçirilmeli.
+
+Code.gs değişince kullanıcı script'i yeniden dağıtmalı.
+
 ## Şu anki durum
+
+- **Revizeler (2026-11-05):** cm girişi, fareyle lot, Okutma sadeleştirme, F5/F6 tamam ve test edildi, **commit edildi ama push ve sürüm yok** (sürüm hâlâ 1.0.2). **Revizeler tamamlanmış sayılmaz:** yukarıdaki iki Sheets işi açık.
 
 - **Adım 11 kurulum paketi tamamlandı** (2026-11-01): `KumasBarkod-Kurulum-1.0.0.exe` üretildi ve kur/çalıştır/kaldır testi geçti. Adım 9 ve Adım 10'un donanımsız kısmı (gösterim modu) da tamam. Sunum: `docs/SUNUM.md`, pilot: `docs/PILOT.md`.
 - **Karar (2026-11-01): ID 6 hane kalır** (seçenek a). Bir istasyon en fazla 999.999 ID üretir (günde 500 kesimle ~6,7 yıl); dolunca uygulama uyarır, Ayarlar'dan yeni istasyon kodu verilir. 7 haneye çıkarma önerilmişti, kullanıcı istemedi — tekrar önerme.
@@ -239,7 +264,7 @@ docs/                    SUNUM.md (donanımsız sunum akışı), PILOT.md (fabri
 - Gerçek USB okuyucu testi hâlâ açık (Adım 6) — gösterim modunda elle giriş/"Okut (gösterim)" ile ikame edildi.
 - **GitHub:** 2026-11-02 itibarıyla her şey gönderildi; **v1.0.2 yayında** (Releases, sabit indirme linki).
 - **2026-11-02:** İptal sebebi sabit 4 seçenekli liste oldu (bkz. İptal sebepleri notları), 1.0.2 olarak yayınlandı.
-- **Donanım araştırması (2026-11-02, yalnızca öneri, satın alma yok):** Kullanıcının fikri = mevcut ofis PC + Cat6 KVM uzatıcı (HDMI+USB) ile makine başına monitör + yazıcı. Önerilen = **makine başına ayrı mini PC (N100, 16/512, Win11 Pro) + 22" monitör + Zebra ZD220t (USB, yerel ZPL) + Zebra DS2208 + 850 VA UPS**, ~35 bin TL. Uzatıcı yolu ~31 bin TL ama ofis PC'si yalnızca bu işe ayrılmalı (aynı masaüstü iki ekranda), ucuz KVM uzatıcılar USB yazıcıyı genelde taşımaz → Ethernet'li yazıcı (ZD421t) gerekir. Endüstriyel paket (IP65 fansız dokunmatik panel PC + ZD421t) ~75 bin TL. Notlar: ZD220t 74 m ribon alır (TSC TE200 300 m alır ama ZPL emülasyonu denenmeli); kuşe etiket kumaşta tutmayabilir → sentetik etiket denenmeli; yedekler aynı diskte → USB belleğe kopyalama ileride eklenebilir.
+- **Donanım araştırması (2026-11-02, yalnızca öneri, satın alma yok):** Kullanıcının fikri = mevcut ofis PC + Cat6 KVM uzatıcı (HDMI+USB) ile makine başına monitör + yazıcı. Önerilen = **makine başına ayrı mini PC (N100, 16/512, Win11 Pro) + 22" monitör + Zebra ZD220t (USB, yerel ZPL) + Zebra DS2208 + 850 VA UPS**, ~35 bin TL. Uzatıcı yolu ~34 bin TL ama ofis PC'si yalnızca bu işe ayrılmalı (aynı masaüstü iki ekranda), ucuz KVM uzatıcılar USB yazıcıyı genelde taşımaz → Ethernet'li yazıcı (ZD421t) gerekir. Endüstriyel paket (IP65 fansız dokunmatik panel PC + ZD421t) ~73–81 bin TL. Notlar: ZD220t 74 m ribon alır (TSC TE200 300 m alır ama ZPL emülasyonu denenmeli); kuşe etiket kumaşta tutmayabilir → sentetik etiket denenmeli; yedekler aynı diskte → USB belleğe kopyalama ileride eklenebilir.
 
 ## Rafa kalkan: Yönetici (izleme) modu — 2026-11-02
 - **Son karar (kullanıcı):** şimdilik takip **yalnızca Google Sheets'ten** yapılacak, KOD YAZILMAYACAK. Ayrı yönetici paneli istenmedi. Kullanıcı tekrar istemedikçe önerme.

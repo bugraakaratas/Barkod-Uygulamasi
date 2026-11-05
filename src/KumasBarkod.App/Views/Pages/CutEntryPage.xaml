@@ -165,7 +165,7 @@
                                            Label="{Binding LastLabel}" MaxHeight="190" HorizontalAlignment="Center" />
                 </Border>
                 <TextBlock Margin="2,6,0,0" Style="{StaticResource FieldHintStyle}" TextWrapping="Wrap"
-                           Text="Etiketin gerçek görünümü (50 × 30 mm). Barkod gerçektir: okuyucu veya telefon uygulamasıyla ekrandan okunabilir." />
+                           Text="Gerçek görünüm (50 × 30 mm). Barkod ekrandan da okunabilir." />
 
                 <!-- Aynı ID ile baskı bilerek iki adımlıdır: yeni parça için kolay yol F5 olmalı. -->
                 <ui:Button Margin="0,8,0,0" HorizontalAlignment="Stretch" MinHeight="36"
