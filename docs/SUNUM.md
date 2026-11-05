@@ -20,7 +20,7 @@ Barkod yazıcısı ve okuyucu olmadan sistemi uçtan uca göstermek için. Süre
 | 4 | **Okut (gösterim)** düğmesi | Okuyucunun yaptığı: kayıt **Okutma** ekranında açılır. Etiket görüntüsü de orada. |
 | 5 | **Okutma** (Ctrl+2): etiketteki kodu elle yaz (ör. `K1000002`) → Enter | Elle giriş de çalışır; okuyucu da aynı kutuya "yazar". |
 | 6 | Okutma ekranında **İptal et (F8)** → sebep → Enter | Yanlış kayıt düzeltilmez, iptal edilip yenisi basılır; iptal kalıcı ve görünür. |
-| 7 | **Geçmiş** (Ctrl+3): tarih, lot, durum filtresi | Toplam metre, iptal sayısı; binlerce kayıtta anında arama. |
+| 7 | **Geçmiş** (Ctrl+3): tarih, lot, durum filtresi | Toplam metre, iptal sayısı; binlerce kayıtta anında arama. Eski bir etiket bozulursa **F6** aynı ID ile yeniden basar (onay ister). |
 | 8 | (Kağıt seçiliyse) kayıt aç → kağıttaki etiketi göster | Gerçek boyut 50 × 30 mm; kesip kumaşa yapıştırma. |
 | 9 | (Sheets açıksa) Google tablosunu göster | Kayıtların kopyası; internet kesilse de uygulama çalışır, sonra tamamlanır. |
 

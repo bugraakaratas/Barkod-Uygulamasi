@@ -9,7 +9,7 @@ using KumasBarkod.App.ViewModels;
 namespace KumasBarkod.App.Views.Pages;
 
 /// <summary>
-/// Geçmiş. Kısayollar: Ctrl+F arama, Enter/çift tık kaydı aç, F5 tekrar bas,
+/// Geçmiş. Kısayollar: Ctrl+F arama, Enter/çift tık kaydı aç, F6 bozulan etiket (onaylı),
 /// Ctrl+PageUp/PageDown sayfa, aramada Esc temizle, aramada ↓ listeye geç.
 /// </summary>
 public partial class HistoryPage : Page
@@ -39,21 +39,56 @@ public partial class HistoryPage : Page
             Dispatcher.BeginInvoke(DispatcherPriority.Loaded, () => FocusGridRow(Grid.SelectedIndex));
         };
 
+        _viewModel.ReprintFocusRequested += toPanel =>
+            Dispatcher.BeginInvoke(DispatcherPriority.Input, () =>
+            {
+                if (toPanel)
+                {
+                    ReprintPanel.Focus();
+                    ReprintPanel.UpdateLayout();
+                    ReprintPanel.BringIntoView();
+                }
+                else if (Grid.SelectedIndex >= 0)
+                {
+                    FocusGridRow(Grid.SelectedIndex);
+                }
+                else
+                {
+                    SearchBox.Focus();
+                }
+            });
+
         AddHandler(PreviewKeyDownEvent, new KeyEventHandler(Page_PreviewKeyDown), handledEventsToo: true);
     }
 
+    /// <summary>Başka yere tıklanınca veya ekran değişince onay açık kalmasın.</summary>
+    private void ReprintPanel_LostKeyboardFocus(object sender, KeyboardFocusChangedEventArgs e) =>
+        _viewModel.CloseReprintPanel();
+
     private void Page_PreviewKeyDown(object sender, KeyEventArgs e)
     {
+        // Okutmanın Enter'ı ScanCapture'da işlenmiş gelir: onaylamaz.
+        if (e.Key == Key.Enter && !e.Handled && ReprintPanel.IsKeyboardFocusWithin)
+        {
+            _viewModel.ConfirmReprintCommand.Execute(null);
+            e.Handled = true;
+            return;
+        }
+
         var ctrl = Keyboard.Modifiers == ModifierKeys.Control;
         switch (e.Key)
         {
+            case Key.Escape when _viewModel.IsReprintPanelOpen:
+                _viewModel.CancelReprintCommand.Execute(null);
+                e.Handled = true;
+                break;
             case Key.F when ctrl:
                 SearchBox.Focus();
                 SearchBox.SelectAll();
                 e.Handled = true;
                 break;
-            case Key.F5:
-                Run(_viewModel.ReprintCommand);
+            case Key.F6:
+                if (!e.IsRepeat) Run(_viewModel.BeginReprintCommand);
                 e.Handled = true;
                 break;
             case Key.PageDown when ctrl:

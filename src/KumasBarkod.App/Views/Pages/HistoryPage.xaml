@@ -165,7 +165,27 @@
                    Text="Bu filtreye uyan kayıt yok." IsHitTestVisible="False" />
 
         <!-- ========== Alt çubuk: sayfa ve işlemler ========== -->
-        <DockPanel Grid.Row="5" Margin="0,10,0,0" LastChildFill="False">
+        <StackPanel Grid.Row="5">
+        <!-- Aynı ID ile baskı onaylıdır: yeni parça için Kesim Girişi kullanılır. -->
+        <Border x:Name="ReprintPanel" Margin="0,10,0,0" Padding="12" CornerRadius="6" BorderThickness="1"
+                Focusable="True" FocusVisualStyle="{x:Null}"
+                BorderBrush="{DynamicResource SystemFillColorCautionBrush}"
+                AutomationProperties.Name="Bozulan etiket onayı"
+                LostKeyboardFocus="ReprintPanel_LostKeyboardFocus"
+                Visibility="{Binding IsReprintPanelOpen, Converter={StaticResource BoolToVisibility}}">
+            <DockPanel LastChildFill="True">
+                <ui:Button DockPanel.Dock="Right" Margin="8,0,0,0" MinHeight="36" Appearance="Secondary" Focusable="False"
+                           Command="{Binding CancelReprintCommand}" Content="Vazgeç  (Esc)" />
+                <ui:Button DockPanel.Dock="Right" Margin="8,0,0,0" MinHeight="36" Appearance="Primary" Focusable="False"
+                           Command="{Binding ConfirmReprintCommand}" Content="Aynı ID ile bas  (Enter)" />
+                <TextBlock VerticalAlignment="Center" FontSize="15" TextWrapping="Wrap">
+                    <Run Text="{Binding ReprintCutId, Mode=OneWay}" FontFamily="Consolas" FontWeight="SemiBold" />
+                    <Run Text="aynı ID ile tekrar basılacak. Yalnızca etiket bozulduysa kullanın. Yeni parça için Kesim Girişi." />
+                </TextBlock>
+            </DockPanel>
+        </Border>
+
+        <DockPanel Margin="0,10,0,0" LastChildFill="False">
             <ui:Button DockPanel.Dock="Left" Margin="0,0,6,0" Focusable="False"
                        Icon="{ui:SymbolIcon ChevronLeft24}" Command="{Binding PreviousPageCommand}"
                        ToolTip="Önceki sayfa (Ctrl+PageUp)" />
@@ -177,11 +197,12 @@
                        Foreground="{DynamicResource TextFillColorTertiaryBrush}" Text="{Binding ElapsedText}" />
 
             <ui:Button DockPanel.Dock="Right" Margin="8,0,0,0" MinHeight="40" Focusable="False" Appearance="Secondary"
-                       Icon="{ui:SymbolIcon Print24}" Content="Etiketi tekrar bas  (F5)"
-                       Command="{Binding ReprintCommand}" />
+                       Icon="{ui:SymbolIcon Print24}" Content="Bozulan etiketi yeniden bas  (F6)"
+                       Command="{Binding BeginReprintCommand}" />
             <ui:Button DockPanel.Dock="Right" MinHeight="40" Focusable="False" Appearance="Primary"
                        Icon="{ui:SymbolIcon Open24}" Content="Kaydı aç  (Enter)"
                        Command="{Binding OpenSelectedCommand}" />
         </DockPanel>
+        </StackPanel>
     </Grid>
 </Page>

@@ -60,10 +60,11 @@ src/KumasBarkod.App      (net10.0-windows, WPF; çıktı adı KumasBarkod.exe)
   Themes/Styles.xaml, Converters.cs
   ViewModels/    MainWindow, CutEntry, Scan, History, Settings
   Views/         MainWindow (FluentWindow + NavigationView + durum çubuğu), Pages/ (CutEntry, Scan, History, Settings)
-tests/KumasBarkod.Tests  (xUnit, 250 test) Data/, Domain/, Services/, Printing/, Scanning/, Sync/ (FakeAppsScript)
-tools/sheets/            Code.gs (Apps Script v5), Code.test.js (node --test), KURULUM.md
+tests/KumasBarkod.Tests  (xUnit, 262 test) Data/, Domain/, Services/, Printing/, Scanning/, Sync/ (FakeAppsScript), Stress/ (rastgele girdi, eşzamanlılık; KUMAS_STRESS=1 ile 1 milyon kayıt)
+tools/sheets/            Code.gs (Apps Script v7), Code.test.js (node --test, 25 test), KURULUM.md
+tools/test/              regresyon: uitest.ps1 (arayüz A/B, gerçek Google C/D), uidb.py, stres.gs, README.md
 tools/installer/         KumasBarkod.iss, build-installer.ps1, generate-icon.ps1
-docs/                    SUNUM.md (donanımsız sunum akışı), PILOT.md (fabrika pilotu)
+docs/                    SUNUM.md (donanımsız sunum akışı), PILOT.md (fabrika pilotu), TEST-RAPORU.md
 ```
 
 **Paketler:** WPF-UI 4.3.0 (Fluent), CommunityToolkit.Mvvm 8.4.2, Microsoft.Extensions.DependencyInjection 10.0.14, Microsoft.Data.Sqlite 10.0.14, Dapper 2.1.89, ZXing.Net 0.16.11 (yalnızca önizleme barkodu).
@@ -77,7 +78,7 @@ docs/                    SUNUM.md (donanımsız sunum akışı), PILOT.md (fabri
 - **Lot:** kırpılır, en fazla 50 karakter, büyük/küçük harf korunur (Türkçe i/İ).
 - **Zaman:** UTC, `yyyy-MM-ddTHH:mm:ss.fffZ` (sabit uzunluk, metin sıralaması = zaman sırası). `TimeProvider` enjekte edilir (testte sabit saat).
 - **Giriş ekranı:** açılır liste (ComboBox) KULLANILMAZ — odak sorunları çıkardı. Lot = TextBox; ↑↓ son lotlarda gezer; son lotlar altta düğme (chip) olarak görünür.
-- **Kısayollar:** sayfa kısayolları code-behind'da `AddHandler(PreviewKeyDownEvent, ..., handledEventsToo: true)` ile; KeyBinding kullanma (F5 üst denetimde yutuluyor). Giriş ekranı: Enter, F2 (lot), ↑↓ (son lotlar), F5 (sıradaki parça), F6 (bozulan etiket), Esc (uzunluğu temizle / onaydan vazgeç). Okutma: F8 (iptal), Esc. Geçmiş: F5 (aynı ID ile baskı).
+- **Kısayollar:** sayfa kısayolları code-behind'da `AddHandler(PreviewKeyDownEvent, ..., handledEventsToo: true)` ile; KeyBinding kullanma (F5 üst denetimde yutuluyor). Giriş ekranı: Enter, F2 (lot), ↑↓ (son lotlar), F5 (sıradaki parça), F6 (bozulan etiket), Esc (uzunluğu temizle / onaydan vazgeç). Okutma: F8 (iptal), Esc. Geçmiş: F6 (bozulan etiket, onaylı).
 - **Odak:** Tuşa bağlı odak değişimi anında yapılır (`FocusNow`); ertelenirse hızlı yazılan karakter yanlış kutuya düşer.
 - **Ekran kısayolları (MainWindow):** Ctrl+1 Kesim Girişi, Ctrl+2 Okutma, Ctrl+3 Geçmiş, Ctrl+4 Ayarlar. Okutma her ekranda yakalanır (bkz. Adım 6 notları).
 - **Sayfalar:** her `Page`'de `ScrollViewer.CanContentScroll="False"` (WPF-UI'nin dış kaydırma alanını kapatır; yoksa sanallaştırma bozulur). Kaydırma sayfanın içinde yönetilir.
@@ -208,7 +209,7 @@ docs/                    SUNUM.md (donanımsız sunum akışı), PILOT.md (fabri
 - Panoya kopyalama: Windows PowerShell 5 konsolu Türkçe karakteri bozuk GÖSTERİR; pwsh ile `Get-Clipboard` dosyayla karşılaştırıldı, içerik doğruydu.
 
 | Sürüm 1.0.1 | ✅ yayında | `31d815d` (etiket `v1.0.1`) | GitHub Release + sabit indirme linki |
-| Sürüm 1.0.2 | ✅ yayında (en yeni) | `6908af3` (etiket `v1.0.2`) | Sabit iptal sebepleri. 2026-11-02 |
+| Sürüm 1.0.2 | ✅ yayında | `6908af3` (etiket `v1.0.2`) | Sabit iptal sebepleri. 2026-11-02 |
 
 ### Sürüm yayınlama (GitHub Releases)
 - **İndirme linki (her zaman en yeni sürüm):** <https://github.com/bugraakaratas/Barkod-Uygulamasi/releases/latest/download/KumasBarkod-Kurulum.exe>. Dosya her sürümde **aynı adla** (`KumasBarkod-Kurulum.exe`) yüklenmeli, yoksa link kırılır.
@@ -220,13 +221,15 @@ docs/                    SUNUM.md (donanımsız sunum akışı), PILOT.md (fabri
 - Hız testi (`CutSearchTests`) artık paralel olmayan koleksiyonda (`TimingCollection`): paralel koşuda 1 sn sınırını aşıp kurulum derlemesini durdurmuştu.
 
 | İptal sebepleri | ✅ | `eb9d025` | Okutma ekranında serbest metin yerine sabit 4 sebep (tek seçim, 1–4 / ↑↓ / Enter). 247 test |
-| Revize: cm girişi | ✅ (henüz yayında değil) | `e5e3ae8` | Personel tam sayı cm girer. 2026-11-05 |
-| Revize: fareyle lot | ✅ (henüz yayında değil) | `578f9f7` | Son lot önerileri tıklanarak seçilir |
-| Revize: Okutma sadeleşti | ✅ (henüz yayında değil) | `75da294`, `b69e608` | "Yerine yeni kayıt" (F9) ve "Etiketi tekrar bas" kalktı; yalnızca İptal et |
-| Revize: F5/F6 | ✅ (henüz yayında değil) | `067bdcc` | Sıradaki parça ve bozulan etiket ayrıldı. 250 test |
+| Revize: cm girişi | ✅ | `e5e3ae8` | Personel tam sayı cm girer. 2026-11-05 |
+| Revize: fareyle lot | ✅ | `578f9f7` | Son lot önerileri tıklanarak seçilir |
+| Revize: Okutma sadeleşti | ✅ | `75da294`, `b69e608` | "Yerine yeni kayıt" (F9) ve "Etiketi tekrar bas" kalktı; yalnızca İptal et |
+| Revize: F5/F6 | ✅ | `067bdcc` | Sıradaki parça ve bozulan etiket ayrıldı |
+| Sheets v5–v7 + test çalışması | ✅ | `5d69247`, `50b2874` | En yeni üstte, Türkçe başlık, büyük tablo hızı, formül koruması. 262 + 25 test |
+| Geçmiş F6 + sürüm 1.0.5 | ✅ yayında (en yeni) | etiket `v1.0.5` | Bozulan etiket onaylı. Regresyon temiz |
 
 ### İptal sebepleri notları (kullanıcı isteği, 2026-11-02)
-- **Karar:** tek seçim, liste sabit (Ayarlar'dan düzenlenmez), "Diğer"/ek not YOK. Sebepler `Core/Domain/VoidReasons.cs`: 1 Yanlış metre girildi · 2 Yanlış lot girildi · 3 Çift kayıt · 4 Kesim yapılmadı / vazgeçildi. "Etiket bozuk/okunmuyor" bilerek yok (çözüm Kesim Girişi'nde F6 veya Geçmiş'ten aynı ID ile baskı, iptal değil). **Metinleri değiştirme** — raporlardaki sayım bölünür; yeni sebep eklenecekse sona ekle.
+- **Karar:** tek seçim, liste sabit (Ayarlar'dan düzenlenmez), "Diğer"/ek not YOK. Sebepler `Core/Domain/VoidReasons.cs`: 1 Yanlış metre girildi · 2 Yanlış lot girildi · 3 Çift kayıt · 4 Kesim yapılmadı / vazgeçildi. "Etiket bozuk/okunmuyor" bilerek yok (çözüm Kesim Girişi'nde veya Geçmiş'te F6, iptal değil). **Metinleri değiştirme** — raporlardaki sayım bölünür; yeni sebep eklenecekse sona ekle.
 - Seçilen metin `void_reason`'a aynen yazılır → şema, Sheets, geri kurma değişmedi; eski serbest metinli iptaller geçerli. `VoidCut` hâlâ serbest metin kabul eder (liste kuralı arayüzde).
 - Arayüz: F8 → panel seçeneklerle açılır, seçim boş; odak `VoidPanel` kartında (seçenekler `Focusable=False`), panel `BringIntoView` ile ekrana kaydırılır (1366×768'de onay düğmeleri altta kalıyordu). Tuşlar sayfa işleyicisinde, yalnızca panel açık + okutma kutusunda odak yok + değiştirici tuş yok + olay işlenmemişse: 1–4 (NumPad dahil) seçer, ↑↓ kaydırır, Enter onaylar, Esc vazgeçer. Seçimsiz Enter → panel içinde kırmızı uyarı (üstteki InfoBar ekran dışında kalıyordu).
 - **Rakam tuşları `Handled` işaretlenmez:** işaretlenirse TextInput üretilmez ve panel açıkken yapılan okutma `ScanCapture`'a ulaşmaz. Okutmanın Enter'ı `ScanCapture`'da işlenir ve `Open` eşzamanlı paneli kapatır → iptal tetiklenmez. Ctrl+1–4 ekran kısayolları sebep seçmez.
@@ -252,27 +255,29 @@ docs/                    SUNUM.md (donanımsız sunum akışı), PILOT.md (fabri
 - Yerel veritabanından anahtar okuyup tabloya istek atan betik otomatik güvenlik denetimine takıldı: doğrulamayı uygulamanın kendisi tetiklemeli.
 - `RequiredScriptVersion` 3 kaldı: sıra ve başlık yalnızca görünümdür, eski script veri bozmaz. `FakeAppsScript` varsayılanı v5.
 
-## ⚠️ EN SON YAPILACAK — Sheets (2026-11-05, kullanıcı isteği)
+### Geçmiş ekranı baskısı (kullanıcı isteği, 2026-11-06)
+- **Karar:** düğme kaldırılmadı, çünkü eski bir etiket bozulursa aynı ID ile basmanın tek yolu burası. Kesim Girişi'yle aynı dile getirildi: **F6 "Bozulan etiketi yeniden bas"**, satır içi onay (Enter bas, Esc vazgeç). Hiç basılmamış kayıtta (`print_count = 0`) onaysız basar, iptal kaydında pasif. **F5 Geçmiş'te çalışmaz:** F5 uygulama genelinde "yeni parça" demektir, Geçmiş'te sıradaki parça yoktur.
 
-Revizeler bu iki iş yapılmadan **tamamlandı sayılmaz**. Diğer revizeler bitince kullanıcıya hatırlat, onay alıp başla.
-
-- [x] **Sütun adları Türkçe (test tablosunda doğrulandı):** görünen başlıklar Türkçe; iç anahtarlar ve JSON sözleşmesi İngilizce kalır. Geri kurma başlık adıyla okuduğu için hem eski hem yeni başlıkları tanımalı.
-- [ ] **En yeni kayıt en üstte (mevcut satırlar döndü; gerçek yeni kaydın üste girmesi henüz doğrulanmadı):** yeni satır başlığın hemen altına girer, sıralama yeniden eskiye. Amaç: 4 ay sonra binlerce satırda tabloya bakan kişi en alta inmesin. Dikkat: Code.gs bugün eskiden yeniye sıralıyor (yeni satır en altta, araya girme, eski tablo düzeltme); `exportRows`/geri kurma ve `Code.test.js`, `FakeAppsScript` bu sıraya göre gözden geçirilmeli.
-
-Code.gs değişince kullanıcı script'i yeniden dağıtmalı.
+### Test çalışması ve Sheets v6/v7 (2026-11-06)
+- Sonuçlar, bulunan hatalar ve ölçümler: `docs/TEST-RAPORU.md`. Tekrar çalıştırma: `tools/test/README.md`.
+- **v6:** ölçümle bulundu: 50 bin satırda uzun sütunu okumak 7 sn (1 sütun da 13 sütun da aynı), üste eklemek 0,2 sn, TextFinder 0,2 sn. Bu yüzden üstteki `SCAN_WINDOW` (2000) satır okunur, altı TextFinder ile aranır, `max_sequences` `MAX_SEQUENCES` script özelliğinde tutulur, geç gelen kayıt üst bölüme düşüyorsa yalnızca o bölüm sıralanır. Sıralı tablo varsayımı: en alttaki satır üst bölümden yeniyse tablo tamamen yeniden sıralanır.
+- **v7:** düz metin biçimi `=` ile başlayan metni formül olmaktan KORUMUYOR. `toValues_` metin sütunlarında `= + - @ '` ile başlayanların başına `'` yazar (hücrede görünmez, okurken gelmez). `export` metin sütunlarını `String` döndürür.
+- `MAX_SEQUENCES` özelliği elle silinirse sonraki gönderimde tablo bir kez baştan sona okunur. Tabloya elle satır eklemek önbelleğe yansımaz.
+- Stres testinde `sheet_` geçersiz kılınarak ayrı `STRES` sekmesi kullanılır; `Kesimler` ve yayındaki sürüm etkilenmez.
+- Apps Script editörü: Monaco'ya `monaco.editor.getModels()[0].setValue` ile kod yazılabilir, panodan yapıştırma ilk denemede bazen tutmaz (ikinci deneme tuttu). İşlev açılır listesi ilk tıkta geç açılabilir; seçimi çalıştırmadan önce sayfa metninden doğrula, yoksa `doPost` çalışır. Listede en fazla ilk 9 işlev görünür.
 
 ## Şu anki durum
 
-- **Revizeler (2026-11-05):** cm girişi, fareyle lot, Okutma sadeleştirme, F5/F6 tamam ve test edildi, **GitHub'a gönderildi** (2026-11-06). **Sürüm 1.0.4 bu bilgisayara kuruldu, kurulum dosyası masaüstünde; GitHub Release YOK:** sabit indirme linki hâlâ 1.0.2 verir, Release kullanıcı isteyince yapılır. **Revizeler tamamlanmış sayılmaz:** yukarıdaki iki Sheets işi açık.
+- **Sürüm 1.0.5 (2026-11-06) yayında, tüm revizeler tamam:** cm girişi, fareyle lot, Okutma sadeleştirme, F5/F6, Geçmiş'te F6, Sheets Türkçe başlık + en yeni en üstte, script v7. Kapsamlı test ve regresyon geçti (`docs/TEST-RAPORU.md`). Bu bilgisayarda yalnızca 1.0.5 kurulu, kurulum dosyası masaüstünde.
 
 - **Adım 11 kurulum paketi tamamlandı** (2026-11-01): `KumasBarkod-Kurulum-1.0.0.exe` üretildi ve kur/çalıştır/kaldır testi geçti. Adım 9 ve Adım 10'un donanımsız kısmı (gösterim modu) da tamam. Sunum: `docs/SUNUM.md`, pilot: `docs/PILOT.md`.
 - **Karar (2026-11-01): ID 6 hane kalır** (seçenek a). Bir istasyon en fazla 999.999 ID üretir (günde 500 kesimle ~6,7 yıl); dolunca uygulama uyarır, Ayarlar'dan yeni istasyon kodu verilir. 7 haneye çıkarma önerilmişti, kullanıcı istemedi — tekrar önerme.
 - **Kalan (donanım/fabrika gerektiren):** Adım 10'un kalanı (etiket yazıcısı seçimi/satın alma, etiket yazıcısına ham ZPL — `RawWindowsPrinter`/winspool, şablonu gerçek etikete uydurma, Türkçe karakter ve kumaş denemesi); fabrika pilotu (temiz PC + bir vardiya kağıtla paralel). Fabrika için yeni Google tablosu + anahtar.
 - **2026-11-02:** ID benzersizliği düzeltmesi tamamlandı ve gerçek Google ile doğrulandı (test tablosunda script v4). Fabrika tablosu kurulurken v4 Code.gs kullanılmalı.
-- **Code.gs v5 (2026-11-06):** test tablosuna dağıtıldı (Apps Script sürüm 5). Uygulama açılışında başlıklar çevrildi, 24 satır yeniden eskiye döndü. Kalan tek doğrulama: gerçek bir kesimin üste girmesi. Gerçek veritabanına test kaydı yazılmaz, bu yüzden kullanıcının yapacağı ilk kesimle bakılır. Fabrika tablosu için de v5 kullanılır.
+- **Code.gs v7 (2026-11-06):** test tablosunda yayında (Apps Script dağıtım sürümü 7), gerçek ekleme, güncelleme, iptal ve geri kurma doğrulandı, tablo özgün 24 kayıtta. Fabrika tablosu için de v7 kullanılır.
 - **Sıradaki:** Kullanıcıya sorulacak. Seçenek: yazıcı modeli belli olmadan da yazılabilecek ham ZPL gönderimi (winspool) — gerçek yazıcıda denenene kadar "denenmedi" olarak işaretlenir.
 - Gerçek USB okuyucu testi hâlâ açık (Adım 6) — gösterim modunda elle giriş/"Okut (gösterim)" ile ikame edildi.
-- **GitHub:** 2026-11-02 itibarıyla her şey gönderildi; **v1.0.2 yayında** (Releases, sabit indirme linki).
+- **GitHub:** 2026-11-06 itibarıyla her şey gönderildi; **v1.0.5 yayında** (Releases, sabit indirme linki).
 - **2026-11-02:** İptal sebebi sabit 4 seçenekli liste oldu (bkz. İptal sebepleri notları), 1.0.2 olarak yayınlandı.
 - **Donanım araştırması (2026-11-02, yalnızca öneri, satın alma yok):** Kullanıcının fikri = mevcut ofis PC + Cat6 KVM uzatıcı (HDMI+USB) ile makine başına monitör + yazıcı. Önerilen = **makine başına ayrı mini PC (N100, 16/512, Win11 Pro) + 22" monitör + Zebra ZD220t (USB, yerel ZPL) + Zebra DS2208 + 850 VA UPS**, ~35 bin TL. Uzatıcı yolu ~34 bin TL ama ofis PC'si yalnızca bu işe ayrılmalı (aynı masaüstü iki ekranda), ucuz KVM uzatıcılar USB yazıcıyı genelde taşımaz → Ethernet'li yazıcı (ZD421t) gerekir. Endüstriyel paket (IP65 fansız dokunmatik panel PC + ZD421t) ~73–81 bin TL. Notlar: ZD220t 74 m ribon alır (TSC TE200 300 m alır ama ZPL emülasyonu denenmeli); kuşe etiket kumaşta tutmayabilir → sentetik etiket denenmeli; yedekler aynı diskte → USB belleğe kopyalama ileride eklenebilir.
 

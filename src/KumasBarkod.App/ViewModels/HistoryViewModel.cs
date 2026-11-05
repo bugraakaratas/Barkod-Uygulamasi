@@ -85,7 +85,7 @@ public partial class HistoryViewModel : ObservableObject
     [ObservableProperty] public partial int StatusIndex { get; set; }
 
     [ObservableProperty]
-    [NotifyCanExecuteChangedFor(nameof(ReprintCommand), nameof(OpenSelectedCommand))]
+    [NotifyCanExecuteChangedFor(nameof(BeginReprintCommand), nameof(OpenSelectedCommand))]
     public partial HistoryRow? SelectedRow { get; set; }
 
     [ObservableProperty] public partial string TotalText { get; set; } = "";
@@ -142,14 +142,57 @@ public partial class HistoryViewModel : ObservableObject
     [RelayCommand(CanExecute = nameof(HasSelection))]
     private void OpenSelected() => WeakReferenceMessenger.Default.Send(new OpenCutMessage(SelectedRow!.CutId));
 
+    /// <summary>"Bozulan etiket" onayı açık mı? (Kesim Girişi'ndeki F6 ile aynı dil ve akış.)</summary>
+    [ObservableProperty] public partial bool IsReprintPanelOpen { get; set; }
+
+    /// <summary>Onayda gösterilen kayıt: liste yenilense de değişmez.</summary>
+    [ObservableProperty] public partial string ReprintCutId { get; set; } = "";
+
+    /// <summary>true → onay paneline, false → listeye odaklan.</summary>
+    public event Action<bool>? ReprintFocusRequested;
+
+    /// <summary>
+    /// Bozulan etiket: AYNI ID ile baskı. Sıradaki parça burada yoktur, o iş Kesim Girişi'ndedir.
+    /// Onay ister; hiç etiket çıkmamış kayıtta (baskı hatası) onay gerekmez, doğrudan basar.
+    /// </summary>
     [RelayCommand(CanExecute = nameof(CanReprint))]
-    private async Task ReprintAsync()
+    private async Task BeginReprintAsync()
     {
-        var cutId = SelectedRow!.CutId;
+        var row = SelectedRow!;
+        if (row.PrintCount == 0)
+        {
+            await PrintAsync(row.CutId);
+            return;
+        }
+        ReprintCutId = row.CutId;
+        IsReprintPanelOpen = true;
+        ReprintFocusRequested?.Invoke(true);
+    }
+
+    [RelayCommand]
+    private async Task ConfirmReprintAsync()
+    {
+        if (!IsReprintPanelOpen) return;
+        CloseReprintPanel();
+        await PrintAsync(ReprintCutId);
+        ReprintFocusRequested?.Invoke(false);
+    }
+
+    [RelayCommand]
+    private void CancelReprint()
+    {
+        CloseReprintPanel();
+        ReprintFocusRequested?.Invoke(false);
+    }
+
+    public void CloseReprintPanel() => IsReprintPanelOpen = false;
+
+    private async Task PrintAsync(string cutId)
+    {
         try
         {
             var cut = await Task.Run(() => _printService.Print(cutId));
-            ShowMessage(InfoBarSeverity.Success, $"{cutId} etiketi tekrar basıldı",
+            ShowMessage(InfoBarSeverity.Success, $"{cutId} etiketi yeniden basıldı",
                 _printService.Printer.IsPhysical ? "" : "Test yazıcısı: etiket dosyaya yazıldı.");
             WeakReferenceMessenger.Default.Send(new CutChangedMessage(cut));
         }
