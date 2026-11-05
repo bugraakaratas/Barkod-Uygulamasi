@@ -124,7 +124,7 @@ public partial class ScanViewModel : ObservableObject
 
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(HasCurrent))]
-    [NotifyCanExecuteChangedFor(nameof(ReprintCommand), nameof(BeginVoidCommand), nameof(StartReplacementCommand))]
+    [NotifyCanExecuteChangedFor(nameof(ReprintCommand), nameof(BeginVoidCommand))]
     public partial CutDetails? Current { get; set; }
 
     public bool HasCurrent => Current is not null;
@@ -234,7 +234,7 @@ public partial class ScanViewModel : ObservableObject
             Current = CutDetails.From(cut);
             IsVoidPanelOpen = false;
             ShowMessage(InfoBarSeverity.Success, $"{cut.CutId} iptal edildi",
-                "Etiketi kumaştan sökün. Doğru bilgiyle yeni kayıt için \"Yerine yeni kayıt\" (F9).");
+                "Etiketi kumaştan sökün.");
             WeakReferenceMessenger.Default.Send(new CutChangedMessage(cut));
             FocusRequested?.Invoke(ScanField.Input);
         }
@@ -253,14 +253,8 @@ public partial class ScanViewModel : ObservableObject
         FocusRequested?.Invoke(ScanField.Input);
     }
 
-    /// <summary>İptal edilen kaydın lotuyla giriş ekranını açar.</summary>
-    [RelayCommand(CanExecute = nameof(CanStartReplacement))]
-    private void StartReplacement() =>
-        WeakReferenceMessenger.Default.Send(new StartNewCutMessage(Current!.LotCode));
-
     private bool CanActOnActive() => Current is { IsVoided: false };
     private bool CanBeginVoid() => Current is { IsVoided: false } && !IsVoidPanelOpen;
-    private bool CanStartReplacement() => Current is { IsVoided: true };
 
     private void ShowMessage(InfoBarSeverity severity, string title, string text)
     {

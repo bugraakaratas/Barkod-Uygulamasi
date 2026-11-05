@@ -13,7 +13,6 @@ public partial class MainWindow : FluentWindow
     public MainWindow(
         MainWindowViewModel viewModel,
         ScanViewModel scanViewModel,
-        CutEntryViewModel cutEntryViewModel,
         IServiceProvider services)
     {
         DataContext = viewModel;
@@ -48,12 +47,5 @@ public partial class MainWindow : FluentWindow
             RootNavigation.Navigate(page);
             e.Handled = true;
         }), handledEventsToo: true);
-
-        // İptal edilen kaydın yerine yeni kayıt: giriş ekranı aynı lotla açılır.
-        WeakReferenceMessenger.Default.Register<StartNewCutMessage>(this, (_, m) =>
-        {
-            cutEntryViewModel.PrepareNewCut(m.LotCode);
-            RootNavigation.Navigate(typeof(CutEntryPage));
-        });
     }
 }

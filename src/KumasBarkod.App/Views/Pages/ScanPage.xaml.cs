@@ -61,10 +61,6 @@ public partial class ScanPage : Page
                 Run(_viewModel.BeginVoidCommand);
                 e.Handled = true;
                 break;
-            case Key.F9:
-                Run(_viewModel.StartReplacementCommand);
-                e.Handled = true;
-                break;
             case Key.Escape:
                 if (_viewModel.IsVoidPanelOpen)
                     _viewModel.CancelVoidCommand.Execute(null);
