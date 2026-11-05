@@ -20,7 +20,7 @@
     <!-- Uygulama bilgisi (Ayarlar'da, dosya özelliklerinde ve kurulumda görünür) -->
     <AssemblyName>KumasBarkod</AssemblyName>
     <RootNamespace>KumasBarkod.App</RootNamespace>
-    <Version>1.0.3</Version>
+    <Version>1.0.4</Version>
     <Product>Kumaş Barkod</Product>
     <AssemblyTitle>Kumaş Kalite Kontrol ve Barkod Takip</AssemblyTitle>
     <Description>Kumaş kesim kaydı, barkod etiketi ve okutma</Description>

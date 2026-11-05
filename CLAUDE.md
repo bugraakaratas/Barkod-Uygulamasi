@@ -248,26 +248,28 @@ docs/                    SUNUM.md (donanımsız sunum akışı), PILOT.md (fabri
 - **Sıra:** yeni satırlar `insertRowsAfter(1, n)` ile başlığın altına girer. Güncellemeler eklemeden ÖNCE yapılır (satır numaraları kayar). Eklenen satır biçimi kalın başlıktan gelmesin diye `setFontWeight('normal')`. Sırasızlık kontrolü ters döndü; eski artan tablolar açılıştaki boş pakette yeniden eskiye döner.
 - **`export` eskiden yeniye verir:** offset tablonun altından sayılır. Yoksa geri kurma sırasında üste eklenen satır sayfaları kaydırırdı. Bu yüzden `RestoreService` satır numarası yerine ID bildirir.
 - **1000 satır:** eski kod sayfa sonuna `getRange` ile yazıyordu; varsayılan 1000 satırlık sayfa dolunca hata vermesi beklenir (gerçek tabloda denenmedi). `insertRowsAfter` sayfayı büyütür.
+- **Dağıtım yolu:** Chrome eklentisiyle editöre yapıştır + SHA-256 karşılaştır + Dağıtımları yönet → kalem → Yeni sürüm. Sürüm 5 = 2026-11-06. Script projesi "Kumaş Barkod", tablo "Kumaş Kesimleri - TEST". Google Sheets bağlayıcısı bu tabloya erişemiyor; okuma Chrome'dan yapılır.
+- Yerel veritabanından anahtar okuyup tabloya istek atan betik otomatik güvenlik denetimine takıldı: doğrulamayı uygulamanın kendisi tetiklemeli.
 - `RequiredScriptVersion` 3 kaldı: sıra ve başlık yalnızca görünümdür, eski script veri bozmaz. `FakeAppsScript` varsayılanı v5.
 
 ## ⚠️ EN SON YAPILACAK — Sheets (2026-11-05, kullanıcı isteği)
 
 Revizeler bu iki iş yapılmadan **tamamlandı sayılmaz**. Diğer revizeler bitince kullanıcıya hatırlat, onay alıp başla.
 
-- [ ] **Sütun adları Türkçe:** görünen başlıklar Türkçe; iç anahtarlar ve JSON sözleşmesi İngilizce kalır. Geri kurma başlık adıyla okuduğu için hem eski hem yeni başlıkları tanımalı.
-- [ ] **En yeni kayıt en üstte:** yeni satır başlığın hemen altına girer, sıralama yeniden eskiye. Amaç: 4 ay sonra binlerce satırda tabloya bakan kişi en alta inmesin. Dikkat: Code.gs bugün eskiden yeniye sıralıyor (yeni satır en altta, araya girme, eski tablo düzeltme); `exportRows`/geri kurma ve `Code.test.js`, `FakeAppsScript` bu sıraya göre gözden geçirilmeli.
+- [x] **Sütun adları Türkçe (test tablosunda doğrulandı):** görünen başlıklar Türkçe; iç anahtarlar ve JSON sözleşmesi İngilizce kalır. Geri kurma başlık adıyla okuduğu için hem eski hem yeni başlıkları tanımalı.
+- [ ] **En yeni kayıt en üstte (mevcut satırlar döndü; gerçek yeni kaydın üste girmesi henüz doğrulanmadı):** yeni satır başlığın hemen altına girer, sıralama yeniden eskiye. Amaç: 4 ay sonra binlerce satırda tabloya bakan kişi en alta inmesin. Dikkat: Code.gs bugün eskiden yeniye sıralıyor (yeni satır en altta, araya girme, eski tablo düzeltme); `exportRows`/geri kurma ve `Code.test.js`, `FakeAppsScript` bu sıraya göre gözden geçirilmeli.
 
 Code.gs değişince kullanıcı script'i yeniden dağıtmalı.
 
 ## Şu anki durum
 
-- **Revizeler (2026-11-05):** cm girişi, fareyle lot, Okutma sadeleştirme, F5/F6 tamam ve test edildi, **GitHub'a gönderildi** (2026-11-06). **Sürüm 1.0.3 bu bilgisayara kuruldu, kurulum dosyası masaüstünde; GitHub Release YOK:** sabit indirme linki hâlâ 1.0.2 verir, Release kullanıcı isteyince yapılır. **Revizeler tamamlanmış sayılmaz:** yukarıdaki iki Sheets işi açık.
+- **Revizeler (2026-11-05):** cm girişi, fareyle lot, Okutma sadeleştirme, F5/F6 tamam ve test edildi, **GitHub'a gönderildi** (2026-11-06). **Sürüm 1.0.4 bu bilgisayara kuruldu, kurulum dosyası masaüstünde; GitHub Release YOK:** sabit indirme linki hâlâ 1.0.2 verir, Release kullanıcı isteyince yapılır. **Revizeler tamamlanmış sayılmaz:** yukarıdaki iki Sheets işi açık.
 
 - **Adım 11 kurulum paketi tamamlandı** (2026-11-01): `KumasBarkod-Kurulum-1.0.0.exe` üretildi ve kur/çalıştır/kaldır testi geçti. Adım 9 ve Adım 10'un donanımsız kısmı (gösterim modu) da tamam. Sunum: `docs/SUNUM.md`, pilot: `docs/PILOT.md`.
 - **Karar (2026-11-01): ID 6 hane kalır** (seçenek a). Bir istasyon en fazla 999.999 ID üretir (günde 500 kesimle ~6,7 yıl); dolunca uygulama uyarır, Ayarlar'dan yeni istasyon kodu verilir. 7 haneye çıkarma önerilmişti, kullanıcı istemedi — tekrar önerme.
 - **Kalan (donanım/fabrika gerektiren):** Adım 10'un kalanı (etiket yazıcısı seçimi/satın alma, etiket yazıcısına ham ZPL — `RawWindowsPrinter`/winspool, şablonu gerçek etikete uydurma, Türkçe karakter ve kumaş denemesi); fabrika pilotu (temiz PC + bir vardiya kağıtla paralel). Fabrika için yeni Google tablosu + anahtar.
 - **2026-11-02:** ID benzersizliği düzeltmesi tamamlandı ve gerçek Google ile doğrulandı (test tablosunda script v4). Fabrika tablosu kurulurken v4 Code.gs kullanılmalı.
-- **Code.gs v5 (2026-11-06):** kod ve testler hazır, gerçek tabloda dağıtım/doğrulama bekliyor (bkz. Sheets v5 notları).
+- **Code.gs v5 (2026-11-06):** test tablosuna dağıtıldı (Apps Script sürüm 5). Uygulama açılışında başlıklar çevrildi, 24 satır yeniden eskiye döndü. Kalan tek doğrulama: gerçek bir kesimin üste girmesi. Gerçek veritabanına test kaydı yazılmaz, bu yüzden kullanıcının yapacağı ilk kesimle bakılır. Fabrika tablosu için de v5 kullanılır.
 - **Sıradaki:** Kullanıcıya sorulacak. Seçenek: yazıcı modeli belli olmadan da yazılabilecek ham ZPL gönderimi (winspool) — gerçek yazıcıda denenene kadar "denenmedi" olarak işaretlenir.
 - Gerçek USB okuyucu testi hâlâ açık (Adım 6) — gösterim modunda elle giriş/"Okut (gösterim)" ile ikame edildi.
 - **GitHub:** 2026-11-02 itibarıyla her şey gönderildi; **v1.0.2 yayında** (Releases, sabit indirme linki).
