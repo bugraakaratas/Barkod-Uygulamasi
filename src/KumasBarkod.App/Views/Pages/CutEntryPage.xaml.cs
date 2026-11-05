@@ -1,3 +1,4 @@
+using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
 using System.Windows.Threading;
@@ -95,7 +96,13 @@ public partial class CutEntryPage : Page
 
     private void RecentLotsList_PreviewMouseLeftButtonUp(object sender, MouseButtonEventArgs e)
     {
-        // Seçim bağlama ile LotText'e yazılır; ardından metreye geç.
+        // Öğeler Focusable=False olduğu için ListBox fare seçimi yapmaz (ListBoxItem önce odak ister).
+        // Tıklanan öğe burada bulunur; boşluğa tıklama lotu değiştirmez.
+        if (ItemsControl.ContainerFromElement(RecentLotsList, e.OriginalSource as DependencyObject)
+            is not ListBoxItem { DataContext: string lot })
+            return;
+
+        _viewModel.LotText = lot;
         FocusNow(EntryField.Length);
     }
 }
