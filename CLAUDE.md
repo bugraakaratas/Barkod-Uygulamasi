@@ -283,8 +283,14 @@ docs/                    SUNUM.md (donanımsız sunum akışı), PILOT.md (fabri
 
 ## Rafa kalkan: Yönetici (izleme) modu — 2026-11-02
 - **Son karar (kullanıcı):** şimdilik takip **yalnızca Google Sheets'ten** yapılacak, KOD YAZILMAYACAK. Ayrı yönetici paneli istenmedi. Kullanıcı tekrar istemedikçe önerme.
+- **Güncelleme (2026-11-06):** Kullanıcı patronun ayrı PC'den Geçmiş'i izlemesini sordu; "yapılabilir, salt okunur izleme bilgisayarı önerilir" yanıtı verildi, konu yine **park edildi**. Tekrar gündeme gelirse koda başlamadan önce sorularla kapsam netleştirilecek. Ağ klasöründe ortak SQLite yapılmaz (WAL ağda güvenli değil).
 - Önkoşul (zaten geçerli): her makineye ayrı istasyon kodu; hepsi aynı Sheets adresi + anahtarı.
 - İleride istenirse önerilen yol: Geçmiş ekranına "Tüm makineler" seçeneği (yalnızca Ayarlar'da açılan bilgisayarda; makineler birbirini görmez), ~1 dk gecikme, salt okunur. Gereken: Code.gs v5 (`rev` sütunu + kilit altında `changes` eylemi), uygulamada ayrı yerel kopya tablosu. Makine durumu (heartbeat) / pano isteğe bağlı. Bir taslak yazılmaya başlanmıştı, hiçbir değişiklik kaydedilmedi.
+
+## Rafa kalkan: Stok entegrasyonu — 2026-11-06
+- **Karar:** Kod yazılmadı, park edildi. Fabrika demosunda sorulması bekleniyor; yanıt: yapılabilir, kapsam stoğun tutulduğu yere bağlı (Excel/Sheets kolay, ERP karşı tarafa bağlı). Başlamadan önce sorularla kapsam netleştirilecek.
+- **Yaklaşım:** Stok tarafı Google tablosunu okur, kesim ekranı stoğa bağımlı olmaz. Riskler: elle yazılan lotun stokla eşleşmemesi (en büyüğü), birim farkı (cm/kg/top), fire, iptalde iade, aynı ürünün iki kez geçmesi, stoktan düşme mi durum taşıma mı.
+- **Demoda sorulacak:** Stok nerede tutuluyor, birim ne, lot kodunu kim üretiyor, toplarda barkod var mı, geçişte stokta ne değişmeli, fire ve iptal nasıl kaydediliyor.
 
 ## Açık konular / riskler
 
