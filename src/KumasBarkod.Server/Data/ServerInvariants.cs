@@ -99,6 +99,14 @@ public static class ServerInvariants
             SELECT 'okutma ' || scan_event_id || ': yanıt kaydı boş' FROM scan_events WHERE response_json = ''
             """));
 
+        // 8) Geri alınan sevkiyatın kalemleri "reversed"; onaylı sevkiyatın hiç geri alınmış kalemi olmaz.
+        problems.AddRange(c.Query<string>("""
+            SELECT s.shipment_no || ': ' || s.status || ' sevkiyatta ' || i.status || ' kalem (' || i.cut_id || ')'
+            FROM shipment_items i JOIN shipments s ON s.shipment_id = i.shipment_id
+            WHERE (s.status = 'reversed' AND i.status NOT IN ('reversed', 'removed'))
+               OR (s.status <> 'reversed' AND i.status = 'reversed')
+            """));
+
         return problems;
     }
 }

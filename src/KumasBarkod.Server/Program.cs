@@ -43,6 +43,7 @@ builder.Services.AddSingleton<LotService>();
 builder.Services.AddSingleton<StockQueryService>();
 builder.Services.AddSingleton<KumasBarkod.Server.Auth.AuthService>();
 builder.Services.AddSingleton<KumasBarkod.Server.Shipments.ShipmentService>();
+builder.Services.AddSingleton<KumasBarkod.Server.Reports.ReportService>();
 builder.Services.AddSingleton(sp => new ServerBackupService(
     sp.GetRequiredService<SqliteConnectionFactory>(), sp.GetRequiredService<ServerPaths>(),
     sp.GetRequiredService<TimeProvider>(),

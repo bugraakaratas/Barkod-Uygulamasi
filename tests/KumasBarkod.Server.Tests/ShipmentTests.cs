@@ -9,7 +9,7 @@ using static KumasBarkod.Server.Tests.Rows;
 namespace KumasBarkod.Server.Tests;
 
 /// <summary>Faz 4: personel girişi ve barkodla sevkiyat (kullanıcının istediği 12 test senaryosu dahil).</summary>
-public sealed class ShipmentTests : IDisposable
+public sealed partial class ShipmentTests : IDisposable
 {
     private const string Pc = "PC-1";
     private readonly ServerFixture _server = new();

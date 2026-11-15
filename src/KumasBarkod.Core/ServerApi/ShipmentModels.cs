@@ -100,7 +100,8 @@ public sealed record ShipmentDetail(
     string OpenedBy, string OpenedAt, string LastActivityAt, string? ClosedAt, string? ClosedBy, string? CloseReason,
     IReadOnlyList<ShipmentLotInfo> Lots, ShipmentStats Stats,
     IReadOnlyList<ShipmentItemInfo> Items, IReadOnlyList<ScanEventInfo> RecentScans,
-    IReadOnlyList<string> Warnings);
+    IReadOnlyList<string> Warnings,
+    string? ReversedBy = null, string? ReversedAt = null, string? ReversalReason = null);
 
 /// <param name="ClientScanId">İstemcinin ürettiği tekil kimlik: ağ kopup tekrar gönderilince aynı okutma ikinci kez işlenmez.</param>
 public sealed record ScanRequest(string ClientScanId, string RawInput);
@@ -133,6 +134,7 @@ public static class ShipmentErrorCodes
     public const string Locked = "LOCKED";
     public const string NotFound = "SHIPMENT_NOT_FOUND";
     public const string NotOpen = "SHIPMENT_NOT_OPEN";
+    public const string NotConfirmed = "SHIPMENT_NOT_CONFIRMED";
     public const string VersionMismatch = "VERSION_MISMATCH";
     public const string Empty = "SHIPMENT_EMPTY";
     public const string InvalidLots = "INVALID_LOTS";

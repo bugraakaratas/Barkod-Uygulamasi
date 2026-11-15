@@ -350,6 +350,71 @@ public sealed class ShipmentService(SqliteConnectionFactory db, TimeProvider clo
         return Get(shipmentId);
     }
 
+    /// <summary>
+    /// Onayı geri alma (yalnızca yetkili, sebep zorunlu): yanlışlıkla onaylanan sevkiyat. Kalemler <c>reversed</c>,
+    /// toplar stoğa döner (<c>ship_reversed</c> hareketi). Kalite kontrolde iptal edilmiş top stoğa değil, iptale döner.
+    /// Hiçbir kayıt silinmez; onay bilgisi de kalır.
+    /// </summary>
+    public ShipmentDetail Reverse(long shipmentId, ShipmentReverseRequest? request, CurrentUser user)
+    {
+        AuthService.RequireSupervisor(user);
+        var requestId = RequireRequestId(request?.RequestId);
+        var reason = request?.Reason?.Trim() ?? "";
+        if (reason.Length is < 3 or > 200 || reason.Any(char.IsControl))
+            throw new ApiException(400, ServerErrorCodes.InvalidRequest, "Geri alma sebebini yazın (en az 3 karakter).");
+        var now = Timestamps.Format(clock.GetUtcNow());
+
+        using var c = db.Open();
+        using var tx = c.BeginTransaction(deferred: false);
+        var ship = c.QuerySingleOrDefault<ShipRow>("""
+            SELECT shipment_no AS No, status AS Status, version AS Version, close_request_id AS CloseRequestId,
+                   reversal_request_id AS ReversalRequestId
+            FROM shipments WHERE shipment_id = @shipmentId
+            """, new { shipmentId }, tx) ?? throw NotFound(shipmentId);
+        if (ship.Status == ShipmentStatuses.Reversed && ship.ReversalRequestId == requestId)
+        {
+            tx.Commit();
+            return Get(shipmentId);
+        }
+        if (ship.Status != ShipmentStatuses.Confirmed)
+            throw new ApiException(409, ShipmentErrorCodes.NotConfirmed,
+                $"{ship.No} {ShipmentStatuses.Display(ship.Status).ToLowerInvariant()}; yalnızca onaylanmış sevkiyat geri alınır.");
+
+        var items = c.Query<(long ItemId, string CutId, string State, string QcStatus)>("""
+            SELECT i.item_id, i.cut_id, r.state, r.qc_status FROM shipment_items i JOIN rolls r ON r.cut_id = i.cut_id
+            WHERE i.shipment_id = @shipmentId AND i.status = 'active'
+            """, new { shipmentId }, tx).ToList();
+        foreach (var it in items)
+        {
+            if (it.State != RollStates.Shipped)
+                throw new InvalidOperationException($"{it.CutId} sevk edilmiş durumda değil ({it.State}); geri alma yapılmadı.");
+            EndItem(c, tx, it.ItemId, "reversed", now, user.UserId, $"Onay geri alındı: {reason}");
+            c.Execute("UPDATE rolls SET state = 'in_stock', updated_at = @now, version = version + 1 WHERE cut_id = @CutId",
+                new { now, it.CutId }, tx);
+            c.Execute("""
+                INSERT INTO stock_movements (cut_id, kind, from_state, to_state, shipment_id, user_id, occurred_at, recorded_at, note)
+                VALUES (@CutId, 'ship_reversed', 'shipped', 'in_stock', @shipmentId, @user, @now, @now, @note)
+                """, new { it.CutId, shipmentId, user = user.UserId, now, note = $"{ship.No} onayı geri alındı: {reason}" }, tx);
+            if (it.QcStatus == "voided")
+            {
+                c.Execute("UPDATE rolls SET state = 'voided', updated_at = @now, version = version + 1 WHERE cut_id = @CutId",
+                    new { now, it.CutId }, tx);
+                c.Execute("""
+                    INSERT INTO stock_movements (cut_id, kind, from_state, to_state, shipment_id, user_id, occurred_at, recorded_at, note)
+                    VALUES (@CutId, 'qc_voided', 'in_stock', 'voided', @shipmentId, @user, @now, @now, 'Kalite kontrolde iptal edilmişti; stoğa değil iptale döndü')
+                    """, new { it.CutId, shipmentId, user = user.UserId, now }, tx);
+            }
+        }
+        c.Execute("""
+            UPDATE shipments SET status = 'reversed', reversed_by = @user, reversed_at = @now, reversal_reason = @reason,
+                                 reversal_request_id = @requestId, version = version + 1
+            WHERE shipment_id = @shipmentId
+            """, new { user = user.UserId, now, reason, requestId, shipmentId }, tx);
+        DataVersion.Bump(c, tx);
+        tx.Commit();
+        return Get(shipmentId);
+    }
+
     // ---------- Kesim alımından çağrılır (QC iptali / karantina ayrılmış topa gelirse) ----------
 
     /// <summary>Ayrılmış topun aktif kalemini kapatır (top sevkiyattan düşer). Durumu çağıran değiştirir.</summary>
@@ -372,8 +437,10 @@ public sealed class ShipmentService(SqliteConnectionFactory db, TimeProvider clo
         var h = c.QuerySingleOrDefault<HeaderRow>("""
             SELECT s.shipment_id AS ShipmentId, s.shipment_no AS ShipmentNo, s.status AS Status, s.version AS Version,
                    uo.name AS OpenedBy, s.opened_at AS OpenedAt, s.last_activity_at AS LastActivityAt,
-                   s.closed_at AS ClosedAt, uc.name AS ClosedBy, s.close_reason AS CloseReason
+                   s.closed_at AS ClosedAt, uc.name AS ClosedBy, s.close_reason AS CloseReason,
+                   ur.name AS ReversedBy, s.reversed_at AS ReversedAt, s.reversal_reason AS ReversalReason
             FROM shipments s JOIN users uo ON uo.user_id = s.opened_by LEFT JOIN users uc ON uc.user_id = s.closed_by
+            LEFT JOIN users ur ON ur.user_id = s.reversed_by
             WHERE s.shipment_id = @shipmentId
             """, new { shipmentId }, tx) ?? throw NotFound(shipmentId);
 
@@ -411,7 +478,8 @@ public sealed class ShipmentService(SqliteConnectionFactory db, TimeProvider clo
         }
 
         return new ShipmentDetail(h.ShipmentId, h.ShipmentNo, h.Status, h.Version, h.OpenedBy, h.OpenedAt, h.LastActivityAt,
-            h.ClosedAt, h.ClosedBy, h.CloseReason, lots, Stats(c, tx, shipmentId), items, scans, warnings);
+            h.ClosedAt, h.ClosedBy, h.CloseReason, lots, Stats(c, tx, shipmentId), items, scans, warnings,
+            h.ReversedBy, h.ReversedAt, h.ReversalReason);
     }
 
     private static List<ShipmentLotInfo> ShipmentLots(SqliteConnection c, SqliteTransaction tx, long shipmentId) =>
@@ -474,11 +542,11 @@ public sealed class ShipmentService(SqliteConnectionFactory db, TimeProvider clo
     private sealed record ScanContext(SqliteConnection C, SqliteTransaction Tx, long ShipmentId, string ClientScanId, string Raw,
         CurrentUser User, string? Device, string Now, string Kind);
 
-    private sealed class ShipRow { public string No { get; init; } = ""; public string Status { get; init; } = ""; public long Version { get; init; } public string? CloseRequestId { get; init; } }
+    private sealed class ShipRow { public string No { get; init; } = ""; public string Status { get; init; } = ""; public long Version { get; init; } public string? CloseRequestId { get; init; } public string? ReversalRequestId { get; init; } }
     private sealed class RollRow { public string CutId { get; init; } = ""; public string State { get; init; } = ""; public string QcStatus { get; init; } = ""; public long? LotId { get; init; } public string? LotName { get; init; } public string LotRaw { get; init; } = ""; public long LengthCm { get; init; } }
     private sealed class ActiveItemRow { public long ItemId { get; init; } public long ShipmentId { get; init; } public string No { get; init; } = ""; public string Status { get; init; } = ""; public string? ClosedAt { get; init; } public string AddedBy { get; init; } = ""; }
     private sealed class SummaryRow { public long ShipmentId { get; init; } public string ShipmentNo { get; init; } = ""; public string Status { get; init; } = ""; public string? LotNames { get; init; } public long Count { get; init; } public long LengthCm { get; init; } public string OpenedBy { get; init; } = ""; public string OpenedAt { get; init; } = ""; public string LastActivityAt { get; init; } = ""; public string? ClosedAt { get; init; } public string? ClosedBy { get; init; } }
-    private sealed class HeaderRow { public long ShipmentId { get; init; } public string ShipmentNo { get; init; } = ""; public string Status { get; init; } = ""; public long Version { get; init; } public string OpenedBy { get; init; } = ""; public string OpenedAt { get; init; } = ""; public string LastActivityAt { get; init; } = ""; public string? ClosedAt { get; init; } public string? ClosedBy { get; init; } public string? CloseReason { get; init; } }
+    private sealed class HeaderRow { public long ShipmentId { get; init; } public string ShipmentNo { get; init; } = ""; public string Status { get; init; } = ""; public long Version { get; init; } public string OpenedBy { get; init; } = ""; public string OpenedAt { get; init; } = ""; public string LastActivityAt { get; init; } = ""; public string? ClosedAt { get; init; } public string? ClosedBy { get; init; } public string? CloseReason { get; init; } public string? ReversedBy { get; init; } public string? ReversedAt { get; init; } public string? ReversalReason { get; init; } }
     private sealed class ItemRow { public string CutId { get; init; } = ""; public string LotName { get; init; } = ""; public long LengthCm { get; init; } public string AddedAt { get; init; } = ""; public string AddedBy { get; init; } = ""; }
     private sealed class ScanRow { public long ScanEventId { get; init; } public string Kind { get; init; } = ""; public string RawInput { get; init; } = ""; public string? CutId { get; init; } public string Code { get; init; } = ""; public long Accepted { get; init; } public string Json { get; init; } = ""; public string ServerTime { get; init; } = ""; public string User { get; init; } = ""; }
 }

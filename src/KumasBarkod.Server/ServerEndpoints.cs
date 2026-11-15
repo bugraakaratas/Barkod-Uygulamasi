@@ -6,6 +6,7 @@ using KumasBarkod.Server.Auth;
 using KumasBarkod.Server.Ingest;
 using KumasBarkod.Server.Shipments;
 using KumasBarkod.Server.Lots;
+using KumasBarkod.Server.Reports;
 using KumasBarkod.Server.Stock;
 
 namespace KumasBarkod.Server;
@@ -110,6 +111,19 @@ public static class ServerEndpoints
             svc.Confirm(id, request, auth.Authenticate(Token(http))));
         app.MapPost(s + "/{id:long}/cancel", (long id, ShipmentCancelRequest? request, ShipmentService svc, AuthService auth, HttpContext http) =>
             svc.Cancel(id, request, auth.Authenticate(Token(http))));
+        app.MapPost(s + "/{id:long}/reverse", (long id, ShipmentReverseRequest? request, ShipmentService svc, AuthService auth, HttpContext http) =>
+            svc.Reverse(id, request, auth.Authenticate(Token(http))));
+
+        // ---------- İstisnalar (yetkili) ve raporlar ----------
+        app.MapGet("/" + ReportPaths.Exceptions, (ReportService r, AuthService auth, HttpContext http) =>
+            r.Exceptions(auth.Authenticate(Token(http))));
+        app.MapPost("/" + ReportPaths.ResolveConflict + "/{id:long}/resolve", (long id, ConflictResolveRequest? request, ReportService r, AuthService auth, HttpContext http) =>
+            r.ResolveConflict(id, request, auth.Authenticate(Token(http))));
+        // Raporlar stok ekranı gibi giriş istemez (yerel ağda salt okunur).
+        app.MapGet("/" + ReportPaths.StockByLot, (ReportService r) => r.StockByLot());
+        app.MapGet("/" + ReportPaths.DailyShipments, (string? from, string? to, ReportService r) => r.DailyShipments(from, to));
+        app.MapGet("/" + ReportPaths.ShippedRolls, (string? from, string? to, ReportService r) => r.ShippedRolls(from, to));
+        app.MapGet("/" + ReportPaths.ShipmentHistory, (string? from, string? to, ReportService r) => r.ShipmentHistory(from, to));
     }
 
     private static string ReadHandheldPage()

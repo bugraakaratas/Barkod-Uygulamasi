@@ -339,6 +339,19 @@ public static class ServerMigrations
                 SELECT RAISE(ABORT, 'sevkiyat kalemi silinemez');
             END;
             """),
+
+        new(4, "Onayı geri alma ve çakışma çözümü bilgisi", """
+            -- Onayı geri alma (yalnızca yetkili): kim, ne zaman, neden. Kapanış bilgisi (closed_*) korunur.
+            ALTER TABLE shipments ADD COLUMN reversed_by INTEGER REFERENCES users (user_id);
+            ALTER TABLE shipments ADD COLUMN reversed_at TEXT;
+            ALTER TABLE shipments ADD COLUMN reversal_reason TEXT;
+            ALTER TABLE shipments ADD COLUMN reversal_request_id TEXT;
+
+            -- Çakışmayı çözen yetkili
+            ALTER TABLE cut_conflicts ADD COLUMN resolved_by INTEGER REFERENCES users (user_id);
+
+            CREATE INDEX ix_shipments_closed ON shipments (status, closed_at);
+            """),
     ];
 
     public static int LatestVersion => All[^1].Version;

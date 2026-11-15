@@ -172,6 +172,11 @@ public sealed class CutIngestService(SqliteConnectionFactory db, TimeProvider cl
 
         if (!sameCut)
         {
+            // Yetkili bu çakışmayı çözdü (o top yeniden etiketlendi): eski kayıt artık yok sayılır, QC'deki uyarı kalkar.
+            if (c.ExecuteScalar<long>("""
+                    SELECT count(*) FROM cut_conflicts WHERE cut_id = @CutId AND created_at = @CreatedAt AND resolved_at IS NOT NULL
+                    """, new { row.CutId, row.CreatedAt }, tx) > 0)
+                return null;
             RecordConflict(c, tx, row, existing, installId, now);
             return new ServerCutConflict(row.CutId, row.CreatedAt, existing.QcCreatedAt);
         }
