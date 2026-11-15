@@ -282,6 +282,8 @@ function PartB {
     K '{F2}' 150; K '^a' 80; K 'IKI{ENTER}' 200; K '500{ENTER}' 700
     $script:p = $first; $script:h = $firstH; $script:root = $firstRoot
     K '{F2}' 150; K '^a' 80; K 'BIR{ENTER}' 200; K '500{ENTER}' 700
+    # Ikinci kaydin yazilmasini bekle (700 ms bazen yetmiyor; 2026-11-15'te bir kez sayim erken okundu, kayitlar dogruydu)
+    $sw = [Diagnostics.Stopwatch]::StartNew(); while ((Count) -lt $n + 2 -and $sw.ElapsedMilliseconds -lt 5000) { Start-Sleep -Milliseconds 100 }
     Check 'Iki kopya farkli ID uretti' ((Count) -eq $n + 2 -and [int](Sql 'select count(*)-count(distinct cut_id) from cuts') -eq 0)
     try { $second.Kill() } catch {}
   }
@@ -419,12 +421,124 @@ function PartD {
   $env:KUMASBARKOD_DATA_DIR = $data
 }
 
+# ---------- E: Depo ekranları (Faz 2) — geçici depo sunucusu ile ----------
+$serverExe = Join-Path $root 'src\KumasBarkod.Server\bin\Debug\net10.0\KumasBarkodSunucu.exe'
+$serverUrl = 'http://localhost:5087/'
+function Api($path) { Invoke-RestMethod ($serverUrl + $path) -TimeoutSec 5 }
+# Lot adlari (Invoke-RestMethod JSON dizisini tek nesne olarak dondurur: .name ile acilir)
+function LotNames { @((Api 'api/v1/lots').name) }
+# Not: InfoBar mesaj metni UI Automation agacinda gorunmuyor; mesajlar ekran goruntusunden, davranis veriden kontrol edilir.
+function Select-ByName($name) {
+  foreach ($e in (All)) {
+    if ($e.Current.Name -eq $name) {
+      $pat = $null
+      if ($e.TryGetCurrentPattern([System.Windows.Automation.SelectionItemPattern]::Pattern, [ref]$pat)) { $pat.Select(); Start-Sleep -Milliseconds 300; return $true }
+    }
+  }
+  return $false
+}
+function Invoke-ByName($name) {
+  foreach ($e in (All)) {
+    if ($e.Current.Name -eq $name -and $e.Current.ControlType.ProgrammaticName -eq 'ControlType.Button') {
+      $e.GetCurrentPattern([System.Windows.Automation.InvokePattern]::Pattern).Invoke(); Start-Sleep -Milliseconds 700; return $true
+    }
+  }
+  return $false
+}
+function WaitFor($scriptBlock, $ms = 8000) {
+  $sw = [Diagnostics.Stopwatch]::StartNew()
+  while ($sw.ElapsedMilliseconds -lt $ms) { if (& $scriptBlock) { return $true }; Start-Sleep -Milliseconds 200 }
+  return $false
+}
+
+function PartE {
+  $env:KUMASBARKOD_SERVER_DATA_DIR = Join-Path $data 'sunucu'
+  $script:srv = Start-Process $serverExe -ArgumentList '--urls', $serverUrl.TrimEnd('/') -PassThru -WindowStyle Hidden
+  Check 'Sunucu acildi' (WaitFor { try { (Api 'health').ok } catch { $false } } 15000)
+
+  Start-App; Stop-App
+  & python $py seed $db $fileSetting 30 | Out-Null
+  & python $py exec $db "insert into settings(key,value) values('server_url','$serverUrl')" | Out-Null
+  & python $py exec $db "insert into server_outbox(cut_id,operation,created_at) select cut_id,'upsert','2026-11-15T00:00:00.000Z' from cuts" | Out-Null
+  Start-App
+  Check 'QC kayitlari sunucuya gitti' (WaitFor { try { (Api 'api/v1/stock').inStock.count -eq 30 } catch { $false } } 20000)
+  Invoke-RestMethod ($serverUrl + 'api/v1/lots') -Method Post -ContentType 'application/json' -Body '{"name":"LOT-0001"}' | Out-Null
+
+  # --- Gorev: Yonetim
+  K '^4' 900
+  Check 'Gorev secenekleri gorunuyor' (Select-ByName 'Görev yönetim')
+  Check 'Gorev kaydedildi' (Invoke-ByName 'Görevi kaydet')
+  Check 'Gorev ayara yazildi' ((Sql "select value from settings where key='station_role'") -eq 'office')
+  K '^1' 1500
+  Check 'Ctrl+1 Depo Stogu' (WaitFor { Has 'Depoda (stokta)' })
+  Check 'Stok ozeti 30 top' (WaitFor { Has 'Sayfa 1 / 1 · 30 top' })
+  Shot 'e1_stok'
+
+  # --- Arama (klavye)
+  K 'LOT-0001' 1500
+  Check 'Lot aramasi tek top' (WaitFor { Has 'Sayfa 1 / 1 · 1 top' })
+  K '{ESC}' 1200
+  Check 'Esc aramayi temizledi' (WaitFor { Has 'Sayfa 1 / 1 · 30 top' })
+  K '^f' 200; K 'zzz' 1500
+  Check 'Sonuc yok durumu' (WaitFor { Has 'Bu filtreye uyan top yok.' })
+  K '{ESC}' 1000
+
+  # --- Barkod okutma (okuyucu gibi hizli + Enter) → topun gecmisi
+  K 'K1000005{ENTER}' 1500
+  Check 'Okutma topun gecmisini acti' (WaitFor { Has 'Hareketler (en yeni üstte)' })
+  Check 'Gecmiste QC kaydi var' (Has 'Kalite kontrol kaydı — stoğa girdi')
+  Check 'Okutma arama kutusunu bozmadi' ((ValueOf (ById 'SearchBox')) -eq '')
+  Shot 'e2_gecmis'
+  K '{ESC}' 800
+  Check 'Esc gecmisi kapatti' (-not (Has 'Hareketler (en yeni üstte)'))
+  K 'K1000999{ENTER}' 1500
+  Check 'Bilinmeyen barkod gecmis acmadi' (-not (Has 'Hareketler (en yeni üstte)'))
+  Check 'Bilinmeyen barkod sonrasi uygulama calisiyor' (-not $script:p.HasExited)
+  Shot 'e2b_bilinmeyen_barkod'
+
+  # --- Lotlar: Enter ile ekle, yazim farkli ayni lot reddedilir
+  K '^2' 1500
+  Check 'Ctrl+2 Lotlar' (WaitFor { Has 'Lotlar (firmalar)' })
+  K 'YENI FIRMA{ENTER}' 1500
+  Check 'Enter ile lot eklendi' (WaitFor { (LotNames) -contains 'YENI FIRMA' })
+  Check 'Eklenince kutu temizlendi' ((ValueOf (Edit 'Yeni lot adı')) -eq '')
+  K 'yeni-firma{ENTER}' 1500
+  Check 'Yazim farkli ayni lot reddedildi (sunucuda 2 lot)' ((LotNames).Count -eq 2)
+  Check 'Reddedilen yazim kutuda kaldi' ((ValueOf (Edit 'Yeni lot adı')) -eq 'yeni-firma')
+  Check 'Eslesmemis yazimlar listelendi' (WaitFor { Has 'Hiçbir lota bağlanmamış' })
+  Shot 'e3_lotlar'
+
+  # --- Okutma Lotlar ekranindayken de calisir (Depo Stogu'na gecer)
+  K 'K1000007{ENTER}' 1500
+  Check 'Lotlarda okutma Depo Stogu na gecti' (WaitFor { Has 'Hareketler (en yeni üstte)' })
+  K '{ESC}' 500
+
+  # --- Gorev: Kalite kontrol'e geri
+  K '^4' 900
+  Check 'QC gorevi secildi' (Select-ByName 'Görev kalite kontrol')
+  Check 'QC gorevi kaydedildi' (Invoke-ByName 'Görevi kaydet')
+  K '^1' 900
+  Check 'QC Ctrl+1 Kesim Girisi' ($null -ne (Edit 'Lot'))
+  $n = Count
+  NewCut 'LOT-0001' 1234
+  Check 'QC kaydi calisiyor' ((Count) -eq $n + 1)
+  Check 'Yeni kayit sunucuya gitti' (WaitFor { (Api 'api/v1/stock').inStock.count -eq 31 } 15000)
+  Check 'Yeni kayit lota baglandi' (WaitFor { (Api 'api/v1/rolls/K1000031').roll.lotName -eq 'LOT-0001' })
+  Stop-App
+
+  $log = Get-ChildItem (Join-Path $data 'logs') -Filter *.log | Get-Content -Raw
+  Check 'Gunlukte beklenmeyen hata yok' ($log -notmatch 'Beklenmeyen')
+  Check 'Sunucu butunluk' ((& $serverExe --kontrol) -match 'sorun yok')
+  try { $script:srv.Kill() } catch {}
+}
+
 try {
-  if ($Part -eq 'A') { PartA } elseif ($Part -eq 'B') { PartB } elseif ($Part -eq 'D') { PartD } else { PartC }
+  if ($Part -eq 'A') { PartA } elseif ($Part -eq 'B') { PartB } elseif ($Part -eq 'D') { PartD } elseif ($Part -eq 'E') { PartE } else { PartC }
 } catch {
   $results.Add("HATA: $($_.Exception.Message) @ satir $($_.InvocationInfo.ScriptLineNumber)")
 } finally {
   try { $script:p.Kill() } catch {}
+  try { $script:srv.Kill() } catch {}
 }
 $results | ForEach-Object { $_ }
 $kaldi = @($results | Where-Object { $_ -match '^(KALDI|HATA)' }).Count
