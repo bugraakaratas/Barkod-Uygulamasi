@@ -294,7 +294,7 @@ Plan: `docs/DEPO-SEVKIYAT-PLANI.md`. Kullanıcı planı 2026-11-15'te onayladı.
 | Faz | Durum | Commit | Özet |
 |---|---|---|---|
 | 0 Saha | ⏳ kullanıcıdan bilgi | — | Yükleme nasıl (elle/forklift, kim okutuyor), Wi-Fi kapsaması, sunucu PC + UPS |
-| 1 Sunucu + veri alımı | ✅ | `87af678` `0fd9cf4` `bf2aa5b` `7b2706e` `5a07204` + belge | Aşağıda. QC 1.1.0, sunucu 0.1.0 |
+| 1 Sunucu + veri alımı | ✅ GitHub'da | `cdde8f8` `4638e97` `5269f72` `8fef74e` `997a4e6` `8ad7071` `46f92c1` | Aşağıda. QC 1.1.0, sunucu 0.1.0 |
 | 2–7 | ⏳ | — | Lot tanımları + Stok ekranı, QC lot önbelleği, Sevkiyat, geri alma/raporlar, Sheets'in sunucuya taşınması |
 
 ### Faz 1 notları (2026-11-15)
@@ -318,6 +318,7 @@ Plan: `docs/DEPO-SEVKIYAT-PLANI.md`. Kullanıcı planı 2026-11-15'te onayladı.
   - **Bulunan hata:** Sheets `SyncWorker` DI kaydı `ISyncRunner` yüzünden çözülemiyordu → uygulama açılışta uyarı verdi. Birim testleri App'in DI kaydını kapsamıyor: **App'te servis kaydı değişince uygulamayı gerçekten açarak dene.**
 - Betikler scratchpad'de (oturuma özel): `e2e\seed.cs` (Core'u `#:project` ile kullanır, geçici QC veritabanına kesim yazar), `e2e\srvcheck.cs` (sunucu veritabanını salt okunur gösterir), `e2e\appcheck.cs`, `e2e\copydb.cs`, `e2e\shot.ps1` (PrintWindow), `e2e\installtest.ps1`.
 - **Testler (son):** istasyon 290 + sunucu 42 (yedek: 5) = 332.
+- **Gizlilik (2026-11-15):** depo HERKESE AÇIK. Ticari çalışma (donanım fiyatları, rakipler, yazılım satış fiyatı) depoya GİRMEZ; `docs/DEPO-SEVKIYAT-PLANI.md`'de yalnızca bu not var. İlk hâlde ticari bölüm bir commit'teydi; gönderilmeden önce kullanıcı onayıyla o dal yeniden kuruldu (yalnızca yerel, gönderilmemiş commit'ler; force push yok).
 - **Fabrika kuralları:** `docs/FABRIKA-KURALLARI.md` — kullanıcı kararı (2026-11-15): sistemi en sade tutup kullanım kurallarını fabrikaya biz veriyoruz (ayrı sunucu PC + UPS, sabit IP, USB yedek diski, depo/rıhtım Wi-Fi, her QC'ye ayrı istasyon kodu…). Her fazda güncellenir; yalnızca uygulamada olan özelliklere dayanır.
 
 ## Şu anki durum
