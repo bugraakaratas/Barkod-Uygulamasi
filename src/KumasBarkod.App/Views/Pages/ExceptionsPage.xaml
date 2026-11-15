@@ -1,0 +1,138 @@
+<Page x:Class="KumasBarkod.App.Views.Pages.ExceptionsPage"
+      xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+      xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+      xmlns:ui="http://schemas.lepo.co/wpfui/2022/xaml"
+      Title="İstisnalar"
+      ScrollViewer.CanContentScroll="False">
+    <ScrollViewer VerticalScrollBarVisibility="Auto">
+        <StackPanel Margin="{StaticResource PageMargin}">
+            <DockPanel>
+                <ui:Button DockPanel.Dock="Right" VerticalAlignment="Center" Appearance="Secondary" Icon="{ui:SymbolIcon SignOut24}"
+                           Content="Çıkış" Command="{Binding LogoutCommand}" Visibility="{Binding IsReady, Converter={StaticResource BoolToVisibility}}" />
+                <TextBlock DockPanel.Dock="Right" Margin="0,0,12,0" VerticalAlignment="Center" FontSize="15" FontWeight="SemiBold" Text="{Binding UserText}" />
+                <TextBlock Style="{StaticResource PageTitleStyle}" Margin="0" Text="İstisnalar" />
+            </DockPanel>
+            <TextBlock Margin="0,4,0,10" FontSize="16" FontWeight="SemiBold" TextWrapping="Wrap" Text="{Binding Summary}" />
+
+            <ui:InfoBar Margin="0,0,0,8" IsOpen="{Binding IsConfigured, Converter={StaticResource InvertBool}, Mode=OneWay}" IsClosable="False"
+                        Severity="Warning" Title="Depo sunucusu ayarlanmadı" Message="Ayarlar → Depo sunucusu bölümüne sunucu adresini yazıp kaydedin." />
+            <ui:InfoBar Margin="0,0,0,8" IsOpen="{Binding MessageIsOpen, Mode=TwoWay}" Severity="{Binding MessageSeverity}"
+                        Title="{Binding MessageTitle}" Message="{Binding MessageText}" IsClosable="True" />
+
+            <!-- Yetkili girişi -->
+            <StackPanel MaxWidth="520" HorizontalAlignment="Left" Visibility="{Binding NeedsLogin, Converter={StaticResource BoolToVisibility}}">
+                <TextBlock FontSize="20" FontWeight="SemiBold" Text="Yetkili girişi" />
+                <TextBlock Style="{StaticResource FieldLabelStyle}" Margin="0,10,0,6" Text="Kart kodu" />
+                <ui:TextBox x:Name="LoginBadgeBox" FontSize="18" Text="{Binding LoginBadge, UpdateSourceTrigger=PropertyChanged}"
+                            AutomationProperties.Name="İstisna kart kodu" KeyDown="LoginBadgeBox_KeyDown" />
+                <TextBlock Style="{StaticResource FieldLabelStyle}" Margin="0,10,0,6" Text="PIN" />
+                <ui:PasswordBox x:Name="LoginPinBox" FontSize="18" Password="{Binding LoginPin, UpdateSourceTrigger=PropertyChanged, Mode=TwoWay}"
+                                AutomationProperties.Name="İstisna PIN" KeyDown="LoginPinBox_KeyDown" />
+                <ui:Button Margin="0,14,0,0" MinHeight="44" Appearance="Primary" Icon="{ui:SymbolIcon ArrowEnterLeft24}" Content="Giriş  (Enter)"
+                           Command="{Binding LoginCommand}" />
+            </StackPanel>
+
+            <StackPanel Visibility="{Binding IsReady, Converter={StaticResource BoolToVisibility}}">
+                <!-- Karantina -->
+                <ui:Card Padding="16" Margin="0,0,0,12">
+                    <StackPanel>
+                        <TextBlock FontSize="18" FontWeight="SemiBold" Text="Karantina: aynı barkod iki topta" />
+                        <TextBlock Style="{StaticResource PageSubtitleStyle}" Margin="0,2,0,8" TextWrapping="Wrap"
+                                   Text="İki fiziksel top aynı etiketi taşıyor; karantinadaki top sevk edilemez. Sonradan gelen top kalite kontrolde iptal edilip yeni etiketle kaydedildikten sonra burada çözüldü olarak işaretleyin." />
+                        <ListBox ItemsSource="{Binding Quarantined}" SelectedItem="{Binding SelectedQuarantine}" MaxHeight="220"
+                                 AutomationProperties.Name="Karantina listesi" ScrollViewer.HorizontalScrollBarVisibility="Disabled">
+                            <ListBox.ItemTemplate>
+                                <DataTemplate>
+                                    <StackPanel Margin="2,4">
+                                        <TextBlock FontSize="17" FontWeight="SemiBold" FontFamily="Consolas" Text="{Binding CutId}" />
+                                        <TextBlock FontSize="14" Text="{Binding Existing}" />
+                                        <TextBlock FontSize="14" Foreground="{DynamicResource SystemFillColorCriticalBrush}" Text="{Binding Incoming}" />
+                                    </StackPanel>
+                                </DataTemplate>
+                            </ListBox.ItemTemplate>
+                        </ListBox>
+                        <DockPanel Margin="0,8,0,0">
+                            <ui:Button DockPanel.Dock="Right" Margin="8,0,0,0" Appearance="Primary" Icon="{ui:SymbolIcon Checkmark24}"
+                                       Content="Çözüldü olarak işaretle" Command="{Binding ResolveCommand}" AutomationProperties.Name="Karantina çözüldü" />
+                            <ui:TextBox PlaceholderText="Ne yapıldı? (ör. ikinci top yeniden etiketlendi: K1-000031)"
+                                        Text="{Binding ResolveNote, UpdateSourceTrigger=PropertyChanged}" AutomationProperties.Name="Karantina notu" />
+                        </DockPanel>
+                    </StackPanel>
+                </ui:Card>
+
+                <!-- Sevk sonrası QC iptali -->
+                <ui:Card Padding="16" Margin="0,0,0,12">
+                    <StackPanel>
+                        <TextBlock FontSize="18" FontWeight="SemiBold" Text="Sevk edildikten sonra kalite kontrolde iptal edilen toplar" />
+                        <TextBlock Style="{StaticResource PageSubtitleStyle}" Margin="0,2,0,8" TextWrapping="Wrap"
+                                   Text="Top tıra gitti ama kaydı sonradan iptal edildi. Müşteriyle kontrol edin; sevkiyat yanlışsa onayı aşağıdan geri alın." />
+                        <DataGrid ItemsSource="{Binding VoidedAfterShip}" AutoGenerateColumns="False" IsReadOnly="True" HeadersVisibility="Column"
+                                  MaxHeight="180" FontSize="14" AutomationProperties.Name="Sevk sonrası iptal">
+                            <DataGrid.Columns>
+                                <DataGridTextColumn Header="Barkod" Width="110" Binding="{Binding CutId}" />
+                                <DataGridTextColumn Header="Lot" Width="*" Binding="{Binding Lot}" />
+                                <DataGridTextColumn Header="Metre" Width="90" Binding="{Binding Meters}" />
+                                <DataGridTextColumn Header="Sevkiyat" Width="260" Binding="{Binding Shipment}" />
+                                <DataGridTextColumn Header="İptal sebebi" Width="180" Binding="{Binding Reason}" />
+                            </DataGrid.Columns>
+                        </DataGrid>
+                    </StackPanel>
+                </ui:Card>
+
+                <!-- Uzun süredir açık -->
+                <ui:Card Padding="16" Margin="0,0,0,12">
+                    <StackPanel>
+                        <TextBlock FontSize="18" FontWeight="SemiBold" Text="24 saattir işlem görmeyen açık sevkiyatlar" />
+                        <TextBlock Style="{StaticResource PageSubtitleStyle}" Margin="0,2,0,8" TextWrapping="Wrap"
+                                   Text="Sistem bunları kendiliğinden iptal etmez. Rıhtımda tıra yüklenip yüklenmediğini kontrol edin; Sevkiyat ekranından onaylatın ya da iptal edin." />
+                        <DataGrid ItemsSource="{Binding Stale}" AutoGenerateColumns="False" IsReadOnly="True" HeadersVisibility="Column"
+                                  MaxHeight="160" FontSize="14" AutomationProperties.Name="Uzun süredir açık">
+                            <DataGrid.Columns>
+                                <DataGridTextColumn Header="Sevkiyat" Width="140" Binding="{Binding No}" />
+                                <DataGridTextColumn Header="Lot" Width="*" Binding="{Binding Lots}" />
+                                <DataGridTextColumn Header="Okutulan" Width="150" Binding="{Binding Counts}" />
+                                <DataGridTextColumn Header="Kim" Width="140" Binding="{Binding Who}" />
+                                <DataGridTextColumn Header="Ne zaman" Width="200" Binding="{Binding When}" />
+                            </DataGrid.Columns>
+                        </DataGrid>
+                    </StackPanel>
+                </ui:Card>
+
+                <!-- Onayı geri alma -->
+                <ui:Card Padding="16" Margin="0,0,0,12">
+                    <StackPanel>
+                        <TextBlock FontSize="18" FontWeight="SemiBold" Text="Son onaylanan sevkiyatlar: onayı geri al" />
+                        <TextBlock Style="{StaticResource PageSubtitleStyle}" Margin="0,2,0,8" TextWrapping="Wrap"
+                                   Text="Yanlışlıkla onaylanan sevkiyat için. Toplar stoğa döner; onay ve geri alma kayıtta kalır." />
+                        <DataGrid ItemsSource="{Binding RecentConfirmed}" SelectedItem="{Binding SelectedConfirmed}" AutoGenerateColumns="False"
+                                  IsReadOnly="True" SelectionMode="Single" HeadersVisibility="Column" MaxHeight="220" FontSize="14"
+                                  AutomationProperties.Name="Son onaylananlar">
+                            <DataGrid.Columns>
+                                <DataGridTextColumn Header="Sevkiyat" Width="140" Binding="{Binding No}" />
+                                <DataGridTextColumn Header="Lot" Width="*" Binding="{Binding Lots}" />
+                                <DataGridTextColumn Header="Sevk edilen" Width="150" Binding="{Binding Counts}" />
+                                <DataGridTextColumn Header="Kim" Width="160" Binding="{Binding Who}" />
+                                <DataGridTextColumn Header="Ne zaman" Width="150" Binding="{Binding When}" />
+                            </DataGrid.Columns>
+                        </DataGrid>
+                        <DockPanel Margin="0,8,0,0">
+                            <ui:Button DockPanel.Dock="Right" Margin="8,0,0,0" Appearance="Danger" Icon="{ui:SymbolIcon ArrowUndo24}"
+                                       Content="Onayı geri al…" Command="{Binding BeginReverseCommand}" AutomationProperties.Name="Onayı geri al" />
+                            <ui:TextBox PlaceholderText="Sebep (ör. tır gitmedi, yanlışlıkla onaylandı)"
+                                        Text="{Binding ReverseReason, UpdateSourceTrigger=PropertyChanged}" AutomationProperties.Name="Geri alma sebebi" />
+                        </DockPanel>
+                        <Border Margin="0,8,0,0" Padding="12" CornerRadius="6" BorderThickness="2" BorderBrush="{DynamicResource SystemFillColorCriticalBrush}"
+                                Visibility="{Binding IsReverseOpen, Converter={StaticResource BoolToVisibility}}">
+                            <DockPanel>
+                                <ui:Button DockPanel.Dock="Right" Margin="8,0,0,0" Appearance="Secondary" Content="Vazgeç" Command="{Binding CancelReverseCommand}" />
+                                <ui:Button DockPanel.Dock="Right" Margin="8,0,0,0" Appearance="Danger" Content="Evet, geri al" Command="{Binding ConfirmReverseCommand}"
+                                           AutomationProperties.Name="Geri almayı onayla" />
+                                <TextBlock VerticalAlignment="Center" FontSize="15" FontWeight="SemiBold" TextWrapping="Wrap" Text="{Binding ReverseText}" />
+                            </DockPanel>
+                        </Border>
+                    </StackPanel>
+                </ui:Card>
+            </StackPanel>
+        </StackPanel>
+    </ScrollViewer>
+</Page>

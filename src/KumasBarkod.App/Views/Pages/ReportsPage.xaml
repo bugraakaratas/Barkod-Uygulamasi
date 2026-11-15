@@ -1,0 +1,39 @@
+<Page x:Class="KumasBarkod.App.Views.Pages.ReportsPage"
+      xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+      xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+      xmlns:ui="http://schemas.lepo.co/wpfui/2022/xaml"
+      Title="Raporlar"
+      ScrollViewer.CanContentScroll="False">
+    <Grid Margin="{StaticResource PageMargin}">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+        </Grid.RowDefinitions>
+        <TextBlock Style="{StaticResource PageTitleStyle}" Text="Raporlar" />
+
+        <WrapPanel Grid.Row="1">
+            <ComboBox Width="260" Margin="0,0,10,8" FontSize="15" ItemsSource="{Binding Kinds}" SelectedIndex="{Binding KindIndex}"
+                      AutomationProperties.Name="Rapor türü" />
+            <StackPanel Orientation="Horizontal" Visibility="{Binding NeedsRange, Converter={StaticResource BoolToVisibility}}">
+                <DatePicker Width="150" Margin="0,0,6,8" FontSize="15" SelectedDateFormat="Short" SelectedDate="{Binding FromDate}" ToolTip="Başlangıç" />
+                <TextBlock Margin="0,0,6,8" VerticalAlignment="Center" Text="–" FontSize="16" />
+                <DatePicker Width="150" Margin="0,0,10,8" FontSize="15" SelectedDateFormat="Short" SelectedDate="{Binding ToDate}" ToolTip="Bitiş" />
+            </StackPanel>
+            <ui:Button Margin="0,0,8,8" Appearance="Primary" Icon="{ui:SymbolIcon ArrowSync24}" Content="Raporu getir"
+                       Command="{Binding LoadCommand}" AutomationProperties.Name="Raporu getir" />
+            <ui:Button Margin="0,0,8,8" Appearance="Secondary" Icon="{ui:SymbolIcon Save24}" Content="Excel için kaydet (CSV)"
+                       Command="{Binding ExportCommand}" AutomationProperties.Name="CSV kaydet" />
+        </WrapPanel>
+
+        <TextBlock Grid.Row="2" Margin="0,4,0,8" FontSize="16" FontWeight="SemiBold" TextWrapping="Wrap" Text="{Binding Summary}" />
+        <ui:InfoBar Grid.Row="3" Margin="0,0,0,8" IsOpen="{Binding MessageIsOpen, Mode=TwoWay}" Severity="{Binding MessageSeverity}"
+                    Title="{Binding MessageTitle}" Message="{Binding MessageText}" IsClosable="True" />
+
+        <DataGrid Grid.Row="4" ItemsSource="{Binding Rows}" AutoGenerateColumns="True" IsReadOnly="True" HeadersVisibility="Column"
+                  GridLinesVisibility="Horizontal" CanUserReorderColumns="False" FontSize="15" RowHeight="32"
+                  EnableRowVirtualization="True" AutoGeneratingColumn="Grid_AutoGeneratingColumn" AutomationProperties.Name="Rapor tablosu" />
+    </Grid>
+</Page>

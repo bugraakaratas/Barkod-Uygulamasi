@@ -88,7 +88,7 @@ public partial class SettingsViewModel : ObservableObject
         Show(InfoBarSeverity.Success, "Görev kaydedildi", role switch
         {
             StationRoles.Dock => "Sevkiyat (rıhtım): sol menüde Sevkiyat ve Depo Stoğu görünür.",
-            StationRoles.Office => "Yönetim: sol menüde Depo Stoğu, Sevkiyat, Lotlar ve Personel görünür.",
+            StationRoles.Office => "Yönetim: sol menüde Depo Stoğu, Sevkiyat, Lotlar, Personel, İstisnalar ve Raporlar görünür.",
             _ => "Kalite kontrol: Kesim Girişi, Okutma, Geçmiş.",
         });
     }

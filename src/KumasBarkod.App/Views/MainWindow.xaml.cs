@@ -19,6 +19,7 @@ public partial class MainWindow : FluentWindow
     /// <summary>Göreve göre sol menüde görünen ekranlar (sırası = Ctrl+1, Ctrl+2, Ctrl+3). Ayarlar her zaman Ctrl+4.</summary>
     private IReadOnlyList<(NavigationViewItem Item, Type Page)> _menu = [];
     private string _role = StationRoles.Qc;
+    private Type _startPage = typeof(CutEntryPage);
 
     public MainWindow(
         MainWindowViewModel viewModel,
@@ -81,7 +82,7 @@ public partial class MainWindow : FluentWindow
         e.Handled = true;
     }
 
-    /// <summary>Görev: kalite kontrol (Kesim, Okutma, Geçmiş) · sevkiyat (Sevkiyat, Depo Stoğu) · yönetim (Depo Stoğu, Sevkiyat, Lotlar, Personel).</summary>
+    /// <summary>Görev: kalite kontrol (Kesim, Okutma, Geçmiş) · sevkiyat (Sevkiyat, Depo Stoğu) · yönetim (Depo Stoğu, Sevkiyat, Lotlar, Personel, İstisnalar, Raporlar).</summary>
     private void ApplyRole()
     {
         var role = _settings.GetStationRole();
@@ -97,22 +98,27 @@ public partial class MainWindow : FluentWindow
             (NavStock, typeof(StockPage)),
             (NavLots, typeof(LotsPage)),
             (NavPersonnel, typeof(PersonnelPage)),
+            (NavExceptions, typeof(ExceptionsPage)),
+            (NavReports, typeof(ReportsPage)),
         };
         var visible = role switch
         {
             StationRoles.Dock => new[] { typeof(ShipmentPage), typeof(StockPage) },
-            StationRoles.Office => new[] { typeof(StockPage), typeof(ShipmentPage), typeof(LotsPage), typeof(PersonnelPage) },
+            // Sıra = sol menüdeki görünen sıra = Ctrl+1, Ctrl+2, Ctrl+3 (menü öğeleri XAML'deki sırayla görünür).
+            StationRoles.Office => new[] { typeof(ShipmentPage), typeof(StockPage), typeof(LotsPage), typeof(PersonnelPage), typeof(ExceptionsPage), typeof(ReportsPage) },
             _ => new[] { typeof(CutEntryPage), typeof(ScanPage), typeof(HistoryPage) },
         };
         foreach (var (item, page) in all)
             item.Visibility = visible.Contains(page) ? Visibility.Visible : Visibility.Collapsed;
         _menu = visible.Select(p => all.First(a => a.Page == p)).ToList();
+        // Açılış ekranı: yönetim bilgisayarı Depo Stoğu ile açılır (Sevkiyat giriş ister); diğerleri menünün ilki.
+        _startPage = role == StationRoles.Office ? typeof(StockPage) : _menu[0].Page;
         for (var i = 0; i < _menu.Count; i++) _menu[i].Item.ToolTip = i < 3 ? $"Ctrl+{i + 1}" : null;
 
         (DataContext as MainWindowViewModel)?.Refresh();
         if (changed && IsLoaded && RootNavigation.SelectedItem is NavigationViewItem current
             && current.Visibility != Visibility.Visible)
-            RootNavigation.Navigate(_menu[0].Page);
+            RootNavigation.Navigate(_startPage);
     }
 
     /// <summary>
@@ -129,6 +135,8 @@ public partial class MainWindow : FluentWindow
         "lots" => typeof(LotsPage),
         "shipment" => typeof(ShipmentPage),
         "personnel" => typeof(PersonnelPage),
-        _ => _menu[0].Page,
+        "exceptions" => typeof(ExceptionsPage),
+        "reports" => typeof(ReportsPage),
+        _ => _startPage,
     };
 }

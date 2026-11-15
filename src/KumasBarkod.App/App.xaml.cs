@@ -228,6 +228,10 @@ public partial class App : Application
         services.AddSingleton<ShipmentPage>();
         services.AddSingleton<PersonnelViewModel>();
         services.AddSingleton<PersonnelPage>();
+        services.AddSingleton<ExceptionsViewModel>();
+        services.AddSingleton<ExceptionsPage>();
+        services.AddSingleton<ReportsViewModel>();
+        services.AddSingleton<ReportsPage>();
 
         return services;
     }

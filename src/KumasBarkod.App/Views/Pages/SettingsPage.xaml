@@ -29,7 +29,7 @@
                     <RadioButton Margin="0,4" FontSize="15" GroupName="Role" IsChecked="{Binding IsRoleDock}"
                                  Content="Sevkiyat (rıhtım) — Sevkiyat, Depo Stoğu" AutomationProperties.Name="Görev sevkiyat" />
                     <RadioButton Margin="0,4" FontSize="15" GroupName="Role" IsChecked="{Binding IsRoleOffice}"
-                                 Content="Yönetim (patron / ofis) — Depo Stoğu, Sevkiyat, Lotlar, Personel" AutomationProperties.Name="Görev yönetim" />
+                                 Content="Yönetim (patron / ofis) — Depo Stoğu, Sevkiyat, Lotlar, Personel, İstisnalar, Raporlar" AutomationProperties.Name="Görev yönetim" />
                     <ui:Button Margin="0,12,0,0" MinHeight="40" Appearance="Primary" Icon="{ui:SymbolIcon Save24}"
                                Content="Görevi kaydet" Command="{Binding SaveRoleCommand}" AutomationProperties.Name="Görevi kaydet" />
                 </StackPanel>

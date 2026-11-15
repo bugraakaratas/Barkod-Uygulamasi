@@ -469,8 +469,8 @@ function PartE {
   Check 'Gorev secenekleri gorunuyor' (Select-ByName 'Görev yönetim')
   Check 'Gorev kaydedildi' (Invoke-ByName 'Görevi kaydet')
   Check 'Gorev ayara yazildi' ((Sql "select value from settings where key='station_role'") -eq 'office')
-  K '^1' 1500
-  Check 'Ctrl+1 Depo Stogu' (WaitFor { Has 'Depoda (stokta)' })
+  K '^2' 1500   # yonetim menusu: Sevkiyat, Depo Stogu, Lotlar, ...
+  Check 'Ctrl+2 Depo Stogu' (WaitFor { Has 'Depoda (stokta)' })
   Check 'Stok ozeti 30 top' (WaitFor { Has 'Sayfa 1 / 1 · 30 top' })
   Shot 'e1_stok'
 
@@ -497,7 +497,7 @@ function PartE {
   Shot 'e2b_bilinmeyen_barkod'
 
   # --- Lotlar: Enter ile ekle, yazim farkli ayni lot reddedilir
-  K '^3' 1500   # yonetim menusu: Depo Stogu, Sevkiyat, Lotlar, Personel
+  K '^3' 1500   # yonetim menusu: Sevkiyat, Depo Stogu, Lotlar, Personel
   Check 'Ctrl+3 Lotlar' (WaitFor { Has 'Lotlar (firmalar)' })
   K 'YENI FIRMA{ENTER}' 1500
   Check 'Enter ile lot eklendi' (WaitFor { (LotNames) -contains 'YENI FIRMA' })
@@ -812,8 +812,129 @@ function PartH {
   try { $script:srv.Kill() } catch {}
 }
 
+# ---------- I: İstisnalar, onayı geri alma, raporlar (Faz 5) ----------
+Add-Type @'
+using System; using System.Text; using System.Runtime.InteropServices;
+public static class W2 {
+ [DllImport("user32.dll")] public static extern IntPtr GetForegroundWindow();
+ [DllImport("user32.dll", CharSet=CharSet.Unicode)] public static extern int GetWindowText(IntPtr h, StringBuilder s, int n);
+ public static string ForegroundTitle() { var sb = new StringBuilder(256); GetWindowText(GetForegroundWindow(), sb, 256); return sb.ToString(); }
+}
+'@
+function SetEdit($name, $value) { $e = Edit $name; if ($null -eq $e) { return $false }; $e.GetCurrentPattern([System.Windows.Automation.ValuePattern]::Pattern).SetValue($value); Start-Sleep -Milliseconds 300; return $true }
+function SelectCombo($name, $item) {
+  foreach ($e in (All)) {
+    if ($e.Current.Name -eq $name -and $e.Current.ControlType.ProgrammaticName -eq 'ControlType.ComboBox') {
+      $e.GetCurrentPattern([System.Windows.Automation.ExpandCollapsePattern]::Pattern).Expand(); Start-Sleep -Milliseconds 500
+      $cond = New-Object System.Windows.Automation.PropertyCondition([System.Windows.Automation.AutomationElement]::NameProperty, $item)
+      $it = $e.FindFirst([System.Windows.Automation.TreeScope]::Descendants, $cond)
+      if ($null -eq $it) { return $false }
+      $it.GetCurrentPattern([System.Windows.Automation.SelectionItemPattern]::Pattern).Select(); Start-Sleep -Milliseconds 300
+      try { $e.GetCurrentPattern([System.Windows.Automation.ExpandCollapsePattern]::Pattern).Collapse() } catch {}
+      return $true
+    }
+  }
+  return $false
+}
+
+function PartI {
+  $env:KUMASBARKOD_SERVER_DATA_DIR = Join-Path $data 'sunucu'
+  Check 'Sunucu acildi' (Start-Server)
+  PostJson 'api/v1/users' @{ name = 'Patron'; role = 'supervisor'; badgeCode = 'Y0001'; pin = '9999' } | Out-Null
+  $boss = (PostJson 'api/v1/auth/login' @{ badgeCode = 'Y0001'; pin = '9999' }).token
+  PostJson 'api/v1/users' @{ name = 'Ali Depo'; role = 'warehouse'; badgeCode = 'P0001'; pin = '1234' } $boss | Out-Null
+  $lot3 = (PostJson 'api/v1/lots' @{ name = 'LOT-3' }).lotId
+  $rows = @()
+  for ($i = 1; $i -le 5; $i++) {
+    $rows += @{ cutId = ('K1-{0:D6}' -f $i); stationCode = 'K1'; sequenceNo = $i; lotCode = 'LOT-3'; lengthCm = 1000 + $i; operator = $null;
+      status = 'active'; voidReason = $null; voidedAt = $null; createdAt = ('2026-11-15T08:0{0}:00.000Z' -f $i); printCount = 1; lastPrintedAt = $null }
+  }
+  PostJson 'api/v1/cuts/batch' @{ installId = 'QC-PC'; stationCode = 'K1'; appVersion = 'test'; rows = $rows } | Out-Null
+  # Ali bir sevkiyatı onaylar (K1-1, K1-3); K1-3 sonradan QC'de iptal edilir; K1-4 için ikinci top (karantina)
+  $ali = (PostJson 'api/v1/auth/login' @{ badgeCode = 'P0001'; pin = '1234' }).token
+  $ship = PostJson 'api/v1/shipments' @{ lotIds = @($lot3) } $ali
+  PostJson "api/v1/shipments/$($ship.shipmentId)/scans" @{ clientScanId = 'i1'; rawInput = 'K1000001' } $ali | Out-Null
+  $last = PostJson "api/v1/shipments/$($ship.shipmentId)/scans" @{ clientScanId = 'i3'; rawInput = 'K1000003' } $ali
+  PostJson "api/v1/shipments/$($ship.shipmentId)/confirm" @{ expectedVersion = $last.shipmentVersion; requestId = 'c1' } $ali | Out-Null
+  $v = $rows[2].Clone(); $v.status = 'voided'; $v.voidReason = 'Çift kayıt'; $v.voidedAt = '2026-11-15T10:00:00.000Z'
+  $dup = $rows[3].Clone(); $dup.lotCode = 'LOT-9'; $dup.lengthCm = 777; $dup.createdAt = '2026-11-15T11:00:00.000Z'
+  PostJson 'api/v1/cuts/batch' @{ installId = 'QC-PC'; stationCode = 'K1'; appVersion = 'test'; rows = @($v, $dup) } | Out-Null
+  Check 'Hazirlik: karantina + sevk sonrasi iptal' ((RollState 'K1-000004') -eq 'quarantined' -and (RollState 'K1-000003') -eq 'shipped')
+
+  Start-App; Stop-App
+  & python $py exec $db "insert into settings(key,value) values('server_url','$serverUrl')" | Out-Null
+  & python $py exec $db "insert into settings(key,value) values('station_role','office')" | Out-Null
+  $env:KUMASBARKOD_START_PAGE = 'exceptions'
+  Start-App
+  $env:KUMASBARKOD_START_PAGE = ''
+
+  Check 'Istisnalar: yetkili girisi istendi' (WaitFor { Has 'Yetkili girişi' })
+  K 'Y0001{ENTER}' 300; K '9999{ENTER}' 2500
+  Check 'Ozet: karantina ve sevk sonrasi iptal' (WaitFor { Has '1 karantina · 1 sevk sonrası iptal' })
+  Check 'Karantina iki kaydi gosteriyor' ((Has 'Sonradan gelen: LOT-9') -and (Has 'İlk kayıt: LOT-3'))
+  Check 'Sevk sonrasi iptal listede' (Has 'Çift kayıt')
+  Shot 'i1_istisnalar'
+
+  # Karantina çözümü
+  Check 'Karantina secildi' (SelectItemContaining 'K1-000004')
+  Check 'Not yazildi' (SetEdit 'Karantina notu' 'İkinci top yeniden etiketlendi: K1-000031')
+  Check 'Cozuldu dugmesi' (Invoke-ByName 'Karantina çözüldü')
+  Check 'Top karantinadan cikti (stokta)' (WaitFor { (RollState 'K1-000004') -eq 'in_stock' })
+
+  # Onayı geri alma
+  Check 'Onayli sevkiyat secildi' (SelectItemContaining 'SV-2026-00001')
+  Invoke-ByName 'Onayı geri al' | Out-Null
+  Check 'Sebepsiz geri alma yok' ((SrvSql "select status from shipments where shipment_id=1") -eq 'confirmed')
+  Check 'Sebep yazildi' (SetEdit 'Geri alma sebebi' 'Tır gitmedi, yanlışlıkla onaylandı')
+  Invoke-ByName 'Onayı geri al' | Out-Null
+  Check 'Geri alma onay paneli' (WaitFor { Has 'onayı geri alınsın mı?' })
+  Invoke-ByName 'Geri almayı onayla' | Out-Null
+  Check 'Sevkiyat geri alindi' (WaitFor { (SrvSql "select status from shipments where shipment_id=1") -eq 'reversed' })
+  Check 'Top stoga dondu' ((RollState 'K1-000001') -eq 'in_stock')
+  Check 'QC iptalli top iptale dondu' ((RollState 'K1-000003') -eq 'voided')
+  Check 'Geri alan yetkili kayitli' ((SrvSql "select u.name from shipments s join users u on u.user_id=s.reversed_by where s.shipment_id=1") -eq 'Patron')
+  Shot 'i2_geri_alindi'
+  Stop-App
+
+  # Raporlar
+  $env:KUMASBARKOD_START_PAGE = 'reports'
+  Start-App
+  $env:KUMASBARKOD_START_PAGE = ''
+  Check 'Rapor: guncel stok' (WaitFor { Has 'Toplam stok: 4 top' })
+  Check 'Rapor turu: sevkiyat gecmisi' (SelectCombo 'Rapor türü' 'Sevkiyat geçmişi')
+  Check 'Gecmiste geri alinan sevkiyat' (WaitFor { Has '1 geri alınmış' })
+  Check 'Geri alma notu tabloda' (Has 'Geri alındı (Patron): Tır gitmedi, yanlışlıkla onaylandı')
+  Shot 'i3_rapor'
+
+  # CSV kaydet (Windows "Farklı kaydet" penceresi)
+  $csv = Join-Path $data 'rapor.csv'
+  Invoke-ByName 'CSV kaydet' | Out-Null
+  $opened = WaitFor { [W2]::ForegroundTitle() -eq 'Raporu kaydet' } 8000
+  Check 'Kaydet penceresi acildi' $opened
+  if ($opened) {
+    Set-Clipboard -Value $csv
+    [System.Windows.Forms.SendKeys]::SendWait('^a'); Start-Sleep -Milliseconds 200
+    if ([W2]::ForegroundTitle() -eq 'Raporu kaydet') { [System.Windows.Forms.SendKeys]::SendWait('^v'); Start-Sleep -Milliseconds 300 }
+    if ([W2]::ForegroundTitle() -eq 'Raporu kaydet') { [System.Windows.Forms.SendKeys]::SendWait('{ENTER}') }
+  }
+  Check 'CSV dosyasi olustu' (WaitFor { Test-Path $csv } 8000)
+  if (Test-Path $csv) {
+    $bytes = [IO.File]::ReadAllBytes($csv)
+    $text = [Text.Encoding]::UTF8.GetString($bytes)
+    Check 'CSV UTF-8 BOM (Excel Turkce)' ($bytes[0] -eq 0xEF -and $bytes[1] -eq 0xBB -and $bytes[2] -eq 0xBF)
+    Check 'CSV basliklari Turkce, noktali virgul' ($text.Contains('Sevkiyat;Durum;Lot;Top;Metre'))
+    Check 'CSV verisi dogru' ($text.Contains('SV-2026-00001;Onay geri alındı;LOT-3;2;'))
+  }
+  Stop-App
+
+  Check 'Sunucu butunluk' ((& $serverExe --kontrol) -match 'sorun yok')
+  $log = Get-ChildItem (Join-Path $data 'logs') -Filter *.log | Get-Content -Raw
+  Check 'Gunlukte beklenmeyen hata yok' ($log -notmatch 'Beklenmeyen')
+  try { $script:srv.Kill() } catch {}
+}
+
 try {
-  if ($Part -eq 'A') { PartA } elseif ($Part -eq 'B') { PartB } elseif ($Part -eq 'D') { PartD } elseif ($Part -eq 'E') { PartE } elseif ($Part -eq 'F') { PartF } elseif ($Part -eq 'G') { PartG } elseif ($Part -eq 'H') { PartH } else { PartC }
+  if ($Part -eq 'A') { PartA } elseif ($Part -eq 'B') { PartB } elseif ($Part -eq 'D') { PartD } elseif ($Part -eq 'E') { PartE } elseif ($Part -eq 'F') { PartF } elseif ($Part -eq 'G') { PartG } elseif ($Part -eq 'H') { PartH } elseif ($Part -eq 'I') { PartI } else { PartC }
 } catch {
   $results.Add("HATA: $($_.Exception.Message) @ satir $($_.InvocationInfo.ScriptLineNumber)")
 } finally {

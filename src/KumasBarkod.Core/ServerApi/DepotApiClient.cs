@@ -108,6 +108,32 @@ public sealed class DepotApiClient(HttpClient http, SettingsRepository settings,
         Send<LotAliasResponse>(HttpMethod.Post, $"{DepotPaths.Lots}/{lotId.ToString(CultureInfo.InvariantCulture)}/aliases",
             new LotAliasRequest(rawText), ct);
 
+    public Task<ShipmentDetail> ReverseShipmentAsync(long shipmentId, string reason, string requestId, CancellationToken ct = default) =>
+        Send<ShipmentDetail>(HttpMethod.Post, $"{ShipmentPaths.Shipments}/{shipmentId.ToString(CultureInfo.InvariantCulture)}/reverse",
+            new ShipmentReverseRequest(reason, requestId), ct);
+
+    // ---------- İstisnalar (yetkili) ve raporlar ----------
+
+    public Task<ExceptionsResponse> GetExceptionsAsync(CancellationToken ct = default) => Get<ExceptionsResponse>(ReportPaths.Exceptions, ct);
+
+    public Task<ExceptionsResponse> ResolveConflictAsync(long conflictId, string note, CancellationToken ct = default) =>
+        Send<ExceptionsResponse>(HttpMethod.Post, $"{ReportPaths.ResolveConflict}/{conflictId.ToString(CultureInfo.InvariantCulture)}/resolve",
+            new ConflictResolveRequest(note), ct);
+
+    public Task<List<StockByLotRow>> GetStockByLotAsync(CancellationToken ct = default) => Get<List<StockByLotRow>>(ReportPaths.StockByLot, ct);
+
+    public Task<List<DailyShipmentRow>> GetDailyShipmentsAsync(DateOnly from, DateOnly to, CancellationToken ct = default) =>
+        Get<List<DailyShipmentRow>>(ReportPaths.DailyShipments + RangeQuery(from, to), ct);
+
+    public Task<List<ShippedRollRow>> GetShippedRollsAsync(DateOnly from, DateOnly to, CancellationToken ct = default) =>
+        Get<List<ShippedRollRow>>(ReportPaths.ShippedRolls + RangeQuery(from, to), ct);
+
+    public Task<List<ShipmentHistoryRow>> GetShipmentHistoryAsync(DateOnly from, DateOnly to, CancellationToken ct = default) =>
+        Get<List<ShipmentHistoryRow>>(ReportPaths.ShipmentHistory + RangeQuery(from, to), ct);
+
+    private static string RangeQuery(DateOnly from, DateOnly to) =>
+        $"?from={from.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture)}&to={to.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture)}";
+
     private Task<T> Get<T>(string path, CancellationToken ct) where T : class =>
         Guard(ServerHttp.SendAsync<T>(http, () => Request(HttpMethod.Get, path), ct));
 
