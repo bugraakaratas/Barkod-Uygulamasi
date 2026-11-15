@@ -5,12 +5,14 @@ using System.Windows.Markup;
 using System.Windows.Threading;
 using CommunityToolkit.Mvvm.Messaging;
 using KumasBarkod.App.Printing;
+using KumasBarkod.App.ServerSync;
 using KumasBarkod.App.ViewModels;
 using KumasBarkod.App.Views;
 using KumasBarkod.App.Views.Pages;
 using KumasBarkod.Core.Data;
 using KumasBarkod.Core.Diagnostics;
 using KumasBarkod.Core.Printing;
+using KumasBarkod.Core.ServerApi;
 using KumasBarkod.Core.Services;
 using KumasBarkod.Core.Sync;
 using Microsoft.Extensions.DependencyInjection;
@@ -62,10 +64,14 @@ public partial class App : Application
         MainWindow = window;
         window.Show();
 
-        // Sheets göndericisi arka planda; kayıt/baskı/okutma ona hiç bağlı değil.
+        // Sheets ve depo sunucusu göndericileri arka planda; kayıt/baskı/okutma onlara hiç bağlı değil.
         var sync = _services.GetRequiredService<SyncWorker>();
-        LogSyncStateChanges(sync);
+        LogSyncStateChanges(sync, "Sheets", "internet");
         sync.Start();
+
+        var server = _services.GetRequiredService<ServerConnection>().Worker;
+        LogSyncStateChanges(server, "Depo sunucusu", "ağ");
+        server.Start();
 
         // Günlük yerel yedek: açılışta ve uygulama açık kaldıkça saatte bir kontrol.
         _ = RunDailyBackupAsync();
@@ -114,7 +120,7 @@ public partial class App : Application
     }
 
     /// <summary>Yalnızca durum değişimlerini yaz (her yeniden denemeyi değil).</summary>
-    private void LogSyncStateChanges(SyncWorker sync)
+    private void LogSyncStateChanges(SyncWorker sync, string target, string network)
     {
         var last = SyncState.Idle;
         sync.StatusChanged += s =>
@@ -122,10 +128,10 @@ public partial class App : Application
             if (s.State == SyncState.Sending || s.State == last) return;
             switch (s.State)
             {
-                case SyncState.Offline: _log.Warn($"Sheets'e gönderilemiyor (internet): {s.LastError} · bekleyen {s.PendingCount}"); break;
-                case SyncState.Error: _log.Error($"Sheets hatası: {s.LastError} · bekleyen {s.PendingCount}"); break;
-                case SyncState.Idle when last is SyncState.Offline or SyncState.Error: _log.Info("Sheets gönderimi düzeldi"); break;
-                case SyncState.NotConfigured: _log.Info("Sheets gönderimi ayarlanmamış"); break;
+                case SyncState.Offline: _log.Warn($"{target}: gönderilemiyor ({network}): {s.LastError} · bekleyen {s.PendingCount}"); break;
+                case SyncState.Error: _log.Error($"{target} hatası: {s.LastError} · bekleyen {s.PendingCount}"); break;
+                case SyncState.Idle when last is SyncState.Offline or SyncState.Error: _log.Info($"{target} gönderimi düzeldi"); break;
+                case SyncState.NotConfigured: _log.Info($"{target} gönderimi ayarlanmamış"); break;
             }
             last = s.State;
         };
@@ -190,8 +196,14 @@ public partial class App : Application
         services.AddSingleton<OutboxRepository>();
         services.AddSingleton<StationCounters>();
         services.AddSingleton<SyncService>();
-        services.AddSingleton<SyncWorker>();
+        services.AddSingleton(sp => new SyncWorker(
+            sp.GetRequiredService<SyncService>(), sp.GetRequiredService<OutboxRepository>(), sp.GetRequiredService<TimeProvider>()));
         services.AddSingleton<RestoreService>();
+
+        // Depo sunucusu (yerel ağ): stok ve sevkiyat. Kısa zaman aşımı — yerel ağda yanıt hızlı gelir.
+        services.AddSingleton(StationIdentityProvider.Create());
+        services.AddSingleton<IServerTransport>(_ => new HttpServerTransport(new HttpClient { Timeout = TimeSpan.FromSeconds(15) }));
+        services.AddSingleton<ServerConnection>();
 
         services.AddSingleton<MainWindowViewModel>();
         services.AddSingleton<MainWindow>();

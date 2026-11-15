@@ -21,7 +21,7 @@ public partial class SettingsPage : Page
         Loaded += (_, _) =>
         {
             viewModel.Load();
-            UrlBox.Focus();   // odak içerik çerçevesinde kalıp siyah odak kenarı göstermesin
+            ServerBox.Focus();   // odak içerik çerçevesinde kalıp siyah odak kenarı göstermesin (ilk kart)
         };
     }
 }

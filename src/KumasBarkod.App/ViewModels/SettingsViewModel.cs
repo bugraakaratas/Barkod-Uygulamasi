@@ -6,15 +6,17 @@ using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using CommunityToolkit.Mvvm.Messaging;
 using KumasBarkod.App.Printing;
+using KumasBarkod.App.ServerSync;
 using KumasBarkod.Core.Data;
 using KumasBarkod.Core.Diagnostics;
 using KumasBarkod.Core.Domain;
+using KumasBarkod.Core.ServerApi;
 using KumasBarkod.Core.Sync;
 using Wpf.Ui.Controls;
 
 namespace KumasBarkod.App.ViewModels;
 
-/// <summary>Ayarlar: Google Sheets bağlantısı, uzunluk üst sınırı, bilgi.</summary>
+/// <summary>Ayarlar: depo sunucusu, Google Sheets bağlantısı, uzunluk üst sınırı, bilgi.</summary>
 public partial class SettingsViewModel : ObservableObject
 {
     /// <summary>Üst sınır ayarının kendi sınırı: 10.000 m (ayar hatasını da yakalasın).</summary>
@@ -30,10 +32,15 @@ public partial class SettingsViewModel : ObservableObject
     private readonly ILog _log;
 
     private readonly SelectablePrinter _printer;
+    private readonly ServerConnection _server;
+    private readonly StationIdentity _identity;
 
     public SettingsViewModel(SettingsRepository settings, SyncService sync, SyncWorker worker,
-        BackupService backup, RestoreService restore, ILog log, SelectablePrinter printer)
+        BackupService backup, RestoreService restore, ILog log, SelectablePrinter printer,
+        ServerConnection server, StationIdentity identity)
     {
+        _server = server;
+        _identity = identity;
         _settings = settings;
         _sync = sync;
         _worker = worker;
@@ -44,6 +51,8 @@ public partial class SettingsViewModel : ObservableObject
 
         worker.StatusChanged += s => Application.Current?.Dispatcher.BeginInvoke(() => ApplyStatus(s));
         ApplyStatus(worker.Status);
+        server.Worker.StatusChanged += s => Application.Current?.Dispatcher.BeginInvoke(() => ApplyServerStatus(s));
+        ApplyServerStatus(server.Worker.Status);
         WeakReferenceMessenger.Default.Register<SettingsViewModel, BackupChangedMessage>(
             this, static (vm, _) => vm.RefreshBackupInfo());
     }
@@ -52,6 +61,85 @@ public partial class SettingsViewModel : ObservableObject
     public string LabelDirectory => AppPaths.LabelOutputDirectory;
     public string BackupDirectory => AppPaths.BackupDirectory;
     public string LogDirectory => AppPaths.LogDirectory;
+
+    // ---------- Depo sunucusu ----------
+
+    [ObservableProperty] public partial string ServerUrl { get; set; } = "";
+    [ObservableProperty] public partial string ServerStatusText { get; set; } = "";
+    [ObservableProperty] public partial bool ServerNeedsAttention { get; set; }
+    [ObservableProperty] public partial long ServerPendingCount { get; set; }
+
+    [ObservableProperty]
+    [NotifyCanExecuteChangedFor(nameof(TestServerCommand), nameof(SaveServerCommand))]
+    public partial bool IsTestingServer { get; set; }
+
+    /// <summary>Sunucunun bu bilgisayarı tanıdığı kimlik (sorun giderirken yöneticiye söylenir).</summary>
+    public string InstallIdText => $"Bu bilgisayarın kimliği: {_identity.InstallId}";
+
+    private bool NotTestingServer() => !IsTestingServer;
+
+    [RelayCommand(CanExecute = nameof(NotTestingServer))]
+    private async Task TestServerAsync()
+    {
+        if (!ServerAddress.TryNormalize(ServerUrl, out var uri, out var error))
+        {
+            Show(InfoBarSeverity.Error, "Adres geçersiz", error!);
+            return;
+        }
+
+        IsTestingServer = true;
+        try
+        {
+            var health = await _server.Service.TestConnectionAsync(uri!);
+            Show(InfoBarSeverity.Success, "Depo sunucusuna bağlanıldı",
+                $"{uri} · sunucu sürümü {health.Version}. Kaydet'e basarak gönderimi başlatın.");
+        }
+        catch (SyncException ex)
+        {
+            Show(InfoBarSeverity.Error, "Depo sunucusuna bağlanılamadı", ex.Message);
+        }
+        finally
+        {
+            IsTestingServer = false;
+        }
+    }
+
+    [RelayCommand(CanExecute = nameof(NotTestingServer))]
+    private void SaveServer()
+    {
+        Uri? saved;
+        try
+        {
+            saved = _settings.SetServerUrl(ServerUrl);
+        }
+        catch (CutValidationException ex)
+        {
+            Show(InfoBarSeverity.Error, "Kaydedilmedi", ex.Message);
+            return;
+        }
+
+        ServerUrl = saved?.ToString() ?? "";
+        _log.Info(saved is null ? "Depo sunucusu gönderimi kapatıldı" : $"Depo sunucusu adresi: {saved}");
+        if (saved is null)
+            Show(InfoBarSeverity.Informational, "Depo sunucusu kapatıldı",
+                "Kayıtlar bu bilgisayarda birikir; adres girilince depo stoğuna gönderilir.");
+        else
+            Show(InfoBarSeverity.Success, "Kaydedildi", "Bekleyen kayıtlar depo sunucusuna gönderiliyor.");
+        _server.Worker.SendNow();
+    }
+
+    [RelayCommand]
+    private void SendServerNow()
+    {
+        _server.Worker.SendNow();
+        Show(InfoBarSeverity.Informational, "Gönderim başlatıldı", "Durum birkaç saniye içinde güncellenir.");
+    }
+
+    private void ApplyServerStatus(SyncStatus s)
+    {
+        (ServerStatusText, ServerNeedsAttention) = MainWindowViewModel.DescribeServer(s);
+        if (s.State != SyncState.Sending) ServerPendingCount = s.PendingCount;
+    }
 
     // ---------- Yazıcı ----------
 
@@ -128,6 +216,8 @@ public partial class SettingsViewModel : ObservableObject
     {
         var target = _settings.GetSyncTarget();
         SheetsUrl = target?.Url ?? "";
+        ServerUrl = _settings.GetServerBaseUri()?.ToString() ?? "";
+        ServerPendingCount = _server.Outbox.CountPendingCuts();
         SheetsKey = target?.Key ?? "";
         MaxLengthText = Length.FormatCm(_settings.GetMaxLengthCm());
         StationCode = _settings.GetStationCode();

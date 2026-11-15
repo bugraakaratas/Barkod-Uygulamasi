@@ -65,12 +65,12 @@
                     <Run Text="İstasyon:" />
                     <Run Text="{Binding StationCode, Mode=OneWay}" FontWeight="SemiBold" />
                 </TextBlock>
-                <ui:SymbolIcon Symbol="CloudArrowUp24" Margin="24,0,6,0" />
-                <TextBlock VerticalAlignment="Center">
-                    <Run Text="Bekleyen kayıt:" />
+                <ui:SymbolIcon Symbol="CloudArrowUp24" Margin="20,0,6,0" />
+                <TextBlock VerticalAlignment="Center" ToolTip="Google Sheets'e henüz gönderilmemiş kayıt">
+                    <Run Text="Sheets bekleyen:" />
                     <Run Text="{Binding PendingSyncCount, Mode=OneWay}" FontWeight="SemiBold" />
                 </TextBlock>
-                <TextBlock Margin="24,0,0,0" VerticalAlignment="Center" MaxWidth="560"
+                <TextBlock Margin="10,0,0,0" VerticalAlignment="Center" MaxWidth="300"
                            TextTrimming="CharacterEllipsis"
                            Text="{Binding SyncStatusText}" ToolTip="{Binding SyncStatusText}">
                     <TextBlock.Style>
@@ -85,7 +85,27 @@
                         </Style>
                     </TextBlock.Style>
                 </TextBlock>
-                <ui:SymbolIcon Symbol="Print24" Margin="24,0,6,0" />
+                <ui:SymbolIcon Symbol="BuildingRetail24" Margin="20,0,6,0" />
+                <TextBlock VerticalAlignment="Center" ToolTip="Depo sunucusuna henüz gönderilmemiş kayıt">
+                    <Run Text="Depo bekleyen:" />
+                    <Run Text="{Binding PendingServerCount, Mode=OneWay}" FontWeight="SemiBold" />
+                </TextBlock>
+                <TextBlock Margin="10,0,0,0" VerticalAlignment="Center" MaxWidth="280"
+                           TextTrimming="CharacterEllipsis"
+                           Text="{Binding ServerStatusText}" ToolTip="{Binding ServerStatusText}">
+                    <TextBlock.Style>
+                        <Style TargetType="TextBlock">
+                            <Setter Property="Foreground" Value="{DynamicResource TextFillColorSecondaryBrush}" />
+                            <Style.Triggers>
+                                <DataTrigger Binding="{Binding ServerNeedsAttention}" Value="True">
+                                    <Setter Property="Foreground" Value="{DynamicResource SystemFillColorCautionBrush}" />
+                                    <Setter Property="FontWeight" Value="SemiBold" />
+                                </DataTrigger>
+                            </Style.Triggers>
+                        </Style>
+                    </TextBlock.Style>
+                </TextBlock>
+                <ui:SymbolIcon Symbol="Print24" Margin="20,0,6,0" />
                 <TextBlock VerticalAlignment="Center">
                     <Run Text="Yazıcı:" />
                     <Run Text="{Binding PrinterName, Mode=OneWay}">

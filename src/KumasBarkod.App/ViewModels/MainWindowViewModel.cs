@@ -2,6 +2,7 @@ using System.Windows;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Messaging;
 using KumasBarkod.App.Printing;
+using KumasBarkod.App.ServerSync;
 using KumasBarkod.Core.Data;
 using KumasBarkod.Core.Sync;
 
@@ -12,11 +13,14 @@ public partial class MainWindowViewModel : ObservableObject
 {
     private readonly SettingsRepository _settings;
     private readonly CutRepository _cuts;
+    private readonly ServerConnection _server;
 
-    public MainWindowViewModel(SettingsRepository settings, CutRepository cuts, SelectablePrinter printer, SyncWorker sync)
+    public MainWindowViewModel(SettingsRepository settings, CutRepository cuts, SelectablePrinter printer, SyncWorker sync,
+        ServerConnection server)
     {
         _settings = settings;
         _cuts = cuts;
+        _server = server;
         PrinterName = printer.DisplayName;
         PrinterIsPhysical = printer.IsPhysical;
         printer.Changed += () =>
@@ -27,7 +31,7 @@ public partial class MainWindowViewModel : ObservableObject
 
         // Kayıt/baskı/iptal: sayıları yenile ve göndericiyi dürt (kısa süre sonra gönderir).
         WeakReferenceMessenger.Default.Register<MainWindowViewModel, CutChangedMessage>(
-            this, (vm, _) => { vm.Refresh(); sync.Nudge(); });
+            this, (vm, _) => { vm.Refresh(); sync.Nudge(); vm._server.Worker.Nudge(); });
         WeakReferenceMessenger.Default.Register<MainWindowViewModel, DatabaseRestoredMessage>(
             this, static (vm, _) => vm.Refresh());
         WeakReferenceMessenger.Default.Register<MainWindowViewModel, SettingsChangedMessage>(
@@ -37,6 +41,10 @@ public partial class MainWindowViewModel : ObservableObject
         sync.StatusChanged += status =>
             Application.Current?.Dispatcher.BeginInvoke(() => ApplySyncStatus(status));
         ApplySyncStatus(sync.Status);
+
+        server.Worker.StatusChanged += status =>
+            Application.Current?.Dispatcher.BeginInvoke(() => ApplyServerStatus(status));
+        ApplyServerStatus(server.Worker.Status);
     }
 
     [ObservableProperty]
@@ -53,6 +61,16 @@ public partial class MainWindowViewModel : ObservableObject
     [ObservableProperty]
     public partial bool SyncNeedsAttention { get; set; }
 
+    /// <summary>Depo sunucusuna henüz gönderilmemiş kayıt sayısı.</summary>
+    [ObservableProperty]
+    public partial long PendingServerCount { get; set; }
+
+    [ObservableProperty]
+    public partial string ServerStatusText { get; set; } = "";
+
+    [ObservableProperty]
+    public partial bool ServerNeedsAttention { get; set; }
+
     [ObservableProperty]
     public partial string PrinterName { get; set; } = "";
 
@@ -64,7 +82,33 @@ public partial class MainWindowViewModel : ObservableObject
     {
         StationCode = _settings.GetStationCode();
         PendingSyncCount = _cuts.CountPendingSync();
+        PendingServerCount = _server.Outbox.CountPendingCuts();
     }
+
+    private void ApplyServerStatus(SyncStatus s)
+    {
+        if (s.State != SyncState.Sending) PendingServerCount = s.PendingCount;
+        (ServerStatusText, ServerNeedsAttention) = DescribeServer(s);
+    }
+
+    /// <summary>
+    /// Depo sunucusu durumu. Ayarlanmamış olması uyarı rengi DEĞİL: sunucu kurulana kadar QC normal çalışır,
+    /// kayıtlar bekler ve sunucu ayarlanınca gider (bekleyen sayısı görünür).
+    /// </summary>
+    public static (string Text, bool Attention) DescribeServer(SyncStatus s) => s.State switch
+    {
+        SyncState.NotConfigured => ("Depo sunucusu ayarlanmadı", false),
+        SyncState.Sending => ("Depoya gönderiliyor…", false),
+        SyncState.Idle when s.PendingCount == 0 && s.LastSuccessUtc is { } t =>
+            ($"Depo güncel · {t.ToLocalTime():HH:mm}", false),
+        SyncState.Idle => ("Depo: gönderim bekliyor", false),
+        SyncState.Offline => ($"Depoya ulaşılamıyor · {NextShort(s)} tekrar", true),
+        SyncState.Error => ($"Depo hatası: {s.LastError}", true),
+        _ => ("", false),
+    };
+
+    private static string NextShort(SyncStatus s) =>
+        s.NextAttemptUtc is { } n ? $"{n.ToLocalTime():HH:mm:ss}'de" : "sonra";
 
     private void ApplySyncStatus(SyncStatus s)
     {
