@@ -28,6 +28,8 @@ public sealed class SettableClock : TimeProvider
 /// </summary>
 public sealed class ServerFixture : WebApplicationFactory<Program>
 {
+    static ServerFixture() => KumasBarkod.Server.Auth.AuthService.Iterations = 1_000;   // testler hızlı (gerçek sunucu 100.000)
+
     public string DataDirectory { get; } =
         Path.Combine(Path.GetTempPath(), "kumas-server-tests", Guid.NewGuid().ToString("N"));
 

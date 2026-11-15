@@ -7,6 +7,7 @@ using KumasBarkod.Core.Services;
 using KumasBarkod.Core.Sync;
 using KumasBarkod.Server.Data;
 using KumasBarkod.Server.Lots;
+using KumasBarkod.Server.Shipments;
 using Microsoft.Data.Sqlite;
 
 namespace KumasBarkod.Server.Ingest;
@@ -220,7 +221,11 @@ public sealed class CutIngestService(SqliteConnectionFactory db, TimeProvider cl
         // Yalnızca stoktaki top 'voided' olur. Sevk edilmiş / karantinadaki / sevkiyatta okutulmuş topun
         // durumu değişmez (tıra yüklenmiş top "iptal" görünüp stoktan sessizce kaybolmasın); iptal bilgisi
         // kayda ve harekete yazılır, yetkili ekranında görünür.
-        var newState = currentState == RollStates.InStock ? RollStates.Voided : currentState;
+        // Sevkiyata okutulmuş (onaysız) top: sevkiyattan çıkar, iptal olur (rıhtım ekranında listeden düşer).
+        var wasReserved = currentState == RollStates.Reserved;
+        if (wasReserved)
+            ShipmentService.DetachReservedRoll(c, tx, row.CutId, now, $"QC'de iptal edildi ({row.VoidReason})");
+        var newState = currentState is RollStates.InStock or RollStates.Reserved ? RollStates.Voided : currentState;
         c.Execute("""
             UPDATE rolls SET qc_status = 'voided', void_reason = @VoidReason, voided_at = @VoidedAt,
                              state = @newState, updated_at = @now, version = version + 1
@@ -229,7 +234,7 @@ public sealed class CutIngestService(SqliteConnectionFactory db, TimeProvider cl
 
         var note = newState == currentState
             ? $"QC'de iptal edildi ({row.VoidReason}); top '{currentState}' durumundayken — yetkili kontrol etmeli"
-            : row.VoidReason;
+            : wasReserved ? $"{row.VoidReason}; sevkiyattan çıkarıldı" : row.VoidReason;
         Movement(c, tx, row.CutId, MovementKinds.QcVoided, currentState, newState, row.VoidedAt!, now, row.StationCode, note);
     }
 
@@ -248,6 +253,9 @@ public sealed class CutIngestService(SqliteConnectionFactory db, TimeProvider cl
 
         if (existing.State is not (RollStates.Quarantined or RollStates.Shipped))
         {
+            // Aynı barkodlu iki top: sevkiyata okutulmuşsa (onaysız) sevkiyattan çıkar.
+            if (existing.State == RollStates.Reserved)
+                ShipmentService.DetachReservedRoll(c, tx, row.CutId, now, "Aynı barkod iki topta (karantina)");
             c.Execute("""
                 UPDATE rolls SET state = 'quarantined', updated_at = @now, version = version + 1 WHERE cut_id = @CutId
                 """, new { row.CutId, now }, tx);

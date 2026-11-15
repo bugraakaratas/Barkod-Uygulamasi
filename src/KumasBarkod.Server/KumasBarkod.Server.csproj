@@ -8,7 +8,7 @@
     <!-- Depo sunucusu: fabrikada sürekli açık bilgisayarda Windows hizmeti olarak çalışır. -->
     <AssemblyName>KumasBarkodSunucu</AssemblyName>
     <RootNamespace>KumasBarkod.Server</RootNamespace>
-    <Version>0.2.0</Version>
+    <Version>0.3.0</Version>
     <Product>Kumaş Barkod Sunucu</Product>
     <AssemblyTitle>Kumaş Barkod Depo Sunucusu</AssemblyTitle>
   </PropertyGroup>

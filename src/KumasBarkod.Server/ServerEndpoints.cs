@@ -2,7 +2,9 @@ using KumasBarkod.Core.Data;
 using KumasBarkod.Core.Domain;
 using KumasBarkod.Core.ServerApi;
 using KumasBarkod.Server.Data;
+using KumasBarkod.Server.Auth;
 using KumasBarkod.Server.Ingest;
+using KumasBarkod.Server.Shipments;
 using KumasBarkod.Server.Lots;
 using KumasBarkod.Server.Stock;
 
@@ -56,7 +58,57 @@ public static class ServerEndpoints
             lots.MapRawText(lotId, request?.RawText, Actor(http)));
     }
 
-    /// <summary>İşlemi yapan cihaz (kullanıcı girişi Faz 4'te). En fazla 100 karakter.</summary>
+    public static void MapShipmentEndpoints(this WebApplication app)
+    {
+        // ---------- Giriş ve personel ----------
+        app.MapPost("/" + ShipmentPaths.Login, (LoginRequest? request, AuthService auth, HttpContext http) =>
+            auth.Login(request, Actor(http)));
+        app.MapPost("/" + ShipmentPaths.Logout, (AuthService auth, HttpContext http) =>
+        {
+            auth.Logout(Token(http));
+            return Results.Ok(new { ok = true });
+        });
+        app.MapGet("/" + ShipmentPaths.Me, (AuthService auth, HttpContext http) => auth.Authenticate(Token(http)));
+        app.MapGet("/" + ShipmentPaths.BootstrapNeeded, (AuthService auth) => new BootstrapNeededResponse(auth.BootstrapNeeded()));
+        app.MapGet("/" + ShipmentPaths.Users, (AuthService auth, HttpContext http) => auth.List(auth.Authenticate(Token(http))));
+        app.MapPost("/" + ShipmentPaths.Users, (UserCreateRequest? request, AuthService auth, HttpContext http) =>
+            // Hiç personel yokken (ilk yetkili) giriş istenmez; sonrasında yetkili girişi gerekir.
+            auth.Create(request, auth.BootstrapNeeded() ? null : auth.Authenticate(Token(http))));
+        app.MapPut("/" + ShipmentPaths.Users + "/{userId:long}", (long userId, UserUpdateRequest? request, AuthService auth, HttpContext http) =>
+            auth.Update(userId, request, auth.Authenticate(Token(http))));
+
+        // ---------- Sevkiyat (her işlem giriş ister; kim yaptı kaydedilir) ----------
+        var s = "/" + ShipmentPaths.Shipments;
+        app.MapGet(s, (string? status, ShipmentService svc, AuthService auth, HttpContext http) =>
+        {
+            auth.Authenticate(Token(http));
+            return svc.List(status);
+        });
+        app.MapPost(s, (ShipmentOpenRequest? request, ShipmentService svc, AuthService auth, HttpContext http) =>
+            svc.Open(request, auth.Authenticate(Token(http)), Actor(http)));
+        app.MapGet(s + "/{id:long}", (long id, ShipmentService svc, AuthService auth, HttpContext http) =>
+        {
+            auth.Authenticate(Token(http));
+            return svc.Get(id);
+        });
+        app.MapPost(s + "/{id:long}/scans", (long id, ScanRequest? request, ShipmentService svc, AuthService auth, HttpContext http) =>
+            svc.Scan(id, request, auth.Authenticate(Token(http)), Actor(http)));
+        app.MapPost(s + "/{id:long}/removals", (long id, ScanRequest? request, ShipmentService svc, AuthService auth, HttpContext http) =>
+            svc.Remove(id, request, auth.Authenticate(Token(http)), Actor(http)));
+        app.MapPost(s + "/{id:long}/confirm", (long id, ShipmentConfirmRequest? request, ShipmentService svc, AuthService auth, HttpContext http) =>
+            svc.Confirm(id, request, auth.Authenticate(Token(http))));
+        app.MapPost(s + "/{id:long}/cancel", (long id, ShipmentCancelRequest? request, ShipmentService svc, AuthService auth, HttpContext http) =>
+            svc.Cancel(id, request, auth.Authenticate(Token(http))));
+    }
+
+    /// <summary><c>Authorization: Bearer &lt;belirteç&gt;</c></summary>
+    private static string? Token(HttpContext http)
+    {
+        var header = http.Request.Headers.Authorization.ToString();
+        return header.StartsWith("Bearer ", StringComparison.OrdinalIgnoreCase) ? header[7..].Trim() : null;
+    }
+
+    /// <summary>İşlemi yapan cihaz. En fazla 100 karakter.</summary>
     private static string? Actor(HttpContext http)
     {
         var device = http.Request.Headers[DepotPaths.DeviceHeader].ToString().Trim();

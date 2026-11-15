@@ -41,6 +41,8 @@ builder.Services.AddSingleton(TimeProvider.System);
 builder.Services.AddSingleton<CutIngestService>();
 builder.Services.AddSingleton<LotService>();
 builder.Services.AddSingleton<StockQueryService>();
+builder.Services.AddSingleton<KumasBarkod.Server.Auth.AuthService>();
+builder.Services.AddSingleton<KumasBarkod.Server.Shipments.ShipmentService>();
 builder.Services.AddSingleton(sp => new ServerBackupService(
     sp.GetRequiredService<SqliteConnectionFactory>(), sp.GetRequiredService<ServerPaths>(),
     sp.GetRequiredService<TimeProvider>(),
@@ -60,6 +62,7 @@ app.Logger.LogInformation("Sunucu açılıyor (sürüm {Version}, veri: {Data})"
 
 app.UseMiddleware<ApiErrorMiddleware>();
 app.MapServerEndpoints();
+app.MapShipmentEndpoints();
 
 app.Run();
 return 0;

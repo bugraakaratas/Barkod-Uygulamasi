@@ -209,6 +209,136 @@ public static class ServerMigrations
             -- Her veri değişikliğinde artar; ekranlar yalnızca bunu sorup değiştiyse yeniden okur.
             INSERT INTO server_settings (key, value) VALUES ('data_version', '0');
             """),
+
+        new(3, "Sevkiyat: users, auth_sessions, shipments, shipment_lots, shipment_items, scan_events", """
+            -- Personel: kart kodu (okutulur ya da yazılır) + PIN. PIN düz saklanmaz (PBKDF2 + tuz).
+            CREATE TABLE users (
+                user_id         INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
+                name            TEXT    NOT NULL CHECK (length(name) BETWEEN 1 AND 60 AND name = trim(name)),
+                role            TEXT    NOT NULL CHECK (role IN ('warehouse', 'supervisor')),
+                badge_code      TEXT    NOT NULL UNIQUE CHECK (length(badge_code) BETWEEN 3 AND 32),
+                pin_hash        TEXT    NOT NULL,
+                pin_salt        TEXT    NOT NULL,
+                active          INTEGER NOT NULL DEFAULT 1 CHECK (active IN (0, 1)),
+                failed_attempts INTEGER NOT NULL DEFAULT 0 CHECK (failed_attempts >= 0),
+                locked_until    TEXT,
+                created_at      TEXT    NOT NULL,
+                created_by      TEXT
+            ) STRICT;
+            CREATE TRIGGER trg_users_no_delete BEFORE DELETE ON users
+            BEGIN
+                SELECT RAISE(ABORT, 'personel silinemez; pasif yapın');
+            END;
+
+            -- Oturum: belirteç düz saklanmaz (SHA-256).
+            CREATE TABLE auth_sessions (
+                token_hash   TEXT    NOT NULL PRIMARY KEY,
+                user_id      INTEGER NOT NULL REFERENCES users (user_id),
+                device       TEXT,
+                created_at   TEXT    NOT NULL,
+                last_seen_at TEXT    NOT NULL,
+                expires_at   TEXT    NOT NULL,
+                ended_at     TEXT
+            ) STRICT;
+
+            CREATE TABLE shipment_counter (
+                year INTEGER NOT NULL PRIMARY KEY,
+                last INTEGER NOT NULL CHECK (last >= 0)
+            ) STRICT;
+
+            CREATE TABLE shipments (
+                shipment_id      INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
+                shipment_no      TEXT    NOT NULL UNIQUE,
+                status           TEXT    NOT NULL CHECK (status IN ('open', 'confirmed', 'cancelled', 'reversed')),
+                opened_by        INTEGER NOT NULL REFERENCES users (user_id),
+                opened_at        TEXT    NOT NULL,
+                opened_device    TEXT,
+                last_activity_at TEXT    NOT NULL,
+                closed_by        INTEGER REFERENCES users (user_id),
+                closed_at        TEXT,
+                close_request_id TEXT,
+                close_reason     TEXT,
+                version          INTEGER NOT NULL DEFAULT 1 CHECK (version >= 1),
+                CHECK ((status = 'open') = (closed_at IS NULL)),
+                CHECK (status <> 'open' OR closed_by IS NULL)
+            ) STRICT;
+
+            CREATE TRIGGER trg_shipments_status
+            BEFORE UPDATE OF status ON shipments
+            WHEN NEW.status <> OLD.status AND NOT (
+                   (OLD.status = 'open'      AND NEW.status IN ('confirmed', 'cancelled'))
+                OR (OLD.status = 'confirmed' AND NEW.status = 'reversed')
+            )
+            BEGIN
+                SELECT RAISE(ABORT, 'izin verilmeyen sevkiyat durumu geçişi');
+            END;
+            CREATE TRIGGER trg_shipments_no_delete BEFORE DELETE ON shipments
+            BEGIN
+                SELECT RAISE(ABORT, 'sevkiyat silinemez');
+            END;
+
+            CREATE TABLE shipment_lots (
+                shipment_id INTEGER NOT NULL REFERENCES shipments (shipment_id),
+                lot_id      INTEGER NOT NULL REFERENCES lots (lot_id),
+                PRIMARY KEY (shipment_id, lot_id)
+            ) STRICT;
+
+            -- Okutma kaydı (kabul + ret). Yalnızca eklenir; yanıt bir kez yazılır (tekrar gönderimde aynen döner).
+            CREATE TABLE scan_events (
+                scan_event_id  INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
+                client_scan_id TEXT    NOT NULL UNIQUE CHECK (length(client_scan_id) BETWEEN 1 AND 64),
+                shipment_id    INTEGER NOT NULL REFERENCES shipments (shipment_id),
+                kind           TEXT    NOT NULL CHECK (kind IN ('add', 'remove')),
+                raw_input      TEXT    NOT NULL,
+                cut_id         TEXT,
+                result_code    TEXT    NOT NULL,
+                accepted       INTEGER NOT NULL CHECK (accepted IN (0, 1)),
+                user_id        INTEGER NOT NULL REFERENCES users (user_id),
+                device         TEXT,
+                server_time    TEXT    NOT NULL,
+                response_json  TEXT    NOT NULL
+            ) STRICT;
+            CREATE INDEX ix_scan_events_shipment ON scan_events (shipment_id, scan_event_id);
+            CREATE TRIGGER trg_scan_events_no_update BEFORE UPDATE ON scan_events
+            WHEN NOT (OLD.response_json = '' AND NEW.response_json <> ''
+                      AND NEW.scan_event_id = OLD.scan_event_id AND NEW.client_scan_id = OLD.client_scan_id
+                      AND NEW.result_code = OLD.result_code AND NEW.accepted = OLD.accepted
+                      AND NEW.cut_id IS OLD.cut_id AND NEW.shipment_id = OLD.shipment_id)
+            BEGIN
+                SELECT RAISE(ABORT, 'okutma kaydı değiştirilemez');
+            END;
+            CREATE TRIGGER trg_scan_events_no_delete BEFORE DELETE ON scan_events
+            BEGIN
+                SELECT RAISE(ABORT, 'okutma kaydı silinemez');
+            END;
+
+            -- Sevkiyat kalemi. ASIL KİLİT: bir top aynı anda yalnızca BİR aktif kalemde (açık ya da onaylı sevkiyat).
+            CREATE TABLE shipment_items (
+                item_id       INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
+                shipment_id   INTEGER NOT NULL REFERENCES shipments (shipment_id),
+                cut_id        TEXT    NOT NULL REFERENCES rolls (cut_id),
+                status        TEXT    NOT NULL CHECK (status IN ('active', 'removed', 'cancelled', 'reversed')),
+                added_at      TEXT    NOT NULL,
+                added_by      INTEGER NOT NULL REFERENCES users (user_id),
+                scan_event_id INTEGER NOT NULL REFERENCES scan_events (scan_event_id),
+                ended_at      TEXT,
+                ended_by      INTEGER REFERENCES users (user_id),
+                end_reason    TEXT,
+                CHECK ((status = 'active') = (ended_at IS NULL))
+            ) STRICT;
+            CREATE UNIQUE INDEX ux_items_one_active_per_roll ON shipment_items (cut_id) WHERE status = 'active';
+            CREATE INDEX ix_items_shipment ON shipment_items (shipment_id, status);
+            CREATE TRIGGER trg_items_status
+            BEFORE UPDATE ON shipment_items
+            WHEN OLD.status <> 'active' OR NEW.cut_id <> OLD.cut_id OR NEW.shipment_id <> OLD.shipment_id
+            BEGIN
+                SELECT RAISE(ABORT, 'kapanmış sevkiyat kalemi değiştirilemez');
+            END;
+            CREATE TRIGGER trg_items_no_delete BEFORE DELETE ON shipment_items
+            BEGIN
+                SELECT RAISE(ABORT, 'sevkiyat kalemi silinemez');
+            END;
+            """),
     ];
 
     public static int LatestVersion => All[^1].Version;

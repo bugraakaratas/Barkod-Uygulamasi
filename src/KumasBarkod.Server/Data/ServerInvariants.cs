@@ -53,6 +53,52 @@ public static class ServerInvariants
               AND NOT EXISTS (SELECT 1 FROM cut_conflicts k WHERE k.cut_id = r.cut_id AND k.resolved_at IS NULL)
             """));
 
+        // 5) Ayrılmış top ⇔ açık bir sevkiyatta tam bir aktif kalem.
+        problems.AddRange(c.Query<string>("""
+            SELECT r.cut_id || ': durum reserved ama açık sevkiyatta aktif kalemi yok'
+            FROM rolls r WHERE r.state = 'reserved' AND NOT EXISTS (
+                SELECT 1 FROM shipment_items i JOIN shipments s ON s.shipment_id = i.shipment_id
+                WHERE i.cut_id = r.cut_id AND i.status = 'active' AND s.status = 'open')
+            """));
+        problems.AddRange(c.Query<string>("""
+            SELECT i.cut_id || ': açık sevkiyatta (' || s.shipment_no || ') ama durumu ' || r.state
+            FROM shipment_items i JOIN shipments s ON s.shipment_id = i.shipment_id JOIN rolls r ON r.cut_id = i.cut_id
+            WHERE i.status = 'active' AND s.status = 'open' AND r.state <> 'reserved'
+            """));
+
+        // 6) Sevk edilmiş top ⇔ onaylı sevkiyatta aktif kalem. Aktif kalem yalnızca açık/onaylı sevkiyatta olur.
+        problems.AddRange(c.Query<string>("""
+            SELECT r.cut_id || ': durum shipped ama onaylı sevkiyatta kalemi yok'
+            FROM rolls r WHERE r.state = 'shipped' AND NOT EXISTS (
+                SELECT 1 FROM shipment_items i JOIN shipments s ON s.shipment_id = i.shipment_id
+                WHERE i.cut_id = r.cut_id AND i.status = 'active' AND s.status = 'confirmed')
+            """));
+        problems.AddRange(c.Query<string>("""
+            SELECT i.cut_id || ': onaylı sevkiyatta (' || s.shipment_no || ') ama durumu ' || r.state
+            FROM shipment_items i JOIN shipments s ON s.shipment_id = i.shipment_id JOIN rolls r ON r.cut_id = i.cut_id
+            WHERE i.status = 'active' AND s.status = 'confirmed' AND r.state <> 'shipped'
+            """));
+        problems.AddRange(c.Query<string>("""
+            SELECT i.cut_id || ': ' || s.status || ' sevkiyatta (' || s.shipment_no || ') aktif kalem'
+            FROM shipment_items i JOIN shipments s ON s.shipment_id = i.shipment_id
+            WHERE i.status = 'active' AND s.status NOT IN ('open', 'confirmed')
+            """));
+
+        // 7) Her kabul edilmiş "ekle" okutmasının bir kalemi var; her kalemin okutma kaydı bu sevkiyata ait.
+        problems.AddRange(c.Query<string>("""
+            SELECT 'okutma ' || e.scan_event_id || ' (' || e.cut_id || '): kabul edildi ama kalemi yok'
+            FROM scan_events e WHERE e.accepted = 1 AND e.kind = 'add'
+              AND NOT EXISTS (SELECT 1 FROM shipment_items i WHERE i.scan_event_id = e.scan_event_id)
+            """));
+        problems.AddRange(c.Query<string>("""
+            SELECT 'kalem ' || i.item_id || ': okutma kaydı başka sevkiyata/topa ait'
+            FROM shipment_items i JOIN scan_events e ON e.scan_event_id = i.scan_event_id
+            WHERE e.shipment_id <> i.shipment_id OR e.cut_id IS NOT i.cut_id
+            """));
+        problems.AddRange(c.Query<string>("""
+            SELECT 'okutma ' || scan_event_id || ': yanıt kaydı boş' FROM scan_events WHERE response_json = ''
+            """));
+
         return problems;
     }
 }
