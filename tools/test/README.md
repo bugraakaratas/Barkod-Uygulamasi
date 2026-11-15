@@ -5,7 +5,7 @@ Sonuçlar ve ölçümler: `docs/TEST-RAPORU.md`.
 ## Otomatik
 
 ```powershell
-dotnet test                               # 322 + 66 test
+dotnet test                               # 322 + 101 test
 node --test tools/sheets/Code.test.js     # 25 test
 
 # 1 milyon kayıt ölçümü (yaklaşık 3 dk)
@@ -22,9 +22,11 @@ pwsh -STA -File tools\test\uitest.ps1 -Part A   # tüm ekranlar, sınırlar, oku
 pwsh -STA -File tools\test\uitest.ps1 -Part B   # 300 bin kayıt, 300 F5, zorla kapatma, iki kopya (21 kontrol)
 pwsh -STA -File tools\test\uitest.ps1 -Part E   # depo: geçici sunucu, görev değişimi, Depo Stoğu, okutma, Lotlar (31 kontrol)
 pwsh -STA -File tools\test\uitest.ps1 -Part F   # QC lot önerisi ve tanımsız lot onayı, geçici sunucuyla (24 kontrol)
+pwsh -STA -File tools\test\uitest.ps1 -Part G   # sevkiyat (rıhtım WPF): giriş, okutma, ret, çıkarma, sunucu kesintisi, onay, iptal, personel (41 kontrol)
+pwsh -STA -File tools\test\uitest.ps1 -Part H   # el terminali web sayfası: görünmez Edge + handheld-e2e.mjs (Node), ağ kesintisi (26 kontrol)
 ```
 
-A, B, E ve F yalnızca `%TEMP%\kumas-uitest` altında çalışır. E ve F kendi geçici depo sunucusunu `http://localhost:5087` üzerinde açar (önce `dotnet build`).
+A, B, E, F, G ve H yalnızca `%TEMP%\kumas-uitest` altında çalışır. E–H kendi geçici depo sunucusunu `http://localhost:5087` üzerinde açar (önce `dotnet build`).
 InfoBar mesaj metni UI Automation ağacında görünmez: mesajlar ekran görüntüsünden, davranış veriden kontrol edilir.
 
 ## Gerçek Google (DİKKAT: tabloya yazar)

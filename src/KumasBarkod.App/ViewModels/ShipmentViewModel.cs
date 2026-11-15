@@ -425,6 +425,7 @@ public partial class ShipmentViewModel : ObservableObject
     private void ToggleRemoveMode()
     {
         IsRemoveMode = !IsRemoveMode;
+        _lastRaw = null;   // mod değişince aynı barkod hemen tekrar okutulabilsin (okut → çıkarma modu → aynı topu okut)
         ShowFeedback(IsRemoveMode ? FeedbackKinds.Remove : FeedbackKinds.Idle,
             IsRemoveMode ? "ÇIKARMA MODU" : "Barkod okutun",
             IsRemoveMode ? "Tırdan indirilen topu okutun: sevkiyattan çıkar, stoğa döner." : $"Seçili lot: {LotTitle}");

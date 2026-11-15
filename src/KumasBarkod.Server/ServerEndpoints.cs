@@ -58,8 +58,19 @@ public static class ServerEndpoints
             lots.MapRawText(lotId, request?.RawText, Actor(http)));
     }
 
+    public const string HandheldPath = "/el-terminali";
+
     public static void MapShipmentEndpoints(this WebApplication app)
     {
+        // ---------- El terminali (telefon / Android el terminali tarayıcısı): sade sevkiyat sayfası ----------
+        var handheld = ReadHandheldPage();
+        app.MapGet(HandheldPath, (HttpContext http) =>
+        {
+            http.Response.Headers.CacheControl = "no-store";   // güncelleme hemen gelsin
+            return Results.Content(handheld, "text/html; charset=utf-8");
+        });
+        app.MapGet("/", () => Results.Redirect(HandheldPath));
+
         // ---------- Giriş ve personel ----------
         app.MapPost("/" + ShipmentPaths.Login, (LoginRequest? request, AuthService auth, HttpContext http) =>
             auth.Login(request, Actor(http)));
@@ -99,6 +110,14 @@ public static class ServerEndpoints
             svc.Confirm(id, request, auth.Authenticate(Token(http))));
         app.MapPost(s + "/{id:long}/cancel", (long id, ShipmentCancelRequest? request, ShipmentService svc, AuthService auth, HttpContext http) =>
             svc.Cancel(id, request, auth.Authenticate(Token(http))));
+    }
+
+    private static string ReadHandheldPage()
+    {
+        using var stream = typeof(ServerEndpoints).Assembly.GetManifestResourceStream("handheld.html")
+            ?? throw new InvalidOperationException("El terminali sayfası programda yok.");
+        using var reader = new StreamReader(stream);
+        return reader.ReadToEnd();
     }
 
     /// <summary><c>Authorization: Bearer &lt;belirteç&gt;</c></summary>

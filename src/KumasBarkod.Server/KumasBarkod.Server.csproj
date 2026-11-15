@@ -32,4 +32,9 @@
     <InternalsVisibleTo Include="KumasBarkod.Server.Tests" />
   </ItemGroup>
 
+  <!-- El terminali sayfası programın içine gömülür (ayrı dosya kopyalamak gerekmez). -->
+  <ItemGroup>
+    <EmbeddedResource Include="Web\handheld.html" LogicalName="handheld.html" />
+  </ItemGroup>
+
 </Project>

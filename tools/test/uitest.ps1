@@ -709,7 +709,7 @@ function PartG {
   Check 'Sistemde olmayan barkod ret' (WaitFor { Has 'sistemde yok' })
 
   # --- Cikarma modu
-  K '{F7}' 500
+  K '{F7}' 300   # cift okuma penceresi (1,5 sn) icinde: mod degisince ayni barkod hemen okutulabilmeli
   Check 'Cikarma modu acildi' (Has 'ÇIKARMA MODU')
   K 'K1000002{ENTER}' 1500
   Check 'Cikarilan top stoga dondu' (WaitFor { (RollState 'K1-000002') -eq 'in_stock' })
@@ -778,8 +778,42 @@ function PartG {
   try { $script:srv.Kill() } catch {}
 }
 
+# ---------- H: El terminali web sayfası (Faz 4) — görünmez Edge + CDP ----------
+function PartH {
+  $env:KUMASBARKOD_SERVER_DATA_DIR = Join-Path $data 'sunucu'
+  Check 'Sunucu acildi' (Start-Server)
+  PostJson 'api/v1/users' @{ name = 'Patron'; role = 'supervisor'; badgeCode = 'Y0001'; pin = '9999' } | Out-Null
+  $boss = (PostJson 'api/v1/auth/login' @{ badgeCode = 'Y0001'; pin = '9999' }).token
+  PostJson 'api/v1/users' @{ name = 'Ali Depo'; role = 'warehouse'; badgeCode = 'P0001'; pin = '1234' } $boss | Out-Null
+  foreach ($n in 'LOT-3', 'LOT-2') { PostJson 'api/v1/lots' @{ name = $n } | Out-Null }
+  $rows = @()
+  for ($i = 1; $i -le 7; $i++) {
+    $rows += @{ cutId = ('K1-{0:D6}' -f $i); stationCode = 'K1'; sequenceNo = $i; lotCode = $(if ($i -le 5) { 'LOT-3' } else { 'LOT-2' });
+      lengthCm = 1000 + $i; operator = $null; status = 'active'; voidReason = $null; voidedAt = $null;
+      createdAt = ('2026-11-15T08:0{0}:00.000Z' -f $i); printCount = 1; lastPrintedAt = $null }
+  }
+  PostJson 'api/v1/cuts/batch' @{ installId = 'QC-PC'; stationCode = 'K1'; appVersion = 'test'; rows = $rows } | Out-Null
+
+  $edge = @("${env:ProgramFiles(x86)}\Microsoft\Edge\Application\msedge.exe", "$env:ProgramFiles\Microsoft\Edge\Application\msedge.exe") |
+    Where-Object { Test-Path $_ } | Select-Object -First 1
+  if (-not $edge) { Check 'Edge bulundu' $false; return }
+  $profile = Join-Path $data 'edge-profil'
+  $script:edgeProc = Start-Process $edge -ArgumentList '--headless=new', '--remote-debugging-port=9333', "--user-data-dir=$profile",
+    '--no-first-run', '--disable-extensions', 'about:blank' -PassThru
+  Check 'Edge acildi' (WaitFor { try { (Invoke-RestMethod 'http://127.0.0.1:9333/json/version' -TimeoutSec 2).Browser } catch { $false } } 15000)
+
+  $out = & node (Join-Path $PSScriptRoot 'handheld-e2e.mjs') 9333 $serverUrl $scratch 2>&1
+  foreach ($line in $out) { if ("$line" -match '^(GECTI|KALDI) ') { $results.Add("$line") } elseif ("$line".Trim()) { $results.Add("NOT  node: $line") } }
+
+  # Yalnızca testin KENDİ geçici profiliyle açılan Edge süreçleri kapatılır (kullanıcının Edge pencerelerine dokunulmaz).
+  Get-CimInstance Win32_Process -Filter "Name='msedge.exe'" | Where-Object { $_.CommandLine -and $_.CommandLine.Contains($profile) } |
+    ForEach-Object { try { Stop-Process -Id $_.ProcessId -Force -ErrorAction Stop } catch {} }
+  Check 'Sunucu butunluk' ((& $serverExe --kontrol) -match 'sorun yok')
+  try { $script:srv.Kill() } catch {}
+}
+
 try {
-  if ($Part -eq 'A') { PartA } elseif ($Part -eq 'B') { PartB } elseif ($Part -eq 'D') { PartD } elseif ($Part -eq 'E') { PartE } elseif ($Part -eq 'F') { PartF } elseif ($Part -eq 'G') { PartG } else { PartC }
+  if ($Part -eq 'A') { PartA } elseif ($Part -eq 'B') { PartB } elseif ($Part -eq 'D') { PartD } elseif ($Part -eq 'E') { PartE } elseif ($Part -eq 'F') { PartF } elseif ($Part -eq 'G') { PartG } elseif ($Part -eq 'H') { PartH } else { PartC }
 } catch {
   $results.Add("HATA: $($_.Exception.Message) @ satir $($_.InvocationInfo.ScriptLineNumber)")
 } finally {

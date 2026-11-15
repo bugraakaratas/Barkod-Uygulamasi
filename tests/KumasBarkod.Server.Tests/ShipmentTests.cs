@@ -572,6 +572,25 @@ public sealed class ShipmentTests : IDisposable
         Assert.Equal([ShipmentStatuses.Cancelled, ShipmentStatuses.Confirmed], closed.Select(x => x.Status));
     }
 
+    // ---------- El terminali sayfası ----------
+
+    [Fact]
+    public async Task Handheld_page_is_served_and_root_redirects_to_it()
+    {
+        var page = await _anon.GetAsync("/el-terminali");
+        Assert.Equal(HttpStatusCode.OK, page.StatusCode);
+        Assert.Equal("text/html", page.Content.Headers.ContentType!.MediaType);
+        Assert.Equal("no-store", page.Headers.CacheControl!.ToString());
+        var html = await page.Content.ReadAsStringAsync();
+        Assert.Contains("api/v1/", html);
+        Assert.Contains("BAĞLANTI YOK", html);
+        Assert.Contains("clientScanId", html);   // okutma tekrar gönderime dayanıklı
+
+        var noRedirect = _server.CreateClient(new Microsoft.AspNetCore.Mvc.Testing.WebApplicationFactoryClientOptions { AllowAutoRedirect = false });
+        var root = await noRedirect.GetAsync("/");
+        Assert.Equal("/el-terminali", root.Headers.Location!.ToString());
+    }
+
     // ---------- Veritabanı korumaları ----------
 
     [Fact]

@@ -1,0 +1,329 @@
+<!doctype html>
+<html lang="tr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+<title>Kumaş Barkod — Sevkiyat</title>
+<style>
+  :root { --ok:#1e8e3e; --warn:#f2b705; --err:#c62828; --off:#7a0000; --rem:#e8710a; --bg:#f4f5f7; --fg:#1a1a1a; --mut:#666; }
+  * { box-sizing:border-box; }
+  body { margin:0; font-family:Segoe UI, Roboto, Arial, sans-serif; background:var(--bg); color:var(--fg); }
+  header { display:flex; align-items:center; gap:8px; padding:10px 12px; background:#11698e; color:#fff; }
+  header h1 { font-size:18px; margin:0; flex:1; }
+  header button { background:transparent; color:#fff; border:1px solid #fff8; }
+  main { padding:12px; max-width:720px; margin:0 auto; }
+  .hidden { display:none !important; }
+  label { display:block; font-weight:600; margin:12px 0 4px; }
+  input, select { width:100%; font-size:22px; padding:12px; border:2px solid #aaa; border-radius:8px; }
+  input:focus { border-color:#11698e; outline:none; }
+  button { font-size:18px; padding:12px 16px; border-radius:8px; border:0; background:#11698e; color:#fff; font-weight:600; }
+  button.big { width:100%; font-size:22px; padding:16px; margin-top:14px; }
+  button.sec { background:#e0e0e0; color:#222; }
+  button.danger { background:var(--err); }
+  button.go { background:var(--ok); }
+  button.rem { background:var(--rem); }
+  button:disabled { opacity:.5; }
+  .err { color:var(--err); font-weight:600; min-height:24px; margin-top:8px; }
+  .msg { color:var(--ok); font-weight:600; min-height:22px; }
+  .list { list-style:none; padding:0; margin:6px 0; }
+  .list li { background:#fff; border:2px solid #ddd; border-radius:8px; padding:12px; margin-bottom:8px; }
+  .list li.sel { border-color:#11698e; background:#e3f2f8; }
+  .list .t { font-size:20px; font-weight:700; }
+  .list .s { color:var(--mut); font-size:14px; }
+  .lot { font-size:34px; font-weight:800; margin:2px 0 6px; word-break:break-word; }
+  .meta { color:var(--mut); font-size:13px; }
+  #band { border-radius:10px; padding:14px; margin:8px 0; background:#e6e6e6; min-height:96px; }
+  #band .h { font-size:28px; font-weight:800; }
+  #band .d { font-size:17px; margin-top:4px; }
+  #band.success { background:var(--ok); color:#fff; } #band.warning { background:var(--warn); }
+  #band.error { background:var(--err); color:#fff; } #band.offline { background:var(--off); color:#fff; }
+  #band.remove { background:var(--rem); color:#fff; }
+  .stats { display:grid; grid-template-columns:repeat(4,1fr); gap:6px; }
+  .stats div { background:#fff; border-radius:8px; padding:6px; text-align:center; }
+  .stats b { display:block; font-size:28px; }
+  .stats span { font-size:11px; color:var(--mut); }
+  .row { display:flex; gap:8px; margin-top:10px; } .row button { flex:1; }
+  .log { font-size:13px; margin-top:10px; } .log div { padding:3px 0; border-bottom:1px solid #ddd; } .log .no { color:var(--err); }
+  .panel { background:#fff; border:3px solid #11698e; border-radius:10px; padding:12px; margin-top:10px; }
+</style>
+</head>
+<body>
+<header><h1 id="title">Sevkiyat</h1><span id="who"></span><button id="logout" class="hidden" type="button">Çıkış</button></header>
+<main>
+  <!-- Giriş -->
+  <section id="login">
+    <p>Personel kartınızı okutun, sonra PIN girin.</p>
+    <label for="badge">Kart kodu</label><input id="badge" autocomplete="off" autocapitalize="characters">
+    <label for="pin">PIN</label><input id="pin" type="password" inputmode="numeric" autocomplete="off">
+    <button id="loginBtn" class="big" type="button">Giriş</button>
+    <div id="loginErr" class="err"></div>
+  </section>
+
+  <!-- Liste -->
+  <section id="list" class="hidden">
+    <div id="listMsg" class="msg"></div>
+    <h3>Açık sevkiyatlar (devam)</h3>
+    <ul id="openList" class="list"></ul>
+    <h3>Yeni sevkiyat: lot seçin</h3>
+    <ul id="lotList" class="list"></ul>
+    <button id="startBtn" class="big" type="button" disabled>Sevkiyatı başlat</button>
+    <div id="listErr" class="err"></div>
+  </section>
+
+  <!-- Okutma -->
+  <section id="scan" class="hidden">
+    <div class="meta" id="shipInfo"></div>
+    <div class="lot" id="lotTitle"></div>
+    <input id="scanBox" autocomplete="off" placeholder="Barkod okutun" enterkeyhint="send">
+    <div id="band"><div class="h" id="bandH">Barkod okutun</div><div class="d" id="bandD"></div></div>
+    <div class="stats">
+      <div><b id="sCount">0</b><span>top</span></div>
+      <div><b id="sMeters">0</b><span>metre</span></div>
+      <div><b id="sRej">0</b><span>ret</span></div>
+      <div><b id="sRem">0</b><span>lotta kalan</span></div>
+    </div>
+    <div class="row">
+      <button id="remBtn" class="rem" type="button">Çıkarma modu</button>
+      <button id="confirmBtn" class="go" type="button">Onayla</button>
+      <button id="cancelBtn" class="danger" type="button">İptal</button>
+    </div>
+    <div id="confirmPanel" class="panel hidden">
+      <div id="confirmText"></div>
+      <div class="row"><button id="confirmYes" class="go" type="button">Evet, onayla</button><button id="confirmNo" class="sec" type="button">Vazgeç</button></div>
+    </div>
+    <div id="cancelPanel" class="panel hidden">
+      <label for="cancelReason">İptal sebebi</label><select id="cancelReason"></select>
+      <div class="row"><button id="cancelYes" class="danger" type="button">Sevkiyatı iptal et</button><button id="cancelNo" class="sec" type="button">Vazgeç</button></div>
+      <div id="cancelErr" class="err"></div>
+    </div>
+    <button id="backBtn" class="big sec" type="button">Listeye dön</button>
+    <div class="log" id="log"></div>
+  </section>
+</main>
+<script>
+"use strict";
+// El terminali sevkiyat sayfası. Kurallar sunucuda; bu sayfa yalnızca gösterir (WPF rıhtım ekranıyla aynı API).
+// Okutmalar sırayla gönderilir; ağ koparsa kuyrukta bekler ve AYNI kimlikle tekrar denenir (sunucu ikinci kez işlemez).
+const $ = id => document.getElementById(id);
+const API = "api/v1/";
+const REASONS = ["Tır gelmedi / yükleme ertelendi", "Yanlış lot seçildi", "Yanlışlıkla açıldı / deneme"];
+const st = { token: sessionStorage.getItem("kb_token"), user: JSON.parse(sessionStorage.getItem("kb_user") || "null"),
+  shipment: null, version: 0, remove: false, queue: [], pumping: false, lastRaw: "", lastAt: 0,
+  selLot: null, selOpen: null, confirmId: null, cancelId: null, audio: null };
+
+function id32() { const a = new Uint8Array(16); crypto.getRandomValues(a); return Array.from(a, b => b.toString(16).padStart(2, "0")).join(""); }
+function m(cm) { return (cm / 100).toLocaleString("tr-TR", { minimumFractionDigits: 2, maximumFractionDigits: 2 }); }
+function t(utc) { try { return new Date(utc).toLocaleTimeString("tr-TR"); } catch { return utc; } }
+
+class Offline extends Error {}
+async function call(method, path, body) {
+  const ctl = new AbortController(); const timer = setTimeout(() => ctl.abort(), 6000);
+  let r;
+  try {
+    r = await fetch(API + path, { method, signal: ctl.signal, headers: Object.assign({ "Content-Type": "application/json", "X-Kumas-Device": "el-terminali" },
+      st.token ? { "Authorization": "Bearer " + st.token } : {}), body: body === undefined ? undefined : JSON.stringify(body) });
+  } catch (e) { throw new Offline("Depo sunucusuna ulaşılamıyor"); } finally { clearTimeout(timer); }
+  const data = await r.json().catch(() => null);
+  if (r.status >= 500) throw new Offline((data && data.message) || "Sunucu geçici hata verdi");
+  if (!r.ok) {
+    if (r.status === 401 && path !== "auth/login") { logoutLocal(); }
+    const e = new Error((data && data.message) || ("Hata " + r.status)); e.code = data && data.code; throw e;
+  }
+  return data;
+}
+
+function show(screen) {
+  for (const s of ["login", "list", "scan"]) $(s).classList.toggle("hidden", s !== screen);
+  $("logout").classList.toggle("hidden", screen === "login");
+  $("who").textContent = st.user ? st.user.name : "";
+  if (screen === "login") $("badge").focus();
+  if (screen === "scan") $("scanBox").focus();
+}
+
+// ---------- Ses ve titreşim (ilk dokunuşta açılır) ----------
+function beep(kind) {
+  try {
+    if (!st.audio) return;
+    const pat = { success: [[1320, .11]], warning: [[740, .09], [0, .06], [740, .09]], error: [[220, .26], [0, .07], [220, .26], [0, .07], [220, .42]], remove: [[880, .11], [520, .16]] }[kind] || [];
+    let at = st.audio.currentTime;
+    for (const [hz, d] of pat) {
+      if (hz) { const o = st.audio.createOscillator(), g = st.audio.createGain(); o.type = "square"; o.frequency.value = hz; g.gain.value = .15;
+        o.connect(g); g.connect(st.audio.destination); o.start(at); o.stop(at + d); }
+      at += d;
+    }
+  } catch { }
+  if (navigator.vibrate) navigator.vibrate(kind === "error" ? [300, 100, 300, 100, 400] : kind === "warning" ? [80, 60, 80] : [60]);
+}
+
+function band(kind, h, d) { $("band").className = kind; $("bandH").textContent = h; $("bandD").textContent = d || ""; }
+
+// ---------- Giriş ----------
+async function login() {
+  $("loginErr").textContent = "";
+  try { st.audio = st.audio || new (window.AudioContext || window.webkitAudioContext)(); } catch { }
+  try {
+    const r = await call("POST", "auth/login", { badgeCode: $("badge").value, pin: $("pin").value });
+    st.token = r.token; st.user = r.user;
+    sessionStorage.setItem("kb_token", st.token); sessionStorage.setItem("kb_user", JSON.stringify(st.user));
+    $("badge").value = ""; $("pin").value = "";
+    await toList();
+  } catch (e) { $("loginErr").textContent = e.message; $("pin").value = ""; $("pin").focus(); }
+}
+function logoutLocal() { st.token = null; st.user = null; st.shipment = null; sessionStorage.removeItem("kb_token"); sessionStorage.removeItem("kb_user"); show("login"); }
+async function logout() {
+  if (st.queue.length) { band("warning", "Gönderilmemiş okutma var", "Bağlantı gelince çıkış yapın."); return; }
+  try { await call("POST", "auth/logout", {}); } catch { } logoutLocal();
+}
+
+// ---------- Liste ----------
+async function toList(message) {
+  st.shipment = null; st.selLot = null; st.selOpen = null;
+  $("listMsg").textContent = message || ""; $("listErr").textContent = "";
+  show("list"); await loadList();
+}
+function pick(ul, li) { for (const x of ul.children) x.classList.remove("sel"); li.classList.add("sel"); }
+async function loadList() {
+  try {
+    const [open, lots] = await Promise.all([call("GET", "shipments?status=open"), call("GET", "lots")]);
+    const ol = $("openList"); ol.innerHTML = "";
+    if (!open.length) ol.innerHTML = '<li class="s">Açık sevkiyat yok.</li>';
+    for (const s of open) {
+      const li = document.createElement("li");
+      li.innerHTML = '<div class="t"></div><div class="s"></div>';
+      li.children[0].textContent = s.shipmentNo + " · " + s.lotNames;
+      li.children[1].textContent = s.count + " top · " + m(s.lengthCm) + " m · açan " + s.openedBy;
+      li.onclick = () => resume(s.shipmentId);
+      ol.appendChild(li);
+    }
+    const ll = $("lotList"); ll.innerHTML = "";
+    for (const l of lots.filter(l => l.active)) {
+      const li = document.createElement("li");
+      li.innerHTML = '<div class="t"></div><div class="s"></div>';
+      li.children[0].textContent = l.name; li.children[1].textContent = l.inStockCount + " top stokta";
+      li.dataset.lot = l.lotId;
+      li.onclick = () => { st.selLot = l.lotId; pick(ll, li); $("startBtn").disabled = false; };
+      ll.appendChild(li);
+    }
+    $("startBtn").disabled = st.selLot == null;
+  } catch (e) { $("listErr").textContent = e.message; }
+}
+async function start() {
+  try { enter(await call("POST", "shipments", { lotIds: [st.selLot] })); } catch (e) { $("listErr").textContent = e.message; }
+}
+async function resume(id) {
+  try { enter(await call("GET", "shipments/" + id)); } catch (e) { $("listErr").textContent = e.message; }
+}
+
+// ---------- Okutma ----------
+function enter(d) { st.shipment = d.shipmentId; st.remove = false; applyDetail(d); band("", "Barkod okutun", "Seçili lot: " + $("lotTitle").textContent); show("scan"); }
+function applyDetail(d) {
+  st.version = d.version;
+  $("title").textContent = d.shipmentNo;
+  $("shipInfo").textContent = d.shipmentNo + " · açan " + d.openedBy;
+  $("lotTitle").textContent = d.lots.map(l => l.name).join(", ");
+  stats(d.stats);
+  const log = $("log"); log.innerHTML = "";
+  for (const s of d.recentScans) { const div = document.createElement("div"); if (!s.accepted) div.className = "no";
+    div.textContent = t(s.serverTime) + " " + (s.accepted ? "" : "RET — ") + s.message; log.appendChild(div); }
+}
+function stats(s) { $("sCount").textContent = s.count; $("sMeters").textContent = m(s.lengthCm); $("sRej").textContent = s.rejected; $("sRem").textContent = s.remainingCount; }
+
+function submit(raw) {
+  raw = (raw || "").trim(); $("scanBox").value = "";
+  if (!raw || st.shipment == null) return;
+  const now = Date.now();
+  if (raw === st.lastRaw && now - st.lastAt < 1500) { st.lastAt = now; return; }   // okuyucunun çift okuması
+  st.lastRaw = raw; st.lastAt = now;
+  hidePanels();
+  st.queue.push({ ship: st.shipment, req: { clientScanId: id32(), rawInput: raw }, remove: st.remove });
+  pump();
+}
+async function pump() {
+  if (st.pumping) return; st.pumping = true;
+  try {
+    while (st.queue.length) {
+      const q = st.queue[0];
+      try {
+        const r = await call("POST", "shipments/" + q.ship + (q.remove ? "/removals" : "/scans"), q.req);
+        st.queue.shift();
+        if (q.ship === st.shipment) applyScan(r, q.remove);
+      } catch (e) {
+        if (e instanceof Offline) {
+          band("offline", "BAĞLANTI YOK — OKUTMAYI DURDURUN", st.queue.length + " okutma bekliyor; bağlantı gelince gönderilecek.");
+          beep("error"); await new Promise(r => setTimeout(r, 2000));
+        } else { st.queue.shift(); band("error", "Okutma işlenemedi", e.message); beep("error"); if (!st.token) return; }
+      }
+    }
+    if (st.shipment != null) { try { const d = await call("GET", "shipments/" + st.shipment); const keep = [$("band").className, $("bandH").textContent, $("bandD").textContent]; applyDetail(d); band(...keep); } catch { } }
+  } finally { st.pumping = false; }
+}
+function applyScan(r, removed) {
+  st.version = r.shipmentVersion; stats(r.stats);
+  if (r.severity === "success" && removed) { band("remove", "ÇIKARILDI " + (r.roll ? r.roll.cutId : ""), r.message); beep("remove"); }
+  else if (r.severity === "success") { band("success", "✓ " + r.roll.cutId, r.roll.lotName + " · " + m(r.roll.lengthCm) + " m"); beep("success"); }
+  else if (r.severity === "warning") { band("warning", "UYARI", r.message); beep("warning"); }
+  else { band("error", "✗ YÜKLEMEYİN", r.message); beep("error"); }
+}
+function toggleRemove() {
+  st.remove = !st.remove; st.lastRaw = "";   // mod değişince aynı barkod hemen tekrar okutulabilsin (çift okuma kuralı sıfırlanır)
+  $("remBtn").textContent = st.remove ? "Çıkarma modunu kapat" : "Çıkarma modu";
+  band(st.remove ? "remove" : "", st.remove ? "ÇIKARMA MODU" : "Barkod okutun", st.remove ? "Tırdan indirilen topu okutun." : "");
+  $("scanBox").focus();
+}
+function hidePanels() { $("confirmPanel").classList.add("hidden"); $("cancelPanel").classList.add("hidden"); }
+function askConfirm() {
+  if (st.queue.length) { band("warning", "Bekleyen okutma var", "Önce gönderilmesini bekleyin."); return; }
+  hidePanels(); st.confirmId = id32();
+  $("confirmText").textContent = $("sCount").textContent + " top · " + $("sMeters").textContent + " m onaylansın mı? Onaydan sonra toplar sevk edildi olur.";
+  $("confirmPanel").classList.remove("hidden");
+}
+async function doConfirm() {
+  try { const d = await call("POST", "shipments/" + st.shipment + "/confirm", { expectedVersion: st.version, requestId: st.confirmId });
+    beep("success"); await toList(d.shipmentNo + " onaylandı: " + d.stats.count + " top sevk edildi.");
+  } catch (e) {
+    if (e.code === "VERSION_MISMATCH") { hidePanels(); applyDetail(await call("GET", "shipments/" + st.shipment)); }
+    band(e.code === "VERSION_MISMATCH" ? "warning" : "error", e.code === "VERSION_MISMATCH" ? "Liste değişti" : "Onaylanamadı", e.message); beep("warning");
+  }
+}
+function askCancel() {
+  if (st.queue.length) return;
+  hidePanels(); st.cancelId = id32(); $("cancelErr").textContent = "";
+  const sel = $("cancelReason"); sel.innerHTML = '<option value="">Sebep seçin…</option>';
+  for (const r of REASONS) { const o = document.createElement("option"); o.textContent = r; o.value = r; sel.appendChild(o); }
+  $("cancelPanel").classList.remove("hidden");
+}
+async function doCancel() {
+  const reason = $("cancelReason").value;
+  if (!reason) { $("cancelErr").textContent = "Önce sebep seçin."; return; }
+  try { const d = await call("POST", "shipments/" + st.shipment + "/cancel", { reason, requestId: st.cancelId });
+    await toList(d.shipmentNo + " iptal edildi; toplar stoğa döndü."); } catch (e) { $("cancelErr").textContent = e.message; }
+}
+
+// Başka cihazdaki değişiklik (3 sn)
+let lastVersion = null;
+setInterval(async () => {
+  if (!st.token || st.queue.length) return;
+  try { const v = (await call("GET", "version")).dataVersion; if (v === lastVersion) return; lastVersion = v;
+    if (st.shipment != null && $("confirmPanel").classList.contains("hidden")) applyDetail(await call("GET", "shipments/" + st.shipment));
+    else if (st.shipment == null && !$("list").classList.contains("hidden")) await loadList();
+  } catch { }
+}, 3000);
+
+// ---------- Olaylar ----------
+$("loginBtn").onclick = login;
+$("badge").onkeydown = e => { if (e.key === "Enter") { e.preventDefault(); $("pin").focus(); } };
+$("pin").onkeydown = e => { if (e.key === "Enter") { e.preventDefault(); login(); } };
+$("logout").onclick = logout;
+$("startBtn").onclick = start;
+$("scanBox").onkeydown = e => { if (e.key === "Enter") { e.preventDefault(); submit($("scanBox").value); } };
+// Okuyucu (klavye gibi) her zaman okutma kutusuna yazsın
+$("scanBox").onblur = () => setTimeout(() => { if (!$("scan").classList.contains("hidden") && $("cancelPanel").classList.contains("hidden")) $("scanBox").focus(); }, 300);
+$("remBtn").onclick = toggleRemove;
+$("confirmBtn").onclick = askConfirm; $("confirmYes").onclick = doConfirm; $("confirmNo").onclick = () => { hidePanels(); $("scanBox").focus(); };
+$("cancelBtn").onclick = askCancel; $("cancelYes").onclick = doCancel; $("cancelNo").onclick = () => { hidePanels(); $("scanBox").focus(); };
+$("backBtn").onclick = () => toList();
+
+if (st.token) toList(); else show("login");
+</script>
+</body>
+</html>
