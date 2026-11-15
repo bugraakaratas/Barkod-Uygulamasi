@@ -2,7 +2,7 @@
 
 Sistem en sade hâliyle tasarlandı; doğru çalışması bu kurallara bağlı. Kurulumda fabrikaya verilir.
 Her geliştirme aşamasında güncellenir. **Yalnızca uygulamada gerçekten bulunan özelliklere dayanan kurallar yazılır.**
-Son güncelleme: 2026-11-15 (Faz 4).
+Son güncelleme: 2026-11-15 (Faz 5).
 
 ## A. Altyapı (kurulumdan önce)
 
@@ -69,11 +69,21 @@ Son güncelleme: 2026-11-15 (Faz 4).
 10. El terminali kullanılacaksa: Wi-Fi'a bağlanır, tarayıcıda `http://depo-sunucu:5080` açılır (sevkiyat sayfası), okuyucusu
     "klavye gibi + Enter" ayarında olmalı. Kurallar ve kayıtlar rıhtım bilgisayarıyla aynıdır.
 
-## E. Yedek ve kontrol (yetkili)
+## E. Yetkili işleri (yönetim bilgisayarı)
+
+1. **İstisnalar ekranı her gün açılır** (üstte "Bekleyen: …" özeti). "Bekleyen istisna yok" görülmeli.
+2. **Karantina (aynı barkod iki topta):** iki top bulunur; SONRADAN kaydedilen top kalite kontrolde iptal edilip yeni etiketle
+   kaydedilir ve eski etiketi sökülür. Sonra İstisnalar'da ne yapıldığı yazılarak "Çözüldü" işaretlenir; ilk top sevk edilebilir olur.
+3. **Sevk edildikten sonra QC'de iptal edilen top:** tır gitmiş, kayıt sonradan iptal edilmiş. Müşteriyle/rıhtımla kontrol edilir.
+4. **Onayı geri alma** yalnızca yanlışlıkla onaylanan (tıra gitmemiş) sevkiyat içindir; sebep yazılır. Toplar stoğa döner,
+   onay ve geri alma kayıtta kalır. Tıra gitmiş topun iadesi bu yolla yapılmaz (iade modülü henüz yok).
+5. **Raporlar** (güncel stok, günlük sevkiyat, sevk edilen toplar, sevkiyat geçmişi) Excel için CSV olarak kaydedilir.
+
+## F. Yedek ve kontrol (yetkili)
 
 1. Haftada bir sunucudaki ikinci yedek klasöründe (USB) son tarihli yedeklerin olduğu kontrol edilir.
 2. Ayda bir sunucuda `KumasBarkodSunucu.exe --kontrol` çalıştırılır ("Veri bütünlüğü: sorun yok" görülmeli).
 
-## F. Sonraki aşamalarda eklenecek (henüz uygulamada YOK)
+## G. Sonraki aşamalarda eklenecek (henüz uygulamada YOK)
 
-Onaylanmış sevkiyatı geri alma (yetkili), karantina/istisna ekranı, raporlar (Faz 5); Google Sheets'e stok ve sevkiyat kopyası (Faz 6).
+Google Sheets'e stok ve sevkiyat kopyası (Faz 6); tek top iadesi, depo sayımı, raf yeri (isteğe bağlı).
