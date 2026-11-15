@@ -39,6 +39,12 @@ public sealed class ServerSyncService(
         if (baseUri is null) return new SyncRunResult(false, 0, null);
         var station = settings.GetStationCode();
 
+        // Kesim yapmayan bilgisayar (sevkiyat/yönetim) sunucuya kendini İSTASYON olarak kaydetmesin: yoksa
+        // varsayılan K1 kodunu gerçek QC bilgisayarından önce kapabilir. Bekleyen kesimi varsa (görevi sonradan
+        // değişmiş QC bilgisayarı) gönderir.
+        if (settings.GetStationRole() != StationRoles.Qc && outbox.CountPendingCuts() == 0)
+            return new SyncRunResult(true, 0, null);
+
         // Oturumdaki ilk gidiş (ya da adres/istasyon kodu değişti): önce BOŞ paket. Sunucu istasyon kodunu
         // bu bilgisayara kaydeder (başka bilgisayara kayıtlıysa reddeder, hiçbir satır yazılmaz) ve
         // sayaçları döndürür: yeni kurulum sunucunun bildiği bir ID'yi tekrar üretmez.

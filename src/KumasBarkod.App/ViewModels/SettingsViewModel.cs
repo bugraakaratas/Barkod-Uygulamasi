@@ -62,6 +62,37 @@ public partial class SettingsViewModel : ObservableObject
     public string BackupDirectory => AppPaths.BackupDirectory;
     public string LogDirectory => AppPaths.LogDirectory;
 
+    // ---------- Bilgisayarın görevi ----------
+
+    [ObservableProperty] public partial bool IsRoleQc { get; set; } = true;
+    [ObservableProperty] public partial bool IsRoleDock { get; set; }
+    [ObservableProperty] public partial bool IsRoleOffice { get; set; }
+
+    private string SelectedRole => IsRoleDock ? StationRoles.Dock : IsRoleOffice ? StationRoles.Office : StationRoles.Qc;
+
+    private void LoadRole()
+    {
+        var role = _settings.GetStationRole();
+        IsRoleQc = role == StationRoles.Qc;
+        IsRoleDock = role == StationRoles.Dock;
+        IsRoleOffice = role == StationRoles.Office;
+    }
+
+    [RelayCommand]
+    private void SaveRole()
+    {
+        var role = SelectedRole;
+        _settings.SetStationRole(role);
+        _log.Info($"Bilgisayarın görevi: {role}");
+        WeakReferenceMessenger.Default.Send(new SettingsChangedMessage());
+        Show(InfoBarSeverity.Success, "Görev kaydedildi", role switch
+        {
+            StationRoles.Dock => "Sevkiyat (rıhtım): sol menüde Depo Stoğu görünür.",
+            StationRoles.Office => "Yönetim: sol menüde Depo Stoğu ve Lotlar görünür.",
+            _ => "Kalite kontrol: Kesim Girişi, Okutma, Geçmiş.",
+        });
+    }
+
     // ---------- Depo sunucusu ----------
 
     [ObservableProperty] public partial string ServerUrl { get; set; } = "";
@@ -217,6 +248,7 @@ public partial class SettingsViewModel : ObservableObject
         var target = _settings.GetSyncTarget();
         SheetsUrl = target?.Url ?? "";
         ServerUrl = _settings.GetServerBaseUri()?.ToString() ?? "";
+        LoadRole();
         ServerPendingCount = _server.Outbox.CountPendingCuts();
         SheetsKey = target?.Key ?? "";
         MaxLengthText = Length.FormatCm(_settings.GetMaxLengthCm());

@@ -86,7 +86,18 @@ public sealed class HttpServerTransport(HttpClient http) : IServerTransport
                 $"Depo sunucusu eski sürüm (API v{serverApiVersion}). Sunucuyu güncelleyin; kayıtlar bekliyor.");
     }
 
-    private async Task<T> SendAsync<T>(Func<HttpRequestMessage> create, CancellationToken cancellationToken) where T : class
+    private Task<T> SendAsync<T>(Func<HttpRequestMessage> create, CancellationToken cancellationToken) where T : class =>
+        ServerHttp.SendAsync<T>(http, create, cancellationToken);
+}
+
+/// <summary>
+/// Sunucuya HTTP isteği + merkezi hata çevirisi (kesim göndericisi ve depo ekranları ortak kullanır):
+/// ulaşılamayan sunucu, zaman aşımı, 5xx → <see cref="SyncFailureKind.Offline"/>; 4xx → <see cref="SyncFailureKind.Rejected"/>
+/// ve sunucunun Türkçe mesajı.
+/// </summary>
+public static class ServerHttp
+{
+    public static async Task<T> SendAsync<T>(HttpClient http, Func<HttpRequestMessage> create, CancellationToken cancellationToken) where T : class
     {
         HttpResponseMessage response;
         try
@@ -124,7 +135,7 @@ public sealed class HttpServerTransport(HttpClient http) : IServerTransport
         }
     }
 
-    private static T? TryRead<T>(string text) where T : class
+    public static T? TryRead<T>(string text) where T : class
     {
         try { return JsonSerializer.Deserialize<T>(text, ServerApiContract.Json); }
         catch (JsonException) { return null; }

@@ -13,6 +13,7 @@
 
     <local:ZeroToVisibleConverter x:Key="ZeroToVisibleConverter" />
     <local:BoolToVisibilityConverter x:Key="BoolToVisibility" />
+    <local:InvertBoolConverter x:Key="InvertBool" />
 
     <Style x:Key="DetailLabelStyle" TargetType="TextBlock">
         <Setter Property="FontSize" Value="14" />

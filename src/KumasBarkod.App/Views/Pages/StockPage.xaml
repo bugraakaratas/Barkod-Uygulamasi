@@ -1,0 +1,264 @@
+<Page x:Class="KumasBarkod.App.Views.Pages.StockPage"
+      xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+      xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+      xmlns:ui="http://schemas.lepo.co/wpfui/2022/xaml"
+      Title="Depo Stoğu"
+      ScrollViewer.CanContentScroll="False">
+    <Grid Margin="{StaticResource PageMargin}">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+            <RowDefinition Height="Auto" />
+        </Grid.RowDefinitions>
+
+        <!-- ========== Başlık + bağlantı ========== -->
+        <DockPanel Margin="0,0,0,10">
+            <TextBlock DockPanel.Dock="Right" VerticalAlignment="Bottom" Margin="0,0,0,6" FontSize="14"
+                       Text="{Binding ConnectionText}">
+                <TextBlock.Style>
+                    <Style TargetType="TextBlock">
+                        <Setter Property="Foreground" Value="{DynamicResource TextFillColorSecondaryBrush}" />
+                        <Style.Triggers>
+                            <DataTrigger Binding="{Binding ConnectionProblem}" Value="True">
+                                <Setter Property="Foreground" Value="{DynamicResource SystemFillColorCautionBrush}" />
+                                <Setter Property="FontWeight" Value="SemiBold" />
+                            </DataTrigger>
+                        </Style.Triggers>
+                    </Style>
+                </TextBlock.Style>
+            </TextBlock>
+            <TextBlock Style="{StaticResource PageTitleStyle}" Margin="0" Text="Depo Stoğu" />
+        </DockPanel>
+
+        <!-- ========== Özet ========== -->
+        <UniformGrid Grid.Row="1" Rows="1" Margin="0,0,0,10">
+            <ui:Card Margin="0,0,8,0" Padding="16,8">
+                <StackPanel>
+                    <TextBlock Style="{StaticResource DetailLabelStyle}" Text="Depoda (stokta)" />
+                    <TextBlock FontSize="22" FontWeight="SemiBold">
+                        <Run Text="{Binding InStockText, Mode=OneWay}" />
+                        <Run Text="·" Foreground="{DynamicResource TextFillColorTertiaryBrush}" />
+                        <Run Text="{Binding InStockMetersText, Mode=OneWay}" />
+                    </TextBlock>
+                </StackPanel>
+            </ui:Card>
+            <ui:Card Margin="4,0,4,0" Padding="16,8">
+                <StackPanel>
+                    <TextBlock Style="{StaticResource DetailLabelStyle}" Text="Bu filtre" />
+                    <TextBlock FontSize="22" FontWeight="SemiBold">
+                        <Run Text="{Binding FilteredText, Mode=OneWay}" />
+                        <Run Text="·" Foreground="{DynamicResource TextFillColorTertiaryBrush}" />
+                        <Run Text="{Binding FilteredMetersText, Mode=OneWay}" />
+                    </TextBlock>
+                </StackPanel>
+            </ui:Card>
+            <ui:Card Margin="8,0,0,0" Padding="16,8">
+                <StackPanel>
+                    <TextBlock Style="{StaticResource DetailLabelStyle}" Text="Dikkat" />
+                    <TextBlock FontSize="16" FontWeight="SemiBold" TextWrapping="Wrap" Text="{Binding WarningsText}">
+                        <TextBlock.Style>
+                            <Style TargetType="TextBlock">
+                                <Setter Property="Foreground" Value="{DynamicResource SystemFillColorSuccessBrush}" />
+                                <Style.Triggers>
+                                    <DataTrigger Binding="{Binding HasWarnings}" Value="True">
+                                        <Setter Property="Foreground" Value="{DynamicResource SystemFillColorCautionBrush}" />
+                                    </DataTrigger>
+                                </Style.Triggers>
+                            </Style>
+                        </TextBlock.Style>
+                    </TextBlock>
+                </StackPanel>
+            </ui:Card>
+        </UniformGrid>
+
+        <!-- ========== Filtreler ========== -->
+        <WrapPanel Grid.Row="2">
+            <ui:TextBox x:Name="SearchBox" Width="300" Margin="0,0,10,8" FontSize="15"
+                        Text="{Binding SearchText, UpdateSourceTrigger=PropertyChanged}"
+                        PlaceholderText="Barkod okutun ya da lot ara  (Ctrl+F)"
+                        Icon="{ui:SymbolIcon Search24}" ClearButtonEnabled="True"
+                        AutomationProperties.Name="Stok arama" />
+            <ComboBox Width="230" Margin="0,0,0,8" FontSize="15"
+                      ItemsSource="{Binding StateTitles}" SelectedIndex="{Binding StateIndex}"
+                      AutomationProperties.Name="Durum filtresi" />
+        </WrapPanel>
+
+        <StackPanel Grid.Row="3">
+            <ui:InfoBar Margin="0,0,0,8" Title="Depo sunucusu ayarlanmadı" Severity="Warning" IsClosable="False"
+                        Message="Ayarlar → Depo sunucusu bölümüne sunucu adresini yazıp kaydedin."
+                        IsOpen="{Binding NotConfigured, Mode=OneWay}" />
+            <ui:InfoBar Margin="0,0,0,8"
+                        IsOpen="{Binding MessageIsOpen, Mode=TwoWay}" Severity="{Binding MessageSeverity}"
+                        Title="{Binding MessageTitle}" Message="{Binding MessageText}" IsClosable="True" />
+        </StackPanel>
+
+        <!-- ========== Lotlar | Toplar | Geçmiş ========== -->
+        <Grid Grid.Row="4">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="200" />
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="Auto" />
+            </Grid.ColumnDefinitions>
+
+            <ListBox Margin="0,0,10,0" ItemsSource="{Binding LotFilters}" SelectedItem="{Binding SelectedLotFilter}"
+                     AutomationProperties.Name="Lot listesi" ScrollViewer.HorizontalScrollBarVisibility="Disabled">
+                <ListBox.ItemTemplate>
+                    <DataTemplate>
+                        <StackPanel Margin="2,3">
+                            <TextBlock FontSize="15" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" Text="{Binding Title}">
+                                <TextBlock.Style>
+                                    <Style TargetType="TextBlock">
+                                        <Style.Triggers>
+                                            <DataTrigger Binding="{Binding IsWarning}" Value="True">
+                                                <Setter Property="Foreground" Value="{DynamicResource SystemFillColorCautionBrush}" />
+                                            </DataTrigger>
+                                        </Style.Triggers>
+                                    </Style>
+                                </TextBlock.Style>
+                            </TextBlock>
+                            <TextBlock FontSize="12" Foreground="{DynamicResource TextFillColorSecondaryBrush}" Text="{Binding Detail}" />
+                        </StackPanel>
+                    </DataTemplate>
+                </ListBox.ItemTemplate>
+            </ListBox>
+
+            <DataGrid x:Name="Grid" Grid.Column="1"
+                      ItemsSource="{Binding Rows}" SelectedItem="{Binding SelectedRow}"
+                      AutoGenerateColumns="False" IsReadOnly="True" SelectionMode="Single" SelectionUnit="FullRow"
+                      HeadersVisibility="Column" GridLinesVisibility="Horizontal"
+                      CanUserReorderColumns="False" CanUserResizeRows="False" CanUserSortColumns="False"
+                      EnableRowVirtualization="True" VirtualizingPanel.VirtualizationMode="Recycling"
+                      FontSize="15" RowHeight="34" AutomationProperties.Name="Toplar">
+                <DataGrid.RowStyle>
+                    <Style TargetType="DataGridRow" BasedOn="{StaticResource {x:Type DataGridRow}}">
+                        <Setter Property="ToolTip" Value="{Binding Tooltip}" />
+                        <Setter Property="BorderThickness" Value="3,0,0,0" />
+                        <Setter Property="BorderBrush" Value="Transparent" />
+                        <Style.Triggers>
+                            <Trigger Property="IsSelected" Value="True">
+                                <Setter Property="Background" Value="{StaticResource SelectedRowBrush}" />
+                                <Setter Property="BorderBrush" Value="{StaticResource SelectedRowBorderBrush}" />
+                            </Trigger>
+                        </Style.Triggers>
+                    </Style>
+                </DataGrid.RowStyle>
+                <DataGrid.Columns>
+                    <DataGridTemplateColumn Header="Barkod" Width="118">
+                        <DataGridTemplateColumn.CellTemplate>
+                            <DataTemplate>
+                                <TextBlock VerticalAlignment="Center" FontFamily="Consolas" FontWeight="SemiBold" Text="{Binding CutId}" />
+                            </DataTemplate>
+                        </DataGridTemplateColumn.CellTemplate>
+                    </DataGridTemplateColumn>
+                    <DataGridTemplateColumn Header="Lot" Width="*" MinWidth="120">
+                        <DataGridTemplateColumn.CellTemplate>
+                            <DataTemplate>
+                                <TextBlock VerticalAlignment="Center" TextTrimming="CharacterEllipsis" Text="{Binding Lot}">
+                                    <TextBlock.Style>
+                                        <Style TargetType="TextBlock">
+                                            <Style.Triggers>
+                                                <DataTrigger Binding="{Binding LotUnmatched}" Value="True">
+                                                    <Setter Property="Foreground" Value="{DynamicResource SystemFillColorCautionBrush}" />
+                                                    <Setter Property="FontStyle" Value="Italic" />
+                                                </DataTrigger>
+                                            </Style.Triggers>
+                                        </Style>
+                                    </TextBlock.Style>
+                                </TextBlock>
+                            </DataTemplate>
+                        </DataGridTemplateColumn.CellTemplate>
+                    </DataGridTemplateColumn>
+                    <DataGridTextColumn Header="Metre" Width="90" Binding="{Binding Meters}">
+                        <DataGridTextColumn.ElementStyle>
+                            <Style TargetType="TextBlock">
+                                <Setter Property="HorizontalAlignment" Value="Right" />
+                                <Setter Property="VerticalAlignment" Value="Center" />
+                            </Style>
+                        </DataGridTextColumn.ElementStyle>
+                    </DataGridTextColumn>
+                    <DataGridTextColumn Header="Kalite kontrol" Width="138" Binding="{Binding QcAt}" />
+                    <DataGridTemplateColumn Header="Durum" Width="96">
+                        <DataGridTemplateColumn.CellTemplate>
+                            <DataTemplate>
+                                <TextBlock VerticalAlignment="Center" TextTrimming="CharacterEllipsis" Text="{Binding StateText}">
+                                    <TextBlock.Style>
+                                        <Style TargetType="TextBlock">
+                                            <Setter Property="Foreground" Value="{DynamicResource TextFillColorSecondaryBrush}" />
+                                            <Style.Triggers>
+                                                <DataTrigger Binding="{Binding State}" Value="in_stock">
+                                                    <Setter Property="Foreground" Value="{DynamicResource SystemFillColorSuccessBrush}" />
+                                                </DataTrigger>
+                                                <DataTrigger Binding="{Binding State}" Value="reserved">
+                                                    <Setter Property="Foreground" Value="{DynamicResource SystemFillColorCautionBrush}" />
+                                                </DataTrigger>
+                                                <DataTrigger Binding="{Binding State}" Value="quarantined">
+                                                    <Setter Property="Foreground" Value="{DynamicResource SystemFillColorCriticalBrush}" />
+                                                    <Setter Property="FontWeight" Value="SemiBold" />
+                                                </DataTrigger>
+                                                <DataTrigger Binding="{Binding State}" Value="voided">
+                                                    <Setter Property="Foreground" Value="{DynamicResource SystemFillColorCriticalBrush}" />
+                                                </DataTrigger>
+                                            </Style.Triggers>
+                                        </Style>
+                                    </TextBlock.Style>
+                                </TextBlock>
+                            </DataTemplate>
+                        </DataGridTemplateColumn.CellTemplate>
+                    </DataGridTemplateColumn>
+                </DataGrid.Columns>
+            </DataGrid>
+
+            <TextBlock Grid.Column="1" Margin="0,60,0,0" HorizontalAlignment="Center" VerticalAlignment="Top"
+                       Style="{StaticResource PageSubtitleStyle}" IsHitTestVisible="False"
+                       Visibility="{Binding IsEmpty, Converter={StaticResource BoolToVisibility}}"
+                       Text="Bu filtreye uyan top yok." />
+
+            <!-- Topun geçmişi -->
+            <ui:Card Grid.Column="2" Width="300" Margin="10,0,0,0" Padding="14" VerticalAlignment="Stretch"
+                     VerticalContentAlignment="Stretch"
+                     Visibility="{Binding IsDetailOpen, Converter={StaticResource BoolToVisibility}}">
+                <DockPanel>
+                    <DockPanel DockPanel.Dock="Top">
+                        <ui:Button DockPanel.Dock="Right" Appearance="Transparent" Icon="{ui:SymbolIcon Dismiss24}"
+                                   Command="{Binding CloseDetailCommand}" ToolTip="Kapat (Esc)" Focusable="False" />
+                        <TextBlock FontFamily="Consolas" FontSize="20" FontWeight="SemiBold" VerticalAlignment="Center"
+                                   Text="{Binding DetailTitle}" />
+                    </DockPanel>
+                    <TextBlock DockPanel.Dock="Top" Margin="0,4,0,10" FontSize="13" TextWrapping="Wrap"
+                               Foreground="{DynamicResource TextFillColorSecondaryBrush}" Text="{Binding DetailSubtitle}" />
+                    <TextBlock DockPanel.Dock="Top" Style="{StaticResource DetailLabelStyle}" Margin="0,0,0,6"
+                               Text="Hareketler (en yeni üstte)" />
+                    <ScrollViewer VerticalScrollBarVisibility="Auto">
+                        <ItemsControl ItemsSource="{Binding Movements}">
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate>
+                                    <Border Margin="0,0,0,8" Padding="10,6,6,6" BorderThickness="3,0,0,0"
+                                            BorderBrush="{DynamicResource AccentFillColorDefaultBrush}">
+                                        <StackPanel>
+                                            <TextBlock FontSize="12" Foreground="{DynamicResource TextFillColorTertiaryBrush}" Text="{Binding Time}" />
+                                            <TextBlock FontSize="14" FontWeight="SemiBold" TextWrapping="Wrap" Text="{Binding Title}" />
+                                            <TextBlock FontSize="13" TextWrapping="Wrap" Foreground="{DynamicResource TextFillColorSecondaryBrush}"
+                                                       Text="{Binding Detail}" />
+                                        </StackPanel>
+                                    </Border>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                    </ScrollViewer>
+                </DockPanel>
+            </ui:Card>
+        </Grid>
+
+        <!-- ========== Sayfa ========== -->
+        <DockPanel Grid.Row="5" Margin="0,8,0,0" LastChildFill="False">
+            <ui:Button DockPanel.Dock="Left" Margin="200,0,6,0" Focusable="False"
+                       Icon="{ui:SymbolIcon ChevronLeft24}" Command="{Binding PreviousPageCommand}" ToolTip="Önceki sayfa" />
+            <ui:Button DockPanel.Dock="Left" Margin="0,0,12,0" Focusable="False"
+                       Icon="{ui:SymbolIcon ChevronRight24}" Command="{Binding NextPageCommand}" ToolTip="Sonraki sayfa" />
+            <TextBlock DockPanel.Dock="Left" VerticalAlignment="Center" FontSize="14" Text="{Binding PageText}" />
+        </DockPanel>
+    </Grid>
+</Page>

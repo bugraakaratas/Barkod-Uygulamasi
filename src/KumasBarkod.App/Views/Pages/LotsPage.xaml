@@ -1,0 +1,148 @@
+<Page x:Class="KumasBarkod.App.Views.Pages.LotsPage"
+      xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+      xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+      xmlns:ui="http://schemas.lepo.co/wpfui/2022/xaml"
+      Title="Lotlar"
+      ScrollViewer.CanContentScroll="False">
+    <Grid Margin="{StaticResource PageMargin}">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+        </Grid.RowDefinitions>
+
+        <DockPanel Margin="0,0,0,4">
+            <TextBlock DockPanel.Dock="Right" VerticalAlignment="Bottom" Margin="0,0,0,6" FontSize="14" FontWeight="SemiBold"
+                       Foreground="{DynamicResource SystemFillColorCautionBrush}" Text="{Binding ConnectionText}" />
+            <TextBlock Style="{StaticResource PageTitleStyle}" Margin="0" Text="Lotlar (firmalar)" />
+        </DockPanel>
+        <TextBlock Grid.Row="1" Style="{StaticResource PageSubtitleStyle}" Margin="0,0,0,10" TextWrapping="Wrap"
+                   Text="Lot adı firmayı gösterir. Kalite kontrolde farklı yazılmış lot adları (ör. &quot;lot 3&quot;, &quot;LOT-03&quot;) burada doğru lota bağlanır; toplar ve etiketler değişmez, bağlama topun geçmişine yazılır ve düzeltilebilir." />
+
+        <StackPanel Grid.Row="2">
+            <ui:InfoBar Margin="0,0,0,8" Title="Depo sunucusu ayarlanmadı" Severity="Warning" IsClosable="False"
+                        Message="Ayarlar → Depo sunucusu bölümüne sunucu adresini yazıp kaydedin."
+                        IsOpen="{Binding IsConfigured, Converter={StaticResource InvertBool}, Mode=OneWay}" />
+            <ui:InfoBar Margin="0,0,0,8"
+                        IsOpen="{Binding MessageIsOpen, Mode=TwoWay}" Severity="{Binding MessageSeverity}"
+                        Title="{Binding MessageTitle}" Message="{Binding MessageText}" IsClosable="True" />
+        </StackPanel>
+
+        <Grid Grid.Row="3">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="16" />
+                <ColumnDefinition Width="*" />
+            </Grid.ColumnDefinitions>
+
+            <!-- ========== Lotlar ========== -->
+            <DockPanel>
+                <DockPanel DockPanel.Dock="Top" Margin="0,0,0,8">
+                    <ui:Button DockPanel.Dock="Right" Margin="8,0,0,0" MinHeight="36" Appearance="Primary"
+                               Icon="{ui:SymbolIcon Add24}" Content="Lot ekle" Command="{Binding CreateCommand}"
+                               AutomationProperties.Name="Lot ekle" />
+                    <ui:TextBox x:Name="NewLotBox" FontSize="15" PlaceholderText="Yeni lot adı (ör. LOT-3 ya da firma adı)"
+                                Text="{Binding NewLotName, UpdateSourceTrigger=PropertyChanged}"
+                                AutomationProperties.Name="Yeni lot adı" KeyDown="NewLotBox_KeyDown" />
+                </DockPanel>
+
+                <!-- Seçili lot -->
+                <Border DockPanel.Dock="Bottom" Margin="0,8,0,0" Padding="12" CornerRadius="6"
+                        Background="{DynamicResource ControlFillColorSecondaryBrush}">
+                    <DockPanel>
+                        <ui:Button DockPanel.Dock="Right" Margin="8,0,0,0" MinHeight="36" Appearance="Secondary"
+                                   Content="{Binding ToggleText}" Command="{Binding ToggleActiveCommand}" />
+                        <ui:Button DockPanel.Dock="Right" Margin="8,0,0,0" MinHeight="36" Appearance="Secondary"
+                                   Icon="{ui:SymbolIcon Save24}" Content="Adı kaydet" Command="{Binding RenameCommand}" />
+                        <ui:TextBox FontSize="15" PlaceholderText="Seçili lotun adı" Text="{Binding EditName, UpdateSourceTrigger=PropertyChanged}"
+                                    AutomationProperties.Name="Seçili lotun adı" />
+                    </DockPanel>
+                </Border>
+
+                <DataGrid ItemsSource="{Binding Lots}" SelectedItem="{Binding SelectedLot}"
+                          AutoGenerateColumns="False" IsReadOnly="True" SelectionMode="Single" SelectionUnit="FullRow"
+                          HeadersVisibility="Column" GridLinesVisibility="Horizontal" CanUserReorderColumns="False"
+                          CanUserResizeRows="False" CanUserSortColumns="False" FontSize="15" RowHeight="34"
+                          AutomationProperties.Name="Lot listesi">
+                    <DataGrid.RowStyle>
+                        <Style TargetType="DataGridRow" BasedOn="{StaticResource {x:Type DataGridRow}}">
+                            <Setter Property="BorderThickness" Value="3,0,0,0" />
+                            <Setter Property="BorderBrush" Value="Transparent" />
+                            <Style.Triggers>
+                                <DataTrigger Binding="{Binding Active}" Value="False">
+                                    <Setter Property="Foreground" Value="{DynamicResource TextFillColorTertiaryBrush}" />
+                                </DataTrigger>
+                                <Trigger Property="IsSelected" Value="True">
+                                    <Setter Property="Background" Value="{StaticResource SelectedRowBrush}" />
+                                    <Setter Property="BorderBrush" Value="{StaticResource SelectedRowBorderBrush}" />
+                                </Trigger>
+                            </Style.Triggers>
+                        </Style>
+                    </DataGrid.RowStyle>
+                    <DataGrid.Columns>
+                        <DataGridTextColumn Header="Lot" Width="*" Binding="{Binding Name}" />
+                        <DataGridTextColumn Header="Durum" Width="70" Binding="{Binding StatusText}" />
+                        <DataGridTextColumn Header="Stokta" Width="70" Binding="{Binding InStock}" />
+                        <DataGridTextColumn Header="Metre" Width="105" Binding="{Binding InStockMeters}" />
+                    </DataGrid.Columns>
+                </DataGrid>
+            </DockPanel>
+
+            <!-- ========== Eşleşmemiş yazımlar ========== -->
+            <DockPanel Grid.Column="2">
+                <TextBlock DockPanel.Dock="Top" Margin="0,4,0,8" FontSize="17" FontWeight="SemiBold" Text="{Binding UnmatchedTitle}">
+                    <TextBlock.Style>
+                        <Style TargetType="TextBlock">
+                            <Setter Property="Foreground" Value="{DynamicResource SystemFillColorSuccessBrush}" />
+                            <Style.Triggers>
+                                <DataTrigger Binding="{Binding HasUnmatched}" Value="True">
+                                    <Setter Property="Foreground" Value="{DynamicResource SystemFillColorCautionBrush}" />
+                                </DataTrigger>
+                            </Style.Triggers>
+                        </Style>
+                    </TextBlock.Style>
+                </TextBlock>
+
+                <WrapPanel DockPanel.Dock="Bottom" Margin="0,8,0,0">
+                    <ui:Button Margin="0,0,8,0" MinHeight="36" Appearance="Primary" Icon="{ui:SymbolIcon Link24}"
+                               Content="Soldaki seçili lota bağla" Command="{Binding MapToSelectedLotCommand}" />
+                    <ui:Button MinHeight="36" Appearance="Secondary" Icon="{ui:SymbolIcon Add24}"
+                               Content="Bu yazımla yeni lot" Command="{Binding CreateFromUnmatchedCommand}" />
+                </WrapPanel>
+
+                <ListBox ItemsSource="{Binding Unmatched}" SelectedItem="{Binding SelectedUnmatched}"
+                         ScrollViewer.HorizontalScrollBarVisibility="Disabled" AutomationProperties.Name="Eşleşmemiş yazımlar">
+                    <ListBox.ItemTemplate>
+                        <DataTemplate>
+                            <StackPanel Margin="2,4">
+                                <TextBlock FontSize="16" FontWeight="SemiBold" TextWrapping="Wrap">
+                                    <Run Text="&quot;" /><Run Text="{Binding RawText, Mode=OneWay}" /><Run Text="&quot;" />
+                                </TextBlock>
+                                <TextBlock FontSize="13" Foreground="{DynamicResource TextFillColorSecondaryBrush}" Text="{Binding Counts}" />
+                                <TextBlock FontSize="12" Foreground="{DynamicResource TextFillColorTertiaryBrush}" Text="{Binding Dates}" />
+                                <ItemsControl Margin="0,4,0,0" ItemsSource="{Binding Suggestions}"
+                                              Visibility="{Binding HasSuggestions, Converter={StaticResource BoolToVisibility}}">
+                                    <ItemsControl.ItemsPanel>
+                                        <ItemsPanelTemplate>
+                                            <WrapPanel />
+                                        </ItemsPanelTemplate>
+                                    </ItemsControl.ItemsPanel>
+                                    <ItemsControl.ItemTemplate>
+                                        <DataTemplate>
+                                            <ui:Button Margin="0,0,6,4" Padding="10,4" Appearance="Secondary" Focusable="False"
+                                                       Icon="{ui:SymbolIcon ArrowRight24}"
+                                                       Content="{Binding Name}" ToolTip="Bu lota bağla"
+                                                       Command="{Binding DataContext.MapToSuggestionCommand, RelativeSource={RelativeSource AncestorType=Page}}"
+                                                       CommandParameter="{Binding}" />
+                                        </DataTemplate>
+                                    </ItemsControl.ItemTemplate>
+                                </ItemsControl>
+                            </StackPanel>
+                        </DataTemplate>
+                    </ListBox.ItemTemplate>
+                </ListBox>
+            </DockPanel>
+        </Grid>
+    </Grid>
+</Page>

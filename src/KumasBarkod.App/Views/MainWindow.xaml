@@ -28,19 +28,29 @@
                            IsPaneToggleVisible="False"
                            OpenPaneLength="230">
             <ui:NavigationView.MenuItems>
-                <ui:NavigationViewItem Content="Kesim Girişi" TargetPageType="{x:Type pages:CutEntryPage}" ToolTip="Ctrl+1">
+                <ui:NavigationViewItem x:Name="NavCutEntry" Content="Kesim Girişi" TargetPageType="{x:Type pages:CutEntryPage}" ToolTip="Ctrl+1">
                     <ui:NavigationViewItem.Icon>
                         <ui:SymbolIcon Symbol="Cut24" />
                     </ui:NavigationViewItem.Icon>
                 </ui:NavigationViewItem>
-                <ui:NavigationViewItem Content="Okutma" TargetPageType="{x:Type pages:ScanPage}" ToolTip="Ctrl+2">
+                <ui:NavigationViewItem x:Name="NavScan" Content="Okutma" TargetPageType="{x:Type pages:ScanPage}" ToolTip="Ctrl+2">
                     <ui:NavigationViewItem.Icon>
                         <ui:SymbolIcon Symbol="BarcodeScanner24" />
                     </ui:NavigationViewItem.Icon>
                 </ui:NavigationViewItem>
-                <ui:NavigationViewItem Content="Geçmiş" TargetPageType="{x:Type pages:HistoryPage}" ToolTip="Ctrl+3">
+                <ui:NavigationViewItem x:Name="NavHistory" Content="Geçmiş" TargetPageType="{x:Type pages:HistoryPage}" ToolTip="Ctrl+3">
                     <ui:NavigationViewItem.Icon>
                         <ui:SymbolIcon Symbol="History24" />
+                    </ui:NavigationViewItem.Icon>
+                </ui:NavigationViewItem>
+                <ui:NavigationViewItem x:Name="NavStock" Content="Depo Stoğu" TargetPageType="{x:Type pages:StockPage}">
+                    <ui:NavigationViewItem.Icon>
+                        <ui:SymbolIcon Symbol="BuildingRetail24" />
+                    </ui:NavigationViewItem.Icon>
+                </ui:NavigationViewItem>
+                <ui:NavigationViewItem x:Name="NavLots" Content="Lotlar" TargetPageType="{x:Type pages:LotsPage}">
+                    <ui:NavigationViewItem.Icon>
+                        <ui:SymbolIcon Symbol="Tag24" />
                     </ui:NavigationViewItem.Icon>
                 </ui:NavigationViewItem>
             </ui:NavigationView.MenuItems>
@@ -60,18 +70,23 @@
                 BorderBrush="{DynamicResource CardStrokeColorDefaultBrush}"
                 BorderThickness="0,1,0,0">
             <StackPanel Orientation="Horizontal">
-                <ui:SymbolIcon Symbol="Desktop24" Margin="0,0,6,0" />
-                <TextBlock VerticalAlignment="Center">
+                <TextBlock VerticalAlignment="Center" Margin="0,0,20,0"
+                           Visibility="{Binding IsQcRole, Converter={StaticResource BoolToVisibility}, ConverterParameter=Invert}">
+                    <Run Text="Bu bilgisayar:" />
+                    <Run Text="{Binding RoleText, Mode=OneWay}" FontWeight="SemiBold" />
+                </TextBlock>
+                <ui:SymbolIcon Symbol="Desktop24" Margin="0,0,6,0" Visibility="{Binding IsQcRole, Converter={StaticResource BoolToVisibility}}" />
+                <TextBlock VerticalAlignment="Center" Visibility="{Binding IsQcRole, Converter={StaticResource BoolToVisibility}}">
                     <Run Text="İstasyon:" />
                     <Run Text="{Binding StationCode, Mode=OneWay}" FontWeight="SemiBold" />
                 </TextBlock>
-                <ui:SymbolIcon Symbol="CloudArrowUp24" Margin="20,0,6,0" />
-                <TextBlock VerticalAlignment="Center" ToolTip="Google Sheets'e henüz gönderilmemiş kayıt">
+                <ui:SymbolIcon Symbol="CloudArrowUp24" Margin="20,0,6,0" Visibility="{Binding IsQcRole, Converter={StaticResource BoolToVisibility}}" />
+                <TextBlock VerticalAlignment="Center" ToolTip="Google Sheets'e henüz gönderilmemiş kayıt" Visibility="{Binding IsQcRole, Converter={StaticResource BoolToVisibility}}">
                     <Run Text="Sheets bekleyen:" />
                     <Run Text="{Binding PendingSyncCount, Mode=OneWay}" FontWeight="SemiBold" />
                 </TextBlock>
                 <TextBlock Margin="10,0,0,0" VerticalAlignment="Center" MaxWidth="300"
-                           TextTrimming="CharacterEllipsis"
+                           TextTrimming="CharacterEllipsis" Visibility="{Binding IsQcRole, Converter={StaticResource BoolToVisibility}}"
                            Text="{Binding SyncStatusText}" ToolTip="{Binding SyncStatusText}">
                     <TextBlock.Style>
                         <Style TargetType="TextBlock">
@@ -85,13 +100,13 @@
                         </Style>
                     </TextBlock.Style>
                 </TextBlock>
-                <ui:SymbolIcon Symbol="BuildingRetail24" Margin="20,0,6,0" />
-                <TextBlock VerticalAlignment="Center" ToolTip="Depo sunucusuna henüz gönderilmemiş kayıt">
+                <ui:SymbolIcon Symbol="BuildingRetail24" Margin="20,0,6,0" Visibility="{Binding IsQcRole, Converter={StaticResource BoolToVisibility}}" />
+                <TextBlock VerticalAlignment="Center" ToolTip="Depo sunucusuna henüz gönderilmemiş kayıt" Visibility="{Binding IsQcRole, Converter={StaticResource BoolToVisibility}}">
                     <Run Text="Depo bekleyen:" />
                     <Run Text="{Binding PendingServerCount, Mode=OneWay}" FontWeight="SemiBold" />
                 </TextBlock>
                 <TextBlock Margin="10,0,0,0" VerticalAlignment="Center" MaxWidth="280"
-                           TextTrimming="CharacterEllipsis"
+                           TextTrimming="CharacterEllipsis" Visibility="{Binding IsQcRole, Converter={StaticResource BoolToVisibility}}"
                            Text="{Binding ServerStatusText}" ToolTip="{Binding ServerStatusText}">
                     <TextBlock.Style>
                         <Style TargetType="TextBlock">
@@ -105,8 +120,8 @@
                         </Style>
                     </TextBlock.Style>
                 </TextBlock>
-                <ui:SymbolIcon Symbol="Print24" Margin="20,0,6,0" />
-                <TextBlock VerticalAlignment="Center">
+                <ui:SymbolIcon Symbol="Print24" Margin="20,0,6,0" Visibility="{Binding IsQcRole, Converter={StaticResource BoolToVisibility}}" />
+                <TextBlock VerticalAlignment="Center" Visibility="{Binding IsQcRole, Converter={StaticResource BoolToVisibility}}">
                     <Run Text="Yazıcı:" />
                     <Run Text="{Binding PrinterName, Mode=OneWay}">
                         <Run.Style>

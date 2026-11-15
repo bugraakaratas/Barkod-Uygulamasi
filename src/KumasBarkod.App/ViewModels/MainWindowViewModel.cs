@@ -50,6 +50,13 @@ public partial class MainWindowViewModel : ObservableObject
     [ObservableProperty]
     public partial string StationCode { get; set; } = "";
 
+    /// <summary>Kalite kontrol bilgisayarı: istasyon ve Sheets bilgisi durum çubuğunda görünür.</summary>
+    [ObservableProperty]
+    public partial bool IsQcRole { get; set; } = true;
+
+    [ObservableProperty]
+    public partial string RoleText { get; set; } = "";
+
     /// <summary>Sheets'e henüz gönderilmemiş kayıt sayısı.</summary>
     [ObservableProperty]
     public partial long PendingSyncCount { get; set; }
@@ -81,6 +88,14 @@ public partial class MainWindowViewModel : ObservableObject
     public void Refresh()
     {
         StationCode = _settings.GetStationCode();
+        var role = _settings.GetStationRole();
+        IsQcRole = role == StationRoles.Qc;
+        RoleText = role switch
+        {
+            StationRoles.Dock => "Sevkiyat (rıhtım)",
+            StationRoles.Office => "Yönetim",
+            _ => "Kalite kontrol",
+        };
         PendingSyncCount = _cuts.CountPendingSync();
         PendingServerCount = _server.Outbox.CountPendingCuts();
     }

@@ -321,6 +321,42 @@ public class ServerOutboxTests : IDisposable
         Assert.Empty(hello.Rows);
     }
 
+    [Theory]
+    [InlineData(StationRoles.Dock)]
+    [InlineData(StationRoles.Office)]
+    public async Task Non_qc_computer_does_not_register_as_station(string role)
+    {
+        _settings.SetServerUrl("depo-sunucu");
+        _settings.SetStationRole(role);
+
+        var r = await _sync.RunOnceAsync();
+
+        Assert.True(r.Succeeded);
+        Assert.Empty(_server.Requests);   // varsayılan K1 kodunu gerçek QC bilgisayarından önce kapmasın
+    }
+
+    [Fact]
+    public async Task Computer_whose_role_changed_still_sends_its_pending_cuts()
+    {
+        _settings.SetServerUrl("depo-sunucu");
+        _cuts.CreateCut("LOT-A", 100);
+        _settings.SetStationRole(StationRoles.Office);
+
+        await _sync.RunOnceAsync();
+
+        Assert.Single(_server.Requests[1].Rows);
+        Assert.Equal(0, _serverOutbox.CountPendingCuts());
+    }
+
+    [Fact]
+    public void Station_role_defaults_to_qc_and_validates()
+    {
+        Assert.Equal(StationRoles.Qc, _settings.GetStationRole());
+        _settings.SetStationRole(StationRoles.Dock);
+        Assert.Equal(StationRoles.Dock, _settings.GetStationRole());
+        Assert.Throws<CutValidationException>(() => _settings.SetStationRole("patron"));
+    }
+
     [Fact]
     public async Task Large_queue_is_sent_in_batches_of_200()
     {

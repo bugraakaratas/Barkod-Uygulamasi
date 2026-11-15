@@ -15,6 +15,24 @@ public static class SettingKeys
     public const string Printer = "printer";
     /// <summary>Depo sunucusu adresi (normalleştirilmiş, ör. http://depo-sunucu:5080/).</summary>
     public const string ServerUrl = "server_url";
+    /// <summary>Bu bilgisayarın görevi (<see cref="StationRoles"/>): görünen ekranları belirler.</summary>
+    public const string StationRole = "station_role";
+}
+
+/// <summary>
+/// Bilgisayarın görevi. Yalnızca hangi ekranların görüneceğini belirler; yetki değildir (kullanıcı girişi Faz 4'te).
+/// Varsayılan kalite kontrol: mevcut kurulumlar aynen çalışır.
+/// </summary>
+public static class StationRoles
+{
+    /// <summary>Kalite kontrol: Kesim Girişi, Okutma, Geçmiş.</summary>
+    public const string Qc = "qc";
+    /// <summary>Sevkiyat / rıhtım: Depo Stoğu (Faz 4'te Sevkiyat).</summary>
+    public const string Dock = "dock";
+    /// <summary>Yönetim (patron / ofis): Depo Stoğu, Lotlar.</summary>
+    public const string Office = "office";
+
+    public static bool IsValid(string? role) => role is Qc or Dock or Office;
 }
 
 /// <summary><c>settings</c> tablosu: anahtar/değer. Kayıt yoksa varsayılan döner.</summary>
@@ -71,6 +89,14 @@ public sealed class SettingsRepository(SqliteConnectionFactory db)
         var url = Get(SettingKeys.SheetsUrl);
         var key = Get(SettingKeys.SheetsKey);
         return string.IsNullOrWhiteSpace(url) || string.IsNullOrWhiteSpace(key) ? null : new SyncTarget(url, key);
+    }
+
+    public string GetStationRole() => Get(SettingKeys.StationRole) is { } role && StationRoles.IsValid(role) ? role : StationRoles.Qc;
+
+    public void SetStationRole(string role)
+    {
+        if (!StationRoles.IsValid(role)) throw new CutValidationException($"Geçersiz görev: {role}");
+        Set(SettingKeys.StationRole, role);
     }
 
     /// <summary>Depo sunucusu adresi; girilmemişse null (sunucuya gönderim kapalı, kayıtlar kuyrukta bekler).</summary>
