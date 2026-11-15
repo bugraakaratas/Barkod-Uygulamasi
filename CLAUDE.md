@@ -303,7 +303,7 @@ Plan: `docs/DEPO-SEVKIYAT-PLANI.md`. Kullanıcı planı 2026-11-15'te onayladı.
 | 4 Sevkiyat | ✅ | `cbfdbdd` `40ee078` + el terminali + belge | Aşağıda. QC 1.4.0, sunucu 0.3.0 |
 | 5 Geri alma + istisnalar + raporlar | ✅ | `ffc82e5` + WPF + belge | Aşağıda. QC 1.5.0, sunucu 0.4.0 |
 | 6 Sheets sunucudan | ✅ | `0b49b0a` | Aşağıda. QC 1.6.0, sunucu 0.5.0, Apps Script v8 |
-| 7 | ⏳ | — | İsteğe bağlılar (sayım, iade, raf, PostgreSQL, HTTPS) |
+| 7 | ⏸ sonraya (kullanıcı kararı 2026-11-15: "şu an gerek yok") | — | İsteğe bağlılar (sayım, iade, raf, QC operatör adı, PostgreSQL, HTTPS) |
 
 ### Faz 6 notları (2026-11-15) — Google Sheets kopyası sunucudan (kullanıcı seçimi "a")
 - **Code.gs v8:** `action: "snapshot"` → yalnızca **Stok** ve **Sevkiyatlar** sayfaları (izin listesi; Kesimler ezilemez) baştan yazılır: `clearContents`, başlık + boş + "Son güncelleme: …" (kalın), satır sayısı yetmezse `insertRowsAfter`, en fazla 50.000 satır, başlık genişliği ≠ satır genişliği → ret, `= + - @ '` ile başlayan metin `'` önekiyle (formül çalışmaz). v7 davranışı aynen. Node testleri 29 (`Code.test.js`: sahte e-tablo artık çok sayfalı).
