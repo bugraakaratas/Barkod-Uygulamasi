@@ -5,15 +5,16 @@ using KumasBarkod.Server.Data;
 namespace KumasBarkod.Server;
 
 /// <summary>
-/// Arka plan bakımı: açılışta ve saatte bir günlük yedek kontrolü (gün içinde bir yedek,
-/// 30 gün saklanır) ve veri bütünlüğü kontrolü (sorun varsa günlüğe HATA yazılır).
+/// Arka plan bakımı: açılışta ve saatte bir yedek (<see cref="ServerBackupService"/>: saatlik + günlük +
+/// ikinci klasör) ve günde bir veri bütünlüğü kontrolü (sorun varsa günlüğe HATA yazılır).
 /// </summary>
 public sealed class MaintenanceWorker(
-    BackupService backup,
+    ServerBackupService backup,
     SqliteConnectionFactory db,
     ILogger<MaintenanceWorker> log) : BackgroundService
 {
-    public static readonly TimeSpan Interval = TimeSpan.FromHours(1);
+    /// <summary>Kontrol aralığı; yedek saat başına bir kez alınır (saat değişince ilk kontrolde).</summary>
+    public static readonly TimeSpan Interval = TimeSpan.FromMinutes(5);
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
@@ -29,15 +30,18 @@ public sealed class MaintenanceWorker(
     {
         try
         {
-            if (backup.EnsureDailyBackup() is { } path)
+            var result = backup.RunDue();
+            if (result.Hourly is not null) log.LogInformation("Saatlik yedek alındı: {Path}", result.Hourly);
+            if (result.MirrorError is not null) log.LogError("{Error}", result.MirrorError);
+            if (result.Daily is not null)
             {
-                log.LogInformation("Günlük yedek alındı: {Path}", path);
-                CheckIntegrity();   // günde bir, yedekle birlikte
+                log.LogInformation("Günlük yedek: {Path}", result.Daily);
+                CheckIntegrity();   // günde bir
             }
         }
         catch (Exception ex)
         {
-            log.LogError(ex, "Günlük yedek alınamadı");
+            log.LogError(ex, "Yedek alınamadı");
         }
     }
 

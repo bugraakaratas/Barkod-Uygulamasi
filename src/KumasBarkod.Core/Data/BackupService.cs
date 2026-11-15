@@ -36,6 +36,17 @@ public sealed class BackupService(SqliteConnectionFactory db, string backupDirec
     {
         Directory.CreateDirectory(BackupDirectory);
         var path = PathFor(Today());
+        WriteVerifiedCopy(db, path);
+        return path;
+    }
+
+    /// <summary>
+    /// Çalışan veritabanının tutarlı kopyasını <paramref name="path"/>'e yazar (Backup API; yazma sürerken de
+    /// güvenli). Önce <c>.tmp</c>'ye yazılır, tek dosya kipine alınır, <c>integrity_check</c> geçerse adlandırılır:
+    /// yarım kalan yedek asla "yedek" görünmez. Sunucu yedekleri de bunu kullanır.
+    /// </summary>
+    public static void WriteVerifiedCopy(SqliteConnectionFactory db, string path)
+    {
         var temp = path + ".tmp";
         if (File.Exists(temp)) File.Delete(temp);
 
@@ -60,7 +71,6 @@ public sealed class BackupService(SqliteConnectionFactory db, string backupDirec
         }
 
         File.Move(temp, path, overwrite: true);
-        return path;
     }
 
     /// <summary>30 günden eski yedekleri siler. Silinen sayısı.</summary>

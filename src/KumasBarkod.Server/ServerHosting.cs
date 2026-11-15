@@ -22,6 +22,10 @@ public sealed record ServerPaths(string DataDirectory)
 {
     public const string ConfigKey = "KumasBarkod:DataDirectory";
     public const string EnvironmentVariable = "KUMASBARKOD_SERVER_DATA_DIR";
+    /// <summary>İkinci yedek klasörü (USB disk / ağ diski). appsettings.json veya --KumasBarkod:BackupMirrorDirectory=…</summary>
+    public const string BackupMirrorConfigKey = "KumasBarkod:BackupMirrorDirectory";
+    /// <summary>Veri klasöründeki ayar dosyası (güncellemede korunur).</summary>
+    public const string SettingsFileName = "ayarlar.json";
 
     public string DatabasePath => Path.Combine(DataDirectory, "sunucu.db");
     public string BackupDirectory => Path.Combine(DataDirectory, "backups");

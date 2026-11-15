@@ -19,8 +19,14 @@ var builder = WebApplication.CreateBuilder(new WebApplicationOptions
 
 builder.Host.UseWindowsService(o => o.ServiceName = ServerInfo.ServiceName);
 
-if (builder.Configuration["Urls"] is null && Environment.GetEnvironmentVariable("ASPNETCORE_URLS") is null)
-    builder.WebHost.UseUrls($"http://0.0.0.0:{ServerApiContract.DefaultPort}");
+// Fabrikaya özel ayarlar (ör. ikinci yedek klasörü, kapı) veri klasöründeki ayarlar.json'da:
+// program klasörü güncellemede silinir, veri klasörü kalır.
+builder.Configuration.AddJsonFile(
+    Path.Combine(ServerPaths.From(builder.Configuration).DataDirectory, ServerPaths.SettingsFileName), optional: true, reloadOnChange: false);
+
+// Dinlenen adres: --urls, ASPNETCORE_URLS ya da ayarlar.json "Urls"; yoksa bütün ağ kartlarında 5080.
+var urls = builder.Configuration["Urls"];
+builder.WebHost.UseUrls(string.IsNullOrWhiteSpace(urls) ? $"http://0.0.0.0:{ServerApiContract.DefaultPort}" : urls);
 
 // Bütün dosya yolları ServerPaths'ten (testler yalnızca bunu değiştirir, gerçek veriye dokunulmaz).
 builder.Services.AddSingleton(sp => ServerPaths.From(sp.GetRequiredService<IConfiguration>()));
@@ -29,9 +35,10 @@ builder.Services.AddSingleton<ILoggerProvider>(sp => new FileLogProvider(sp.GetR
 builder.Services.AddSingleton(sp => new SqliteConnectionFactory(sp.GetRequiredService<ServerPaths>().DatabasePath));
 builder.Services.AddSingleton(TimeProvider.System);
 builder.Services.AddSingleton<CutIngestService>();
-builder.Services.AddSingleton(sp => new BackupService(
-    sp.GetRequiredService<SqliteConnectionFactory>(), sp.GetRequiredService<ServerPaths>().BackupDirectory,
-    sp.GetRequiredService<TimeProvider>()));
+builder.Services.AddSingleton(sp => new ServerBackupService(
+    sp.GetRequiredService<SqliteConnectionFactory>(), sp.GetRequiredService<ServerPaths>(),
+    sp.GetRequiredService<TimeProvider>(),
+    sp.GetRequiredService<IConfiguration>()[ServerPaths.BackupMirrorConfigKey]));
 builder.Services.AddHostedService<MaintenanceWorker>();
 builder.Services.ConfigureHttpJsonOptions(o =>
 {
