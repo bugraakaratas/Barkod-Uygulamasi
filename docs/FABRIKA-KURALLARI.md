@@ -86,4 +86,6 @@ Son güncelleme: 2026-11-15 (Faz 5).
 
 ## G. Sonraki aşamalarda eklenecek (henüz uygulamada YOK)
 
-Google Sheets'e stok ve sevkiyat kopyası (Faz 6); tek top iadesi, depo sayımı, raf yeri (isteğe bağlı).
+Tek top iadesi, depo sayımı, raf yeri (isteğe bağlı).
+
+(Faz 6 ile eklendi: depo sunucusu Google Sheets'e Kesimler + **Stok** + **Sevkiyatlar** sayfalarını gönderir. Tablo yalnızca bakmak içindir; tabloda yapılan değişiklik uygulamaya geçmez, bir sonraki gönderimde silinir.)

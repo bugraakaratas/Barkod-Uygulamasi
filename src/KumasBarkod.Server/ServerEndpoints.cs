@@ -124,6 +124,13 @@ public static class ServerEndpoints
         app.MapGet("/" + ReportPaths.DailyShipments, (string? from, string? to, ReportService r) => r.DailyShipments(from, to));
         app.MapGet("/" + ReportPaths.ShippedRolls, (string? from, string? to, ReportService r) => r.ShippedRolls(from, to));
         app.MapGet("/" + ReportPaths.ShipmentHistory, (string? from, string? to, ReportService r) => r.ShipmentHistory(from, to));
+
+        // ---------- Google Sheets kopyası (yetkili): anahtar hiç geri gönderilmez ----------
+        app.MapGet("/" + SheetsPaths.Settings, (KumasBarkod.Server.Sheets.SheetsSyncService sheets, AuthService auth, HttpContext http) =>
+            sheets.Status(auth.Authenticate(Token(http))));
+        app.MapPut("/" + SheetsPaths.Settings, async (SheetsSettingsRequest? request, KumasBarkod.Server.Sheets.SheetsSyncService sheets,
+                AuthService auth, HttpContext http) =>
+            await sheets.SaveAsync(request, auth.Authenticate(Token(http)), http.RequestAborted));
     }
 
     private static string ReadHandheldPage()

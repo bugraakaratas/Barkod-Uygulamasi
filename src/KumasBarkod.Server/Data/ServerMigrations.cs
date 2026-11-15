@@ -352,6 +352,32 @@ public static class ServerMigrations
 
             CREATE INDEX ix_shipments_closed ON shipments (status, closed_at);
             """),
+
+        new(5, "Google Sheets kopyası sunucudan: sheets_pending kuyruğu", """
+            -- Sheets'in "Kesimler" sayfasına gönderilecek toplar. Satır içeriği gönderim anında rolls'tan
+            -- okunur (her zaman güncel hâli). seq: gönderim sürerken top yeniden değişirse satır silinmesin.
+            CREATE TABLE sheets_pending (
+                cut_id TEXT    NOT NULL PRIMARY KEY,
+                seq    INTEGER NOT NULL
+            ) STRICT;
+
+            -- Kuyruğa yazmayı unutan kod yolu olmasın: QC alanı değişen her top veritabanının kendisince kuyruğa girer.
+            CREATE TRIGGER trg_rolls_sheets_insert AFTER INSERT ON rolls
+            BEGIN
+                INSERT OR REPLACE INTO sheets_pending (cut_id, seq)
+                VALUES (NEW.cut_id, (SELECT coalesce(max(seq), 0) + 1 FROM sheets_pending));
+            END;
+            CREATE TRIGGER trg_rolls_sheets_update
+            AFTER UPDATE OF lot_code_raw, length_cm, operator, qc_status, void_reason, voided_at,
+                            qc_created_at, print_count, last_printed_at ON rolls
+            BEGIN
+                INSERT OR REPLACE INTO sheets_pending (cut_id, seq)
+                VALUES (NEW.cut_id, (SELECT coalesce(max(seq), 0) + 1 FROM sheets_pending));
+            END;
+
+            -- Mevcut bütün toplar: Sheets ilk kez ayarlandığında tabloya hepsi gider.
+            INSERT INTO sheets_pending (cut_id, seq) SELECT cut_id, row_number() OVER (ORDER BY cut_id) FROM rolls;
+            """),
     ];
 
     public static int LatestVersion => All[^1].Version;

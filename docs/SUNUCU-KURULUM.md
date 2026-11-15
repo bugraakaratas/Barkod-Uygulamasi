@@ -71,7 +71,7 @@ Durum çubuğunda "Depo güncel" ve "Depo bekleyen: 0" görünmeli.
 - Yedek sunucu çalışırken, okutmayı durdurmadan alınır (SQLite Backup API) ve doğrulanır (`integrity_check`).
 - İkinci klasöre ulaşılamazsa (USB çıkarılmış) yerel yedek yine alınır, günlüğe `[HATA]` yazılır; disk geri takılınca eksik yedekler tamamlanır.
 - Günde bir veri bütünlüğü kontrolü çalışır; sorun varsa günlüğe `[HATA]`.
-- Google Sheets kopyası şimdilik QC bilgisayarlarından gönderilmeye devam eder (bina dışı kopya; yalnızca kesimler).
+- **Google Sheets kopyası (bina dışı kopya, patronun telefonu):** sunucu gönderir — Kesimler (bütün istasyonlar), Stok ve Sevkiyatlar sayfaları. Ayar: yönetim bilgisayarı → Ayarlar → "Google Sheets kopyası (depo sunucusundan)", yetkili girişiyle (Apps Script **v8** gerekir, `tools\sheets\KURULUM.md`). Kaydetmeden önce sunucu Google'ı dener; yanlış adres/anahtar kaydedilmez. İnternet yokken sevkiyat etkilenmez; kopya bağlantı gelince güncellenir. Adres ve anahtar sunucu veritabanında (`server_settings`) durur, yedekle birlikte korunur.
 
 **Geri dönüş (elle):** hizmeti durdur → `sunucu.db`, `sunucu.db-wal`, `sunucu.db-shm` dosyalarını başka yere taşı →
 seçilen yedeği `sunucu.db` adıyla kopyala → hizmeti başlat. QC bilgisayarlarının kuyruğunda bekleyen kesimler kendiliğinden gelir.

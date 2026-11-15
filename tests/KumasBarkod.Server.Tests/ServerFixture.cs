@@ -35,6 +35,9 @@ public sealed class ServerFixture : WebApplicationFactory<Program>
 
     public SettableClock Clock { get; } = new();
 
+    /// <summary>Google Apps Script yerine (internete çıkılmaz).</summary>
+    public FakeAppsScript Sheets { get; } = new();
+
     protected override void ConfigureWebHost(IWebHostBuilder builder)
     {
         builder.UseEnvironment("Testing");
@@ -42,8 +45,9 @@ public sealed class ServerFixture : WebApplicationFactory<Program>
         {
             services.AddSingleton(new ServerPaths(DataDirectory));
             services.AddSingleton<TimeProvider>(Clock);
-            // Arka plan bakımı (yedek) testte çalışmasın; ayrıca kendi testi var.
+            // Arka plan işleri (yedek, Sheets) testte kendiliğinden çalışmasın; testler doğrudan çağırır.
             services.RemoveAll<IHostedService>();
+            services.AddSingleton(new AppsScriptTransport(new HttpClient(Sheets)));
         });
     }
 

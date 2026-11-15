@@ -206,7 +206,8 @@ public partial class App : Application
         services.AddSingleton<LotCatalog>();
         services.AddSingleton<ServerConnection>();
         // Depo ekranları (stok, lotlar): kurallar sunucuda; cihaz adı "kim yaptı" kaydı için.
-        services.AddSingleton(sp => new DepotApiClient(new HttpClient { Timeout = TimeSpan.FromSeconds(10) },
+        // Zaman aşımı istek başına DepotApiClient'ta (10 sn; Sheets ayarı Google'ı denediği için 75 sn).
+        services.AddSingleton(sp => new DepotApiClient(new HttpClient { Timeout = TimeSpan.FromSeconds(90) },
             sp.GetRequiredService<SettingsRepository>(), Environment.MachineName));
 
         services.AddSingleton<MainWindowViewModel>();
@@ -218,6 +219,7 @@ public partial class App : Application
         services.AddSingleton<ScanPage>();
         services.AddSingleton<HistoryViewModel>();
         services.AddSingleton<HistoryPage>();
+        services.AddSingleton<ServerSheetsViewModel>();
         services.AddSingleton<SettingsViewModel>();
         services.AddSingleton<SettingsPage>();
         services.AddSingleton<StockViewModel>();

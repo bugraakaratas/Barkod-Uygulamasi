@@ -37,8 +37,9 @@ public partial class SettingsViewModel : ObservableObject
 
     public SettingsViewModel(SettingsRepository settings, SyncService sync, SyncWorker worker,
         BackupService backup, RestoreService restore, ILog log, SelectablePrinter printer,
-        ServerConnection server, StationIdentity identity)
+        ServerConnection server, StationIdentity identity, ServerSheetsViewModel serverSheets)
     {
+        ServerSheets = serverSheets;
         _server = server;
         _identity = identity;
         _settings = settings;
@@ -56,6 +57,9 @@ public partial class SettingsViewModel : ObservableObject
         WeakReferenceMessenger.Default.Register<SettingsViewModel, BackupChangedMessage>(
             this, static (vm, _) => vm.RefreshBackupInfo());
     }
+
+    /// <summary>Depo sunucusunun Google Sheets kopyası (yalnızca yönetim bilgisayarında görünür).</summary>
+    public ServerSheetsViewModel ServerSheets { get; }
 
     public string DatabasePath => AppPaths.DatabasePath;
     public string LabelDirectory => AppPaths.LabelOutputDirectory;
@@ -76,6 +80,7 @@ public partial class SettingsViewModel : ObservableObject
         IsRoleQc = role == StationRoles.Qc;
         IsRoleDock = role == StationRoles.Dock;
         IsRoleOffice = role == StationRoles.Office;
+        ServerSheets.IsVisible = role == StationRoles.Office;
     }
 
     [RelayCommand]
@@ -83,6 +88,8 @@ public partial class SettingsViewModel : ObservableObject
     {
         var role = SelectedRole;
         _settings.SetStationRole(role);
+        ServerSheets.IsVisible = role == StationRoles.Office;
+        _ = ServerSheets.RefreshAsync();
         _log.Info($"Bilgisayarın görevi: {role}");
         WeakReferenceMessenger.Default.Send(new SettingsChangedMessage());
         Show(InfoBarSeverity.Success, "Görev kaydedildi", role switch
@@ -258,6 +265,7 @@ public partial class SettingsViewModel : ObservableObject
         LoadPrinterOptions();
         RefreshBackupInfo();
         RefreshRestoreAvailability();
+        _ = ServerSheets.RefreshAsync();
     }
 
     private void RefreshBackupInfo()

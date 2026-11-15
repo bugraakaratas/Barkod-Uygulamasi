@@ -933,8 +933,78 @@ function PartI {
   try { $script:srv.Kill() } catch {}
 }
 
+# ---------- J: Sunucunun Google Sheets kopyası ayarı (Faz 6) — gerçek Google'a gidilmez ----------
+function FocusEdit($name) { $e = Edit $name; if ($null -eq $e) { return $false }; Fore; $e.SetFocus(); Start-Sleep -Milliseconds 300; return $true }
+function SheetsLogin {
+  if (-not (FocusEdit 'Sheets yetkili kart kodu')) { return $false }
+  K 'Y0001{ENTER}' 300; K '9999{ENTER}' 2500
+  return (WaitFor { $null -ne (Edit 'Sunucu Sheets adresi') })
+}
+function SheetsRows { [int](SrvSql "select count(*) from server_settings where key in ('sheets_url','sheets_key')") }
+
+function PartJ {
+  $env:KUMASBARKOD_SERVER_DATA_DIR = Join-Path $data 'sunucu'
+  Check 'Sunucu acildi' (Start-Server)
+  PostJson 'api/v1/users' @{ name = 'Patron'; role = 'supervisor'; badgeCode = 'Y0001'; pin = '9999' } | Out-Null
+
+  # Kalite kontrol bilgisayarında kart görünmez
+  Start-App; Stop-App
+  & python $py exec $db "insert into settings(key,value) values('server_url','$serverUrl')" | Out-Null
+  $env:KUMASBARKOD_START_PAGE = 'settings'
+  Start-App
+  Check 'QC: sunucu Sheets karti gorunmuyor' (-not (Has 'Google Sheets kopyası (depo sunucusundan)'))
+  Stop-App
+
+  & python $py exec $db "insert or replace into settings(key,value) values('station_role','office')" | Out-Null
+  Start-App
+  Check 'Yonetim: kart gorunuyor' (WaitFor { Has 'Google Sheets kopyası (depo sunucusundan)' })
+  Check 'Yetkili girisi istendi' ($null -ne (Edit 'Sheets yetkili kart kodu'))
+  Check 'Yetkili girisi yapildi' (SheetsLogin)
+  Check 'Durum: kapali' (WaitFor { Has 'Kapalı (sunucu Google Sheets' })
+  Shot 'j1_kapali'
+
+  # https olmayan adres ve ulaşılamayan adres kaydedilmez
+  Check 'Adres yazildi (http)' (SetEdit 'Sunucu Sheets adresi' 'http://script.google.com/x')
+  Check 'Anahtar alani' (FocusEdit 'Sunucu Sheets anahtarı')
+  K 'deneme-anahtar' 300
+  Invoke-ByName 'Sunucu Sheets kaydet' | Out-Null
+  Start-Sleep -Seconds 2
+  Check 'http adresi kaydedilmedi' ((SheetsRows) -eq 0)
+  Check 'Adres yazildi (ulasilamayan)' (SetEdit 'Sunucu Sheets adresi' 'https://localhost:1/exec')
+  Invoke-ByName 'Sunucu Sheets kaydet' | Out-Null
+  Start-Sleep -Seconds 4
+  Check 'Ulasilamayan adres kaydedilmedi' ((SheetsRows) -eq 0)
+  Shot 'j2_kaydedilmedi'
+  Stop-App
+
+  # Ayar sunucuda varken Google'a ulaşılamıyorsa: hizmet çalışmaya devam eder, durum hatayı gösterir
+  try { $script:srv.Kill(); $script:srv.WaitForExit(5000) } catch {}
+  & python $py exec (Join-Path $data 'sunucu\sunucu.db') "insert into server_settings(key,value) values('sheets_url','https://localhost:1/exec'),('sheets_key','gizli')" | Out-Null
+  Check 'Sunucu yeniden acildi' (Start-Server)
+  Start-Sleep -Seconds 3
+  Start-App
+  Check 'Yeniden giris' (SheetsLogin)
+  Check 'Durum: gonderilemiyor' (WaitFor { Has 'Gönderilemiyor:' } 10000)
+  Check 'Adres ekranda, anahtar gelmedi' ((ValueOf (Edit 'Sunucu Sheets adresi')) -eq 'https://localhost:1/exec')
+  Check 'Sevkiyat etkilenmiyor (saglik)' ((Api 'health').ok)
+  Shot 'j3_gonderilemiyor'
+
+  Invoke-ByName 'Sunucu Sheets kapat' | Out-Null
+  Check 'Kopya kapatildi' (WaitFor { (SheetsRows) -eq 0 })
+  Check 'Durum: kapali (tekrar)' (WaitFor { Has 'Kapalı (sunucu Google Sheets' })
+  Stop-App
+  $env:KUMASBARKOD_START_PAGE = ''
+
+  $slog = Get-ChildItem (Join-Path $data 'sunucu\logs') -Filter *.log | Get-Content -Raw
+  Check 'Sunucu gunlugu: gonderilemedi uyarisi' ($slog -match 'Sheets kopyası gönderilemedi')
+  Check 'Sunucu gunlugu: kapatildi' ($slog -match 'Sheets kopyası kapatıldı')
+  Check 'Sunucu gunlugunde beklenmeyen hata yok' ($slog -notmatch 'Beklenmeyen')
+  Check 'Sunucu butunluk' ((& $serverExe --kontrol) -match 'sorun yok')
+  try { $script:srv.Kill() } catch {}
+}
+
 try {
-  if ($Part -eq 'A') { PartA } elseif ($Part -eq 'B') { PartB } elseif ($Part -eq 'D') { PartD } elseif ($Part -eq 'E') { PartE } elseif ($Part -eq 'F') { PartF } elseif ($Part -eq 'G') { PartG } elseif ($Part -eq 'H') { PartH } elseif ($Part -eq 'I') { PartI } else { PartC }
+  if ($Part -eq 'A') { PartA } elseif ($Part -eq 'B') { PartB } elseif ($Part -eq 'D') { PartD } elseif ($Part -eq 'E') { PartE } elseif ($Part -eq 'F') { PartF } elseif ($Part -eq 'G') { PartG } elseif ($Part -eq 'H') { PartH } elseif ($Part -eq 'I') { PartI } elseif ($Part -eq 'J') { PartJ } else { PartC }
 } catch {
   $results.Add("HATA: $($_.Exception.Message) @ satir $($_.InvocationInfo.ScriptLineNumber)")
 } finally {

@@ -49,6 +49,10 @@ builder.Services.AddSingleton(sp => new ServerBackupService(
     sp.GetRequiredService<TimeProvider>(),
     sp.GetRequiredService<IConfiguration>()[ServerPaths.BackupMirrorConfigKey]));
 builder.Services.AddHostedService<MaintenanceWorker>();
+// Google Sheets kopyası (Faz 6): ayar sunucu veritabanında (yetkili Ayarlar'dan girer).
+builder.Services.AddSingleton(_ => new KumasBarkod.Core.Sync.AppsScriptTransport(new HttpClient { Timeout = TimeSpan.FromSeconds(60) }));
+builder.Services.AddSingleton<KumasBarkod.Server.Sheets.SheetsSyncService>();
+builder.Services.AddHostedService<KumasBarkod.Server.Sheets.SheetsWorker>();
 builder.Services.ConfigureHttpJsonOptions(o =>
 {
     o.SerializerOptions.PropertyNamingPolicy = ServerApiContract.Json.PropertyNamingPolicy;

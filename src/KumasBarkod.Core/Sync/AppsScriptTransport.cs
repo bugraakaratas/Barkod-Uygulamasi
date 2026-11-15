@@ -10,6 +10,7 @@ namespace KumasBarkod.Core.Sync;
 /// <c>{"ok": false, "error": "..."}</c>. Apps Script POST'a 302 ile yanıt verir; HttpClient
 /// yönlendirmeyi GET ile izler (varsayılan davranış).
 /// Geri kurma: <c>{"key", "action": "export", "offset", "limit"}</c> → <c>{"ok", "total", "rows"}</c>.
+/// Depo sunucusu (v8): <c>{"key", "action": "snapshot", "sheet", "headers", "rows", "updated"}</c> → sayfa baştan yazılır.
 /// </summary>
 public sealed class AppsScriptTransport(HttpClient http) : ISyncTransport
 {
@@ -23,6 +24,24 @@ public sealed class AppsScriptTransport(HttpClient http) : ISyncTransport
 
     /// <summary>Gönderim için gereken en düşük Apps Script sürümü (v3: ID çakışma koruması).</summary>
     public const int RequiredScriptVersion = 3;
+
+    /// <summary>Stok/Sevkiyatlar sayfalarını baştan yazma için gereken Apps Script sürümü.</summary>
+    public const int SnapshotScriptVersion = 8;
+
+    /// <summary>Boş paket gönderir: anahtar ve erişim doğrulanır, script sürümü döner (tabloya yazılmaz).</summary>
+    public async Task<int> GetScriptVersionAsync(SyncTarget target, CancellationToken cancellationToken) =>
+        (await PostAsync<Reply>(target, new Payload(target.Key, []), cancellationToken)).Version;
+
+    /// <summary>İzinli bir sayfayı (Stok, Sevkiyatlar) baştan yazar. Hücreler metin ya da sayı.</summary>
+    public async Task SnapshotAsync(SyncTarget target, string sheet, IReadOnlyList<string> headers,
+        IReadOnlyList<object?[]> rows, string updated, CancellationToken cancellationToken)
+    {
+        var reply = await PostAsync<Reply>(target, new SnapshotRequest(target.Key, "snapshot", sheet, headers, rows, updated), cancellationToken);
+        if (reply.Version < SnapshotScriptVersion)
+            throw new SyncException(SyncFailureKind.Rejected,
+                $"Apps Script eski sürüm (v{reply.Version}). Stok ve Sevkiyatlar sayfaları için v{SnapshotScriptVersion} gerekir: " +
+                "Code.gs'yi güncelleyip yeniden dağıtın (KURULUM.md).");
+    }
 
     public async Task<SendResult> SendAsync(SyncTarget target, IReadOnlyList<CutSyncRow> rows, CancellationToken cancellationToken)
     {
@@ -99,6 +118,9 @@ public sealed class AppsScriptTransport(HttpClient http) : ISyncTransport
     }
 
     private sealed record Payload(string Key, IReadOnlyList<CutSyncRow> Rows);
+
+    private sealed record SnapshotRequest(string Key, string Action, string Sheet, IReadOnlyList<string> Headers,
+        IReadOnlyList<object?[]> Rows, string Updated);
 
     private sealed record ExportRequest(string Key, string Action, int Offset, int Limit);
 

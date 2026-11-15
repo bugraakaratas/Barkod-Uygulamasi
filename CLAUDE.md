@@ -284,7 +284,7 @@ docs/                    SUNUM.md (donanımsız sunum akışı), PILOT.md (fabri
 Plan: `docs/DEPO-SEVKIYAT-PLANI.md`. Kullanıcı planı 2026-11-15'te onayladı. **Her faz sonunda: test → commit → bu dosya → özet → sonraki faz için onay.** Her faz `feature/fazN-…` dalında; bitince `main`'e birleştirilip gönderilir.
 
 ### Kullanıcı kararları (değiştirme)
-- QC ve depo cihazları aynı fabrika yerel ağında. Kurulum: **3 ekranlı bilgisayar** (Kalite kontrol · Sevkiyat/rıhtım · Patron) + **1 ekransız sunucu**. Aynı WPF uygulaması üçünde; ileride Ayarlar'da "bilgisayar rolü" görünen sayfaları seçecek (henüz yok).
+- QC ve depo cihazları aynı fabrika yerel ağında. Kurulum: **3 ekranlı bilgisayar** (Kalite kontrol · Sevkiyat/rıhtım · Patron) + **1 ekransız sunucu**. Aynı WPF uygulaması üçünde; Ayarlar'da "bilgisayarın görevi" (qc / dock / office) görünen sayfaları seçer.
 - **Lot = firma** (lot adı firmayı gösterir). Ayrı firma tablosu yok, sipariş/parti ayrımı yok.
 - **Etiketi basılan top doğrudan stokta** (`in_stock`); depo kabul okutması yok.
 - Depo/Sevkiyat ekranları **WPF'te** (rıhtım PC'si + kablosuz okuyucu + büyük ekran + belirgin sesler). **El terminali ileride kesin:** bütün kurallar sunucuda, API istemciden bağımsız (`/api/v1`, hata kodu + Türkçe mesaj sunucudan, okutma kimliği, sürüm kontrolü); WPF yalnızca istemci (kural yok, sunucu veritabanına doğrudan erişim yok). El terminali için sade web okutma sayfası Faz 4'te yazılacak.
@@ -302,7 +302,18 @@ Plan: `docs/DEPO-SEVKIYAT-PLANI.md`. Kullanıcı planı 2026-11-15'te onayladı.
 | 3 QC'de lot önerisi | ✅ | `3fc2e26` + belge | Aşağıda. QC 1.3.0 |
 | 4 Sevkiyat | ✅ | `cbfdbdd` `40ee078` + el terminali + belge | Aşağıda. QC 1.4.0, sunucu 0.3.0 |
 | 5 Geri alma + istisnalar + raporlar | ✅ | `ffc82e5` + WPF + belge | Aşağıda. QC 1.5.0, sunucu 0.4.0 |
-| 6–7 | ⏳ | — | Sheets'in sunucuya taşınması (stok + sevkiyat sekmeleri), isteğe bağlılar (sayım, iade, raf, PostgreSQL, HTTPS) |
+| 6 Sheets sunucudan | ✅ | (bu dal) | Aşağıda. QC 1.6.0, sunucu 0.5.0, Apps Script v8 |
+| 7 | ⏳ | — | İsteğe bağlılar (sayım, iade, raf, PostgreSQL, HTTPS) |
+
+### Faz 6 notları (2026-11-15) — Google Sheets kopyası sunucudan (kullanıcı seçimi "a")
+- **Code.gs v8:** `action: "snapshot"` → yalnızca **Stok** ve **Sevkiyatlar** sayfaları (izin listesi; Kesimler ezilemez) baştan yazılır: `clearContents`, başlık + boş + "Son güncelleme: …" (kalın), satır sayısı yetmezse `insertRowsAfter`, en fazla 50.000 satır, başlık genişliği ≠ satır genişliği → ret, `= + - @ '` ile başlayan metin `'` önekiyle (formül çalışmaz). v7 davranışı aynen. Node testleri 29 (`Code.test.js`: sahte e-tablo artık çok sayfalı).
+- **Core:** `AppsScriptTransport.GetScriptVersionAsync` (boş paket → sürüm; tabloya yazmaz), `SnapshotAsync` (v8 ister). `SheetsModels.cs`: `SheetsPaths.Settings = api/v1/settings/sheets`, `SheetsSettingsRequest(Url, Key)`, `SheetsStatusResponse` (anahtar yok, yalnızca `KeySet`).
+- **Sunucu şema v5:** `sheets_pending(cut_id PK, seq)`. **Kuyruğu tetikleyiciler doldurur** (`AFTER INSERT ON rolls`, `AFTER UPDATE OF <QC alanları>`; `INSERT OR REPLACE`, seq = max+1) → hiçbir kod yolu kuyruğu unutamaz. Göç mevcut bütün rolls'u kuyruğa koyar. Satır içeriği gönderim anında `rolls`'tan (her zaman güncel); silme `cut_id AND seq` ile → gönderim sırasında değişen top kuyrukta kalır.
+- **`SheetsSyncService` + `SheetsWorker`** (BackgroundService, 15 sn; hata → 1 dk; ayar değişince hemen `Wake`). Kesimler: 200'lük paketler, `lot_code` = QC'nin yazdığı ham metin (istasyonlarla aynı satır). Stok/Sevkiyatlar: `data_version` değiştiyse ve son denemeden ≥ `SnapshotInterval` (2 dk) geçtiyse. Durum bellekte (son başarı, son tablo yazımı, son hata — aynı hata günlüğe bir kez). Beklenmeyen hata hizmeti durdurmaz (`LogError` + durum).
+- **Ayar uçları (yalnızca yetkili):** `GET/PUT api/v1/settings/sheets`. PUT kaydetmeden önce Google'ı dener (sürüm ≥ 8, anahtar, erişim); başarısızsa 400 `SHEETS_FAILED` + sebep, **kaydedilmez**. Adres boş = kapat. Anahtar boş = kayıtlı anahtar korunur. **Adres değişirse bütün toplar yeniden kuyruğa** (yeni tabloya da gitsin). Ayar `server_settings` (`sheets_url`, `sheets_key`) — veritabanı yedeğiyle korunur; anahtar hiçbir yanıtta yok.
+- **WPF:** Ayarlar'da "Google Sheets kopyası (depo sunucusundan)" kartı — **yalnızca yönetim görevi** (`ServerSheetsViewModel`, `SettingsViewModel.ServerSheets`). Kart içinde yetkili girişi (kart → Enter → PIN → Enter; oturum `DepotApiClient` ile ortak), durum satırı (hata turuncu), "Dene ve kaydet" / "Durumu yenile" / "Kopyayı kapat". İstasyonun kendi Sheets kartına "sunucu gönderiyorsa boş bırakılabilir; geri kurmada yeniden yazılır" notu.
+- **`DepotApiClient` zaman aşımı istek başına:** varsayılan 10 sn (`DefaultTimeout`), Sheets kaydı 75 sn (Apps Script ilk açılışta yavaş); `HttpClient.Timeout` 90 sn'ye çıktı. İptal → `SyncException(Offline, "zaman aşımı")`.
+- **Testler:** sunucu 114 (`ShipmentTests.Phase6.cs` + `FakeAppsScript` — test düzeninde `AppsScriptTransport` sahte işleyiciyle; yetki 401/403, http/anahtarsız/yanlış anahtar/v7/internetsiz → kaydedilmez, bütün toplar Kesimler'e + Stok/Sevkiyatlar içeriği, 2 dk sınırı, veri değişmezse yazılmaz, QC basım/iptali kuyruğa, internetsiz bekler, seq yarışı, anahtar korunur/adres boş kapatır/başka tablo hepsini alır). Arayüz **J 22** (QC'de kart yok, yönetimde var, kart içi giriş, http ve ulaşılamayan adres kaydedilmez, sunucuda ayar varken Google'a ulaşılamıyor → "Gönderilemiyor" + sağlık bozulmaz, kapat, sunucu günlüğü). **Gerçek Google'a gönderim kullanıcının hesabıyla ayrıca denenmeli** (Code.gs v8 dağıtımı gerekiyor).
 
 ### Faz 5 notları (2026-11-15)
 - **Şema v4:** `shipments.reversed_by/reversed_at/reversal_reason/reversal_request_id`, `cut_conflicts.resolved_by`, indeks `(status, closed_at)`. Kapanış bilgisi (closed_*) geri almada korunur.
@@ -379,6 +390,8 @@ Plan: `docs/DEPO-SEVKIYAT-PLANI.md`. Kullanıcı planı 2026-11-15'te onayladı.
 - **Fabrika kuralları:** `docs/FABRIKA-KURALLARI.md` — kullanıcı kararı (2026-11-15): sistemi en sade tutup kullanım kurallarını fabrikaya biz veriyoruz (ayrı sunucu PC + UPS, sabit IP, USB yedek diski, depo/rıhtım Wi-Fi, her QC'ye ayrı istasyon kodu…). Her fazda güncellenir; yalnızca uygulamada olan özelliklere dayanır.
 
 ## Şu anki durum
+
+- **2026-11-15 — Faz 6 tamam:** Google Sheets kopyası depo sunucusundan (Kesimler + Stok + Sevkiyatlar), yönetim Ayarlar kartı, Apps Script v8. QC 1.6.0, sunucu 0.5.0. Gerçek Google dağıtımı (Code.gs v8) kullanıcının hesabıyla yapılmadı. Kurulum paketleri bu sürümlerle henüz üretilmedi; GitHub Release yok. Sıradaki: kullanıcı onayıyla kurulum paketleri + fabrika pilotu ya da Faz 7 isteğe bağlıları.
 
 - **2026-11-15 — Faz 5 tamam:** onayı geri alma (yetkili), İstisnalar ekranı (karantina çözümü, sevk sonrası QC iptali, uzun süredir açık sevkiyatlar), Raporlar + CSV. QC 1.5.0, sunucu 0.4.0. Kurulum paketleri bu sürümlerle henüz üretilmedi; GitHub Release yok. Sıradaki: kullanıcı onayıyla Faz 6 (Google Sheets'e stok/sevkiyat kopyası sunucudan) ya da kurulum paketleri + fabrika pilotu.
 - **2026-11-15 — Faz 4 tamam (sevkiyat):** sunucuda personel girişi + sevkiyat (tek kazanan kilidi, tekrar gönderime dayanıklı okutma, sürüm kontrollü onay, iptal), rıhtım WPF ekranı, Personel ekranı, el terminali web sayfası (gerçek tarayıcıyla test edildi). QC 1.4.0, sunucu 0.3.0. Kurulum paketleri bu sürümlerle henüz üretilmedi; GitHub Release yok. Sıradaki: kullanıcı onayıyla Faz 5 (onayı geri alma, karantina/istisna ekranı, raporlar).

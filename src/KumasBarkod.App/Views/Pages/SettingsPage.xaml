@@ -90,6 +90,91 @@
                 </StackPanel>
             </ui:Card>
 
+            <!-- ========== Depo sunucusunun Google Sheets kopyası (yalnızca yönetim) ========== -->
+            <ui:Card Padding="24" Margin="0,0,0,16" DataContext="{Binding ServerSheets}"
+                     Visibility="{Binding IsVisible, Converter={StaticResource BoolToVisibility}}">
+                <StackPanel>
+                    <DockPanel Margin="0,0,0,4">
+                        <ui:SymbolIcon DockPanel.Dock="Left" Symbol="CloudArrowUp24" FontSize="22" Margin="0,0,10,0" />
+                        <TextBlock FontSize="20" FontWeight="SemiBold" Text="Google Sheets kopyası (depo sunucusundan)" />
+                    </DockPanel>
+                    <TextBlock Style="{StaticResource PageSubtitleStyle}" Margin="0,0,0,14"
+                               Text="Depo sunucusu Google Sheets'e üç sayfa gönderir: Kesimler (bütün istasyonlar), Stok ve Sevkiyatlar. Patron fabrika dışından telefondan bakabilir. İnternet yokken depo ve sevkiyat aynen çalışır; kopya bağlantı gelince güncellenir." />
+
+                    <ui:InfoBar Margin="0,0,0,12"
+                                IsOpen="{Binding MessageIsOpen, Mode=TwoWay}"
+                                Severity="{Binding MessageSeverity}"
+                                Title="{Binding MessageTitle}"
+                                Message="{Binding MessageText}"
+                                IsClosable="True" />
+
+                    <TextBlock Style="{StaticResource FieldHintStyle}" TextWrapping="Wrap"
+                               Visibility="{Binding IsConfigured, Converter={StaticResource BoolToVisibility}, ConverterParameter=Invert}"
+                               Text="Önce yukarıda depo sunucusu adresini kaydedin." />
+
+                    <!-- Yetkili girişi -->
+                    <StackPanel Visibility="{Binding NeedsLogin, Converter={StaticResource BoolToVisibility}}">
+                        <TextBlock FontSize="15" TextWrapping="Wrap" Margin="0,0,0,4"
+                                   Text="Bu ayar için yetkili girişi gerekir." />
+                        <TextBlock Style="{StaticResource FieldLabelStyle}" Margin="0,8,0,6" Text="Kart kodu" />
+                        <ui:TextBox x:Name="SheetsBadgeBox" FontSize="15" Text="{Binding LoginBadge, UpdateSourceTrigger=PropertyChanged}"
+                                    AutomationProperties.Name="Sheets yetkili kart kodu" KeyDown="SheetsBadgeBox_KeyDown" />
+                        <TextBlock Style="{StaticResource FieldLabelStyle}" Margin="0,8,0,6" Text="PIN" />
+                        <ui:PasswordBox x:Name="SheetsPinBox" FontSize="15" Password="{Binding LoginPin, UpdateSourceTrigger=PropertyChanged, Mode=TwoWay}"
+                                        AutomationProperties.Name="Sheets yetkili PIN" KeyDown="SheetsPinBox_KeyDown" />
+                        <ui:Button Margin="0,12,0,0" MinHeight="40" Appearance="Primary" Icon="{ui:SymbolIcon ArrowEnterLeft24}"
+                                   Content="Giriş  (Enter)" Command="{Binding LoginCommand}" AutomationProperties.Name="Sheets yetkili giriş" />
+                    </StackPanel>
+
+                    <StackPanel Visibility="{Binding IsReady, Converter={StaticResource BoolToVisibility}}">
+                        <Border Padding="14,10" Margin="0,0,0,16" CornerRadius="6"
+                                Background="{DynamicResource ControlFillColorSecondaryBrush}">
+                            <TextBlock FontSize="15" TextWrapping="Wrap">
+                                <Run Text="Durum:" />
+                                <Run Text="{Binding StatusText, Mode=OneWay}">
+                                    <Run.Style>
+                                        <Style TargetType="Run">
+                                            <Setter Property="FontWeight" Value="SemiBold" />
+                                            <Style.Triggers>
+                                                <DataTrigger Binding="{Binding NeedsAttention}" Value="True">
+                                                    <Setter Property="Foreground" Value="{DynamicResource SystemFillColorCautionBrush}" />
+                                                </DataTrigger>
+                                            </Style.Triggers>
+                                        </Style>
+                                    </Run.Style>
+                                </Run>
+                            </TextBlock>
+                        </Border>
+
+                        <TextBlock Style="{StaticResource FieldLabelStyle}" Text="Apps Script web uygulaması adresi" />
+                        <ui:TextBox Text="{Binding Url, UpdateSourceTrigger=PropertyChanged}"
+                                    PlaceholderText="https://script.google.com/macros/s/…/exec"
+                                    Icon="{ui:SymbolIcon Link24}" FontSize="15"
+                                    AutomationProperties.Name="Sunucu Sheets adresi" />
+
+                        <TextBlock Style="{StaticResource FieldLabelStyle}" Margin="0,14,0,6" Text="Anahtar (API_KEY)" />
+                        <ui:PasswordBox Password="{Binding Key, UpdateSourceTrigger=PropertyChanged, Mode=TwoWay}"
+                                        PlaceholderText="{Binding KeyPlaceholder}"
+                                        Icon="{ui:SymbolIcon Key24}" FontSize="15" RevealButtonEnabled="True"
+                                        AutomationProperties.Name="Sunucu Sheets anahtarı" />
+
+                        <WrapPanel Margin="0,16,0,0">
+                            <ui:Button Margin="0,0,8,8" MinHeight="40" Appearance="Primary"
+                                       Icon="{ui:SymbolIcon Save24}" Content="Dene ve kaydet"
+                                       Command="{Binding SaveCommand}" AutomationProperties.Name="Sunucu Sheets kaydet" />
+                            <ui:Button Margin="0,0,8,8" MinHeight="40" Appearance="Secondary"
+                                       Icon="{ui:SymbolIcon ArrowClockwise24}" Content="Durumu yenile"
+                                       Command="{Binding ReloadCommand}" AutomationProperties.Name="Sunucu Sheets durumu yenile" />
+                            <ui:Button Margin="0,0,8,8" MinHeight="40" Appearance="Secondary"
+                                       Icon="{ui:SymbolIcon CloudDismiss24}" Content="Kopyayı kapat"
+                                       Command="{Binding TurnOffCommand}" AutomationProperties.Name="Sunucu Sheets kapat" />
+                        </WrapPanel>
+                        <TextBlock Style="{StaticResource FieldHintStyle}" TextWrapping="Wrap"
+                                   Text="Apps Script en az v8 olmalı (tools\sheets\KURULUM.md). Adres ve anahtar depo sunucusunda saklanır; anahtar ekrana geri getirilmez. Sunucu gönderdikten sonra kalite kontrol bilgisayarlarındaki Sheets ayarı boşaltılabilir." />
+                    </StackPanel>
+                </StackPanel>
+            </ui:Card>
+
             <!-- ========== Google Sheets ========== -->
             <ui:Card Padding="24" Margin="0,0,0,16">
                 <StackPanel>
@@ -145,7 +230,7 @@
                                    Command="{Binding SendNowCommand}" />
                     </WrapPanel>
                     <TextBlock Style="{StaticResource FieldHintStyle}" TextWrapping="Wrap"
-                               Text="Kurulum adımları: proje klasöründe tools\sheets\KURULUM.md. Adres ve anahtar yalnızca bu bilgisayarda saklanır." />
+                               Text="Kurulum adımları: proje klasöründe tools\sheets\KURULUM.md. Adres ve anahtar yalnızca bu bilgisayarda saklanır. Depo sunucusu Sheets kopyasını gönderiyorsa (yönetim bilgisayarı → Ayarlar) bu bölüm boş bırakılabilir; Sheets'ten geri kurma için adres ve anahtar yeniden yazılır." />
                 </StackPanel>
             </ui:Card>
 

@@ -3,6 +3,8 @@
 Uygulama, kesim kayıtlarını internet olduğunda bir Google E-Tablosuna kopyalar (tek yönlü).
 Asıl veri bilgisayardaki veritabanındadır; tablo bir **kopya**dır ve disk arızasında geri kurmak için kullanılır.
 
+**Depo sunucusu kuruluysa** (v8): kopyayı sunucu gönderir — **Kesimler** (bütün istasyonlar), **Stok** (depodaki toplar) ve **Sevkiyatlar**. Aşağıdaki 1–5. adımlar aynıdır; 6. adımda adres ve anahtar **yönetim bilgisayarı → Ayarlar → "Google Sheets kopyası (depo sunucusundan)"** bölümüne yetkili girişiyle yazılır (bkz. en alttaki "Depo sunucusundan gönderim").
+
 Kurulum bir kez yapılır, yaklaşık 10 dakika sürer. Gerekenler: bir Google hesabı ve bu klasördeki `Code.gs` dosyası.
 
 ---
@@ -79,7 +81,7 @@ Script sizin adınıza çalıştığı için korumalı sayfaya yazmaya devam ede
 - **Elle değişiklik:** Tablodaki bir hücreyi değiştirirseniz o satır, kesim bir sonraki kez gönderildiğinde uygulamadaki değerle değişir. Düzeltme uygulamadan yapılır (iptal + yeni kayıt).
 - **Sütunlar:** `ID … Son Baskı` uygulamadaki veritabanının birebir kopyasıdır (geri kurma bunları başlık adıyla bulur, başlıkları değiştirmeyin). `Uzunluk (cm)` asıl değerdir; son sütun `Metre`, rapor kolaylığı içindir. `Durum` hücreleri `active` / `voided`, zamanlar UTC metindir.
 - **Script'i güncellemek:** `Code.gs` değişirse editöre yapıştırıp kaydedin, sonra **Dağıt → Dağıtımları yönet → (kalem) → Sürüm: Yeni sürüm → Dağıt**. URL aynı kalır, uygulamada değişiklik gerekmez.
-- **Uygulama script v3 veya üstünü ister** (güncel: `const VERSION = 7;`). Eski script kuruluysa uygulama göndermez, durum çubuğunda "Apps Script eski sürüm" yazar; kayıtlar kaybolmaz, script güncellenince hepsi gider.
+- **Uygulama script v3 veya üstünü ister, depo sunucusu v8** (güncel: `const VERSION = 8;`). Eski script kuruluysa uygulama göndermez, durum çubuğunda "Apps Script eski sürüm" yazar; kayıtlar kaybolmaz, script güncellenince hepsi gider.
 - **ID'ler benzersizdir:** Tablodaki her ID tek bir kesime aittir. Aynı ID ile *farklı* bir kesim gelirse (aynı istasyon kodu iki bilgisayarda/veritabanında kullanılmış) tablodaki satırın üzerine **yazılmaz**; uygulama o kesimi göndermez ve durum çubuğunda "… gönderilmedi: bu ID Sheets'te başka bir kesime ait" yazar. Çözüm: o bilgisayara Ayarlar'dan farklı bir istasyon kodu verin. Her bilgisayarın kendi istasyon kodu olmalı (K1, K2…).
 - **Yeni kurulum eski ID'leri tekrar vermez:** Uygulama tabloya ilk bağlandığında her istasyonun tablodaki en büyük numarasını öğrenir ve oradan devam eder. Bu yüzden yeni kurulumda **kesim yapmadan önce** Sheets ayarlarını girin.
 - **Sıra:** En yeni kesim **en üsttedir**: yeni satır başlığın hemen altına girer, aşağı indikçe kayıtlar eskir. İnternetsiz kalmış eski kayıtlar sonradan gelirse zamanına göre araya yerleşir. Tablo elle başka sütuna göre sıralanırsa uygulamanın bir sonraki bağlantısında kendiliğinden bu sıraya döner.
@@ -88,7 +90,7 @@ Script sizin adınıza çalıştığı için korumalı sayfaya yazmaya devam ede
 
 ## Disk arızası / yeni bilgisayar: Sheets'ten geri kurma
 
-Script **v3 veya üstü** gerekir (güncel `Code.gs`: `const VERSION = 7;`). Eski sürüm kuruluysa önce "Script'i güncellemek" adımını yapın.
+Script **v3 veya üstü** gerekir (güncel `Code.gs`: `const VERSION = 8;`). Eski sürüm kuruluysa önce "Script'i güncellemek" adımını yapın.
 
 1. Uygulamayı yeni bilgisayara kurun ve açın (veritabanı boş açılır).
 2. **Ayarlar** (Ctrl+4) → Sheets adresi ve anahtarı girin → **Kaydet**.
@@ -114,3 +116,17 @@ Geri kurma yalnızca **boş** veritabanına yapılır. Tabloda tek bir bozuk sat
 | Sheets yanıtı anlaşılamadı… 'Herkes' erişimi | Dağıtımda erişim "Herkes" değil ya da adres `/exec` ile bitmiyor (`/dev` değil). |
 | Google'a ulaşılamıyor | İnternet yok. Kayıtlar birikir; bağlantı gelince kendiliğinden gönderilir. |
 | Sheets reddetti: Tablo meşgul… | Aynı anda başka bir gönderim sürüyordu; birkaç dakika içinde tekrar denenir. |
+
+## Depo sunucusundan gönderim (v8)
+
+1. `Code.gs`'yi güncelleyip **yeni sürüm** olarak dağıtın ("Script'i güncellemek"). Adres değişmez.
+2. Yönetim bilgisayarında **Ayarlar → Google Sheets kopyası (depo sunucusundan)** → yetkili kartı + PIN → adres ve anahtar → **Dene ve kaydet**.
+   Sunucu önce Google'a bağlanıp dener; anahtar yanlışsa, script v8'den eskiyse ya da internet yoksa **kaydetmez** ve sebebini yazar.
+3. Sunucu birkaç dakika içinde gönderir:
+   - **Kesimler:** istasyonların gönderdiği sayfanın aynısı (aynı sütunlar). Bütün toplar bir kez gider, sonra yalnızca değişenler.
+   - **Stok:** depodaki toplar (stokta + açık sevkiyatta okutulmuş), lot/firma, metre (sayı), durum, sevkiyat no. Veri değiştikçe en sık 2 dakikada bir **baştan yazılır**.
+   - **Sevkiyatlar:** bütün sevkiyatlar, en yenisi üstte (durum, lot, top, metre, açan/kapatan, not).
+   - Stok ve Sevkiyatlar sayfalarının başlık satırının sonunda "Son güncelleme: …" yazar. Bu iki sayfaya elle yazılan her şey bir sonraki gönderimde silinir.
+4. Sunucu gönderiyorsa kalite kontrol bilgisayarlarındaki Sheets ayarı boşaltılabilir (aynı satırlar iki kez yazılmaz, ama gerek de kalmaz). **Sheets'ten geri kurma** gerektiğinde o bilgisayarda adres ve anahtar yeniden yazılır.
+5. Durum aynı bölümde: "Çalışıyor · son kontrol …", "Gönderilemiyor: …" (internet yok, anahtar değişti…), bekleyen top sayısı. İnternet yokken depo ve sevkiyat aynen çalışır.
+6. **Kopyayı kapat** sunucunun göndermesini durdurur; tablodaki veriler silinmez. Başka bir tablonun adresi yazılırsa bütün toplar oraya da gönderilir.

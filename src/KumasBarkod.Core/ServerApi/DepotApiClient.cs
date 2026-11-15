@@ -131,26 +131,47 @@ public sealed class DepotApiClient(HttpClient http, SettingsRepository settings,
     public Task<List<ShipmentHistoryRow>> GetShipmentHistoryAsync(DateOnly from, DateOnly to, CancellationToken ct = default) =>
         Get<List<ShipmentHistoryRow>>(ReportPaths.ShipmentHistory + RangeQuery(from, to), ct);
 
+    // ---------- Google Sheets kopyası (yetkili) ----------
+
+    public Task<SheetsStatusResponse> GetSheetsStatusAsync(CancellationToken ct = default) =>
+        Get<SheetsStatusResponse>(SheetsPaths.Settings, ct);
+
+    /// <summary>Sunucu kaydetmeden önce Google'a bağlanıp dener (Apps Script ilk açılışta yavaş olabilir: uzun zaman aşımı).</summary>
+    public Task<SheetsStatusResponse> SaveSheetsAsync(string? url, string? key, CancellationToken ct = default) =>
+        Send<SheetsStatusResponse>(HttpMethod.Put, SheetsPaths.Settings, new SheetsSettingsRequest(url, key), ct, SlowTimeout);
+
+    /// <summary>Her isteğin zaman aşımı (yerel ağ; sunucu cevap vermiyorsa kullanıcı uzun beklemesin).</summary>
+    public static TimeSpan DefaultTimeout { get; set; } = TimeSpan.FromSeconds(10);
+    public static readonly TimeSpan SlowTimeout = TimeSpan.FromSeconds(75);
+
     private static string RangeQuery(DateOnly from, DateOnly to) =>
         $"?from={from.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture)}&to={to.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture)}";
 
     private Task<T> Get<T>(string path, CancellationToken ct) where T : class =>
-        Guard(ServerHttp.SendAsync<T>(http, () => Request(HttpMethod.Get, path), ct));
+        Guard(t => ServerHttp.SendAsync<T>(http, () => Request(HttpMethod.Get, path), t), ct, DefaultTimeout);
 
-    private Task<T> Send<T>(HttpMethod method, string path, object body, CancellationToken ct) where T : class =>
-        Guard(ServerHttp.SendAsync<T>(http, () =>
+    private Task<T> Send<T>(HttpMethod method, string path, object body, CancellationToken ct, TimeSpan? timeout = null) where T : class =>
+        Guard(t => ServerHttp.SendAsync<T>(http, () =>
         {
             var request = Request(method, path);
             request.Content = JsonContent.Create(body, body.GetType(), options: ServerApiContract.Json);
             return request;
-        }, ct));
+        }, t), ct, timeout ?? DefaultTimeout);
 
-    /// <summary>Sunucu oturumu reddederse (401) yerel oturum da kapanır: ekran giriş ister.</summary>
-    private async Task<T> Guard<T>(Task<T> call)
+    /// <summary>
+    /// İstek başına zaman aşımı + sunucu oturumu reddederse (401) yerel oturum da kapanır: ekran giriş ister.
+    /// </summary>
+    private async Task<T> Guard<T>(Func<CancellationToken, Task<T>> send, CancellationToken ct, TimeSpan timeout)
     {
+        using var cts = CancellationTokenSource.CreateLinkedTokenSource(ct);
+        cts.CancelAfter(timeout);
         try
         {
-            return await call;
+            return await send(cts.Token);
+        }
+        catch (OperationCanceledException ex) when (!ct.IsCancellationRequested)
+        {
+            throw new SyncException(SyncFailureKind.Offline, "Depo sunucusu yanıt vermedi (zaman aşımı).", ex);
         }
         catch (SyncException ex) when (ex.StatusCode == 401 && _session is not null)
         {

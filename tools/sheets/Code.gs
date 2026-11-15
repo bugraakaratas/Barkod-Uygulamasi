@@ -30,6 +30,11 @@
  *    Metin hücreleri başına görünmez tırnak (') konarak yazılır; okurken tırnak gelmez.
  *  - Geri kurmada metin sütunları her zaman metin döner: tek bir sayısal hücre tüm yanıtı bozmasın.
  *
+ * v8 — depo sunucusu (2026-11-15):
+ *  - "snapshot" eylemi: "Stok" ve "Sevkiyatlar" sayfaları depo sunucusundan gelen GÜNCEL tabloyla
+ *    baştan yazılır (yalnızca bu iki sayfa; "Kesimler" eskisi gibi satır satır güncellenir).
+ *  - Kesimleri artık depo sunucusu gönderir (QC bilgisayarlarından gelmeye devam etse de aynı satır olur).
+ *
  * Kurulum: tools/sheets/KURULUM.md
  * Asıl veri uygulamadaki SQLite'tadır; bu tablo yalnızca kopyadır. Elle değişiklik
  * bir sonraki gönderimde üzerine yazılır.
@@ -41,7 +46,10 @@
 // v5: en yeni kayıt en üstte, Türkçe başlıklar; "export" yine eskiden yeniye verir.
 // v6: büyük tabloda her gönderimde tablo baştan sona okunmaz.
 // v7: metinler formül olarak yorumlanmaz; export metin sütunlarını metin döndürür.
-const VERSION = 7;
+// v8: "snapshot" eylemi (Stok, Sevkiyatlar sayfaları depo sunucusundan baştan yazılır).
+const VERSION = 8;
+const SNAPSHOT_SHEETS = new Set(['Stok', 'Sevkiyatlar']);
+const SNAPSHOT_MAX_ROWS = 50000;
 const EXPORT_MAX_LIMIT = 2000;
 const SCAN_WINDOW = 2000;                  // her gönderimde üstten okunan satır
 const MAX_SEQ_KEY = 'MAX_SEQUENCES';       // istasyon → en büyük sıra (script özelliği)
@@ -79,6 +87,16 @@ function doPost(e) {
 
     if (body.action === 'export') {
       return json_(export_(Number(body.offset) || 0, Number(body.limit) || EXPORT_MAX_LIMIT));
+    }
+
+    if (body.action === 'snapshot') {
+      const lock = LockService.getScriptLock();
+      if (!lock.tryLock(30000)) return json_({ ok: false, error: 'Tablo meşgul, sonra tekrar denenecek.' });
+      try {
+        return json_(snapshot_(body.sheet, body.headers, body.rows, body.updated));
+      } finally {
+        lock.releaseLock();
+      }
     }
 
     const rows = Array.isArray(body.rows) ? body.rows : [];
@@ -302,6 +320,35 @@ function export_(offset, limit) {
     return row;
   });
   return { ok: true, total: total, rows: rows, version: VERSION };
+}
+
+/**
+ * Sayfayı baştan yazar: başlık + satırlar; başlığın sağına "Son güncelleme: …". Yalnızca izinli sayfalar.
+ * Metin hücreleri formül olarak çalışmasın diye "=" vb. ile başlayanların başına görünmez ' konur.
+ */
+function snapshot_(name, headers, rows, updated) {
+  if (!SNAPSHOT_SHEETS.has(name)) throw new Error('Bu sayfa yazılamaz: ' + name);
+  if (!Array.isArray(headers) || headers.length === 0) throw new Error('Başlık eksik.');
+  if (!Array.isArray(rows)) throw new Error('Satırlar eksik.');
+  if (rows.length > SNAPSHOT_MAX_ROWS) throw new Error('Çok fazla satır: ' + rows.length);
+  const width = headers.length;
+  if (rows.some((r) => !Array.isArray(r) || r.length !== width)) throw new Error('Satır sütun sayısı başlıkla uyuşmuyor.');
+
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const sh = ss.getSheetByName(name) || ss.insertSheet(name);
+  sh.clearContents();
+  sh.getRange(1, 1, 1, width + 2).setValues([headers.map(String).concat(['', 'Son güncelleme: ' + (updated || '')])]).setFontWeight('bold');
+  sh.setFrozenRows(1);
+  if (rows.length > 0) {
+    const missing = rows.length + 1 - sh.getMaxRows();
+    if (missing > 0) sh.insertRowsAfter(sh.getMaxRows(), missing);
+    const values = rows.map((r) => r.map((v) => {
+      if (v === null || v === undefined) return '';
+      return typeof v === 'string' && /^[=+\-@']/.test(v) ? "'" + v : v;
+    }));
+    sh.getRange(2, 1, rows.length, width).setValues(values).setFontWeight('normal');
+  }
+  return { ok: true, sheet: name, rows: rows.length, version: VERSION };
 }
 
 function validate_(r) {

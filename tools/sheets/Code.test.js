@@ -78,8 +78,45 @@ function load(maxRows = 1000) {
       };
     },
   };
+  // v8: "Stok" / "Sevkiyatlar" gibi baştan yazılan sayfalar
+  const snaps = new Map();
+  const snapSheet = (name) => {
+    const d = [];
+    let max = 1000;
+    const sh = {
+      name, data: d,
+      clearContents: () => { d.length = 0; },
+      getMaxRows: () => max,
+      insertRowsAfter: (after, n) => { max += n; },
+      setFrozenRows: () => {},
+      getRange(row, col, nr = 1, nc = 1) {
+        if (row + nr - 1 > max) throw new Error('The coordinates of the range are outside the dimensions of the sheet.');
+        return {
+          setValues(values) {
+            values.forEach((v, i) => {
+              d[row - 1 + i] = d[row - 1 + i] || [];
+              v.forEach((cell, j) => {
+                let stored = cell;
+                if (typeof cell === 'string' && cell.startsWith("'")) stored = cell.slice(1);
+                else if (typeof cell === 'string' && cell.startsWith('=')) stored = 2;
+                d[row - 1 + i][col - 1 + j] = stored;
+              });
+            });
+            return this;
+          },
+          setFontWeight() { return this; },
+        };
+      },
+    };
+    return sh;
+  };
   const ctx = {
-    SpreadsheetApp: { getActiveSpreadsheet: () => ({ getSheetByName: () => sheet, insertSheet: () => sheet }) },
+    SpreadsheetApp: {
+      getActiveSpreadsheet: () => ({
+        getSheetByName: (n) => (n === 'Kesimler' ? sheet : snaps.get(n) || null),
+        insertSheet: (n) => { if (n === 'Kesimler') return sheet; const s = snapSheet(n); snaps.set(n, s); return s; },
+      }),
+    },
     PropertiesService: {
       getScriptProperties: () => ({ getProperty: (k) => props.get(k) ?? null, setProperty: (k, v) => props.set(k, v) }),
     },
@@ -94,7 +131,7 @@ function load(maxRows = 1000) {
   const post = (body) => JSON.parse(ctx.doPost({ postData: { contents: JSON.stringify({ key: KEY, ...body }) } }).text);
   const ids = () => data.slice(1).map((r) => r[0]);
   const lot = (id) => data.slice(1).find((r) => r[0] === id)[3];
-  return { post, ids, lot, data, formats, props, reads };
+  return { post, ids, lot, data, formats, props, reads, snaps };
 }
 
 function row(cutId, createdAt, lot = 'LOT', extra = {}) {
@@ -106,11 +143,11 @@ function row(cutId, createdAt, lot = 'LOT', extra = {}) {
 }
 const t = (s) => `2026-11-02T09:00:${String(s).padStart(2, '0')}.000Z`;
 
-test('sürüm 7, boş paket sayaçları döndürür', () => {
+test('sürüm 8, boş paket sayaçları döndürür', () => {
   const s = load();
   const r = s.post({ rows: [] });
   assert.strictEqual(r.ok, true);
-  assert.strictEqual(r.version, 7);
+  assert.strictEqual(r.version, 8);
   assert.deepStrictEqual(r.max_sequences, {});
   s.post({ rows: [row('K1-000007', t(1)), row('K2-000003', t(2))] });
   assert.deepStrictEqual(s.post({ rows: [] }).max_sequences, { K1: 7, K2: 3 });
@@ -351,4 +388,43 @@ test('sayfanın satır sınırı dolunca yeni kayıt yine eklenir', () => {
   const r = s.post({ rows: [row('K1-000003', t(3))] });
   assert.strictEqual(r.ok, true);
   assert.deepStrictEqual(s.ids(), ['K1-000003', 'K1-000002', 'K1-000001']);
+});
+
+// ---------- v8: depo sunucusundan baştan yazılan sayfalar ----------
+
+test('snapshot: Stok sayfası baştan yazılır, eski satırlar kalmaz, güncelleme zamanı başlıkta', () => {
+  const s = load();
+  const headers = ['Barkod', 'Lot', 'Metre'];
+  let r = s.post({ action: 'snapshot', sheet: 'Stok', headers, rows: [['K1-000001', 'LOT-3', 25.5], ['K1-000002', 'LOT-3', 10]], updated: '15.11.2026 21:30' });
+  assert.deepStrictEqual([r.ok, r.rows, r.version], [true, 2, 8]);
+  r = s.post({ action: 'snapshot', sheet: 'Stok', headers, rows: [['K1-000003', 'LOT-9', 7]], updated: '15.11.2026 21:35' });
+  const d = s.snaps.get('Stok').data;
+  assert.deepStrictEqual(d[0], ['Barkod', 'Lot', 'Metre', '', 'Son güncelleme: 15.11.2026 21:35']);
+  assert.deepStrictEqual(d.slice(1), [['K1-000003', 'LOT-9', 7]]);
+  assert.strictEqual(s.ids().length, 0);   // Kesimler sayfasına dokunulmadı
+});
+
+test('snapshot: boş tablo da yazılır (stok bitti), büyük tablo sayfayı büyütür', () => {
+  const s = load();
+  s.post({ action: 'snapshot', sheet: 'Sevkiyatlar', headers: ['No'], rows: [] });
+  assert.deepStrictEqual(s.snaps.get('Sevkiyatlar').data, [['No', '', 'Son güncelleme: ']]);
+  const rows = Array.from({ length: 2500 }, (_, i) => ['SV-' + i]);
+  assert.strictEqual(s.post({ action: 'snapshot', sheet: 'Sevkiyatlar', headers: ['No'], rows }).rows, 2500);
+  assert.strictEqual(s.snaps.get('Sevkiyatlar').data.length, 2501);
+});
+
+test('snapshot: yalnızca izinli sayfalar; Kesimler ezilemez; bozuk satır reddedilir', () => {
+  const s = load();
+  assert.match(s.post({ action: 'snapshot', sheet: 'Kesimler', headers: ['x'], rows: [] }).error, /yazılamaz/);
+  assert.match(s.post({ action: 'snapshot', sheet: 'Stok', headers: ['a', 'b'], rows: [['tek']] }).error, /uyuşmuyor/);
+  assert.match(s.post({ action: 'snapshot', sheet: 'Stok', headers: [], rows: [] }).error, /Başlık/);
+});
+
+test('snapshot: formül gibi metin çalıştırılmaz, anahtar gerekir', () => {
+  const s = load();
+  s.post({ action: 'snapshot', sheet: 'Stok', headers: ['Lot'], rows: [['=1+1'], ['+90 firma']] });
+  assert.deepStrictEqual(s.snaps.get('Stok').data.slice(1), [['=1+1'], ['+90 firma']]);
+  const r = s.post({ key: 'yanlis', action: 'snapshot', sheet: 'Stok', headers: ['Lot'], rows: [['X']] });
+  assert.strictEqual(r.ok, false);
+  assert.deepStrictEqual(s.snaps.get('Stok').data.slice(1), [['=1+1'], ['+90 firma']]);
 });
