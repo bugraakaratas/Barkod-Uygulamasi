@@ -302,7 +302,7 @@ Plan: `docs/DEPO-SEVKIYAT-PLANI.md`. Kullanıcı planı 2026-11-15'te onayladı.
 | 3 QC'de lot önerisi | ✅ | `3fc2e26` + belge | Aşağıda. QC 1.3.0 |
 | 4 Sevkiyat | ✅ | `cbfdbdd` `40ee078` + el terminali + belge | Aşağıda. QC 1.4.0, sunucu 0.3.0 |
 | 5 Geri alma + istisnalar + raporlar | ✅ | `ffc82e5` + WPF + belge | Aşağıda. QC 1.5.0, sunucu 0.4.0 |
-| 6 Sheets sunucudan | ✅ | (bu dal) | Aşağıda. QC 1.6.0, sunucu 0.5.0, Apps Script v8 |
+| 6 Sheets sunucudan | ✅ | `0b49b0a` | Aşağıda. QC 1.6.0, sunucu 0.5.0, Apps Script v8 |
 | 7 | ⏳ | — | İsteğe bağlılar (sayım, iade, raf, PostgreSQL, HTTPS) |
 
 ### Faz 6 notları (2026-11-15) — Google Sheets kopyası sunucudan (kullanıcı seçimi "a")
