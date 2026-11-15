@@ -69,7 +69,7 @@ src/KumasBarkod.App      (net10.0-windows, WPF; çıktı adı KumasBarkod.exe)
   Themes/Styles.xaml, Converters.cs
   ViewModels/    MainWindow, CutEntry, Scan, History, Settings
   Views/         MainWindow (FluentWindow + NavigationView + durum çubuğu), Pages/ (CutEntry, Scan, History, Settings)
-tests/KumasBarkod.Tests  (xUnit, 312 test) Data/, Domain/, Services/, Printing/, Scanning/, Sync/ (FakeAppsScript, ServerOutboxTests), Stress/ (rastgele girdi, eşzamanlılık; KUMAS_STRESS=1 ile 1 milyon kayıt)
+tests/KumasBarkod.Tests  (xUnit, 322 test) Data/, Domain/, Services/, Printing/, Scanning/, Sync/ (FakeAppsScript, ServerOutboxTests), Stress/ (rastgele girdi, eşzamanlılık; KUMAS_STRESS=1 ile 1 milyon kayıt)
 tests/KumasBarkod.Server.Tests (xUnit, 66 test) WebApplicationFactory + geçici SQLite: CutIngestTests, StationToServerTests, ServerBackupTests, LotAndStockTests (gerçek istasyon veritabanı → gerçek HTTP → sunucu)
 tools/sheets/            Code.gs (Apps Script v7), Code.test.js (node --test, 25 test), KURULUM.md
 tools/test/              regresyon: uitest.ps1 (arayüz A/B, gerçek Google C/D), uidb.py, stres.gs, README.md
@@ -83,6 +83,7 @@ docs/                    SUNUM.md (donanımsız sunum akışı), PILOT.md (fabri
 ### Önemli tasarım kararları
 - **Veritabanı:** SQLite, WAL + `synchronous=FULL` + `foreign_keys` + `busy_timeout=5000`. Şema sürümü `PRAGMA user_version`; her göç kendi işleminde. **Yayınlanmış göç asla değiştirilmez, yeni sürüm eklenir.** Uygulamadan yeni şemalı veritabanı açılmaz.
 - **Şema v1:** `cuts` (STRICT, CHECK'ler: ID = istasyon + '-' + 6 hane, lot kırpılmış/boş değil, length_cm > 0, durum active/voided, iptal bilgisi tutarlılığı), `sync_outbox` (FK → cuts), `station_counter`, `settings` (anahtar/değer).
+- **Şema v3 (2026-11-15):** `lots_cache` (lot_id, name, lot_key, active) — depo sunucusundaki lot tanımlarının kopyası; yalnızca öneri/uyarı, kayıt buna bağlı değil.
 - **Şema v2 (2026-11-15):** `server_outbox` (sync_outbox ile aynı yapı, depo sunucusu kuyruğu). Göç, mevcut bütün kesimleri kayıt sırasıyla bu kuyruğa ekler. Kesimdeki her değişiklik `OutboxWriter.EnqueueAll` ile AYNI işlemde iki kuyruğa yazılır. Ayar `server_url` (normalleştirilmiş tam adres).
 - **ID:** `K1-000123` saklanır/görünür; barkodda tiresiz `K1000123` (Türkçe klavye tire sorunu). İstasyon kodu `^[A-Z][A-Z0-9]$`, varsayılan `K1`. Sıra 1–999999.
 - **Kayıt:** `CutService.CreateCut` tek işlemde (BEGIN IMMEDIATE) sayaç + cuts + sync_outbox. Hatalı giriş sıra numarası harcamaz.
@@ -298,7 +299,17 @@ Plan: `docs/DEPO-SEVKIYAT-PLANI.md`. Kullanıcı planı 2026-11-15'te onayladı.
 | 0 Saha | ⏳ kullanıcıdan bilgi | — | Yükleme nasıl (elle/forklift, kim okutuyor), Wi-Fi kapsaması, sunucu PC + UPS |
 | 1 Sunucu + veri alımı | ✅ GitHub'da | `cdde8f8` `4638e97` `5269f72` `8fef74e` `997a4e6` `8ad7071` `46f92c1` | Aşağıda. QC 1.1.0, sunucu 0.1.0 |
 | 2 Lot tanımları + Depo Stoğu | ✅ | `2c40993` `e81be0c` + belge | Aşağıda. QC 1.2.0, sunucu 0.2.0 |
-| 3–7 | ⏳ | — | QC lot önbelleği, Sevkiyat, geri alma/raporlar, Sheets'in sunucuya taşınması |
+| 3 QC'de lot önerisi | ✅ | `3fc2e26` + belge | Aşağıda. QC 1.3.0 |
+| 4–7 | ⏳ | — | Sevkiyat, geri alma/raporlar, Sheets'in sunucuya taşınması |
+
+### Faz 3 notları (2026-11-15)
+- **Önbellek:** `LotCatalog` (Core/Data) `lots_cache`'i tek işlemde yeniler. `ServerSyncService` her BAŞARILI turun sonunda `GET /api/v1/lots` ile yeniler (yalnızca QC görevinde — QC dışında tur zaten erken döner); alınamazsa eski liste kalır, kesim gönderimi etkilenmez; `LotCatalogRefreshed` olayı (arka plan iş parçacığı). `IServerTransport.GetLotsAsync` eklendi.
+- **Eşleştirme (`LotMatcher`, sunucuyla aynı `LotKeys`):** liste boş → `NoCatalog` (kontrol yok, ekran eskisi gibi; sunucusuz kurulumlar ve A/B testleri bu yolda). `Key` eşit → `Defined` (etikete/kayda TANIMLI AD yazılır, sonuç mesajında "yazılan … → tanımlı ad"). Değilse `Undefined`; öneri YALNIZCA `LooseKey` eşitliği (sıfır farkı) — "içinde geçiyor" önerilmez (LOT-31 → LOT-3 yanlış firma riski). `Suggest` (yazarken): başı uyanlar, sonra içinde geçenler, en fazla 8.
+- **Kesim Girişi:** lot kutusunun altındaki seçenekler artık başlıklı: yazılan metne uyan tanımlı lot varsa "Tanımlı lotlar", yoksa "Son lotlar" (aynı `RecentLots` koleksiyonu, ↑↓ ve tıklama aynı). Seçeneklerden biri seçilince liste değişmez; yazınca yeniden süzülür.
+  - **Tanımsız lot onayı** (`LotCheckPanel`, Kaydet düğmesinin üstünde, Focusable Border — `ReprintPanel` deseni): öneri yoksa seçim "2" hazır, Enter yazıldığı gibi kaydeder; öneri varsa HİÇBİR ŞEY seçili değil, seçimsiz Enter kaydetmez ("Önce seçin"); 1 = önerilen, 2 = yazıldığı gibi, Esc = düzelt (odak lota), tıklama/başka yere odak = kapanır (kayıt yok). Rakam tuşları `Handled` işaretlenmez (okutma karakterleri ScanCapture'a ulaşsın); okutmanın Enter'ı ScanCapture'da işlendiği için panel kaydetmez (testte doğrulandı). F5/F6 paneli kapatır.
+  - Oturumda "yazıldığı gibi" onaylanan tanımsız lot (anahtar → İLK yazım) tekrar sorulmaz ve hep ilk yazımla basılır ("YENI LOT"/"yeni lot" karışmasın — testte görülüp düzeltildi).
+  - F5 (sıradaki parça) kontrol etmez: son kaydın lotu zaten kontrolden geçti.
+- **Arayüz testi F** (`uitest.ps1 -Part F`, geçici sunucu `localhost:5087`, 24/24): önbellek dolar, yazarken "Tanımlı lotlar", ↓ ilk öneri, Türkçe harfsiz yazımla öneri (akin → Akın Tekstil), "lot 3" → LOT-3 basıldı, tanımsız + Enter, aynı tanımsız tekrar sorulmaz + ilk yazım, LOT-03'te seçimsiz Enter kaydetmez / 1 → LOT-3 / 2 → LOT-03, Esc + düzeltme, panel açıkken okutma kayıt açmaz ve Okutma ekranına geçer, F5, sunucuda LOT-3 bağlı / tanımsızlar yönetime düştü. Aynı turda A 60/60, B 21/21 (300 F5 orta 161 ms, en kötü 706 ms — tek ölçüm), E 31/31; birim 322 + 66.
 
 ### Faz 2 notları (2026-11-15)
 - **Bilgisayar görevi (`settings.station_role`, `StationRoles`):** `qc` (varsayılan; Kesim Girişi, Okutma, Geçmiş), `dock` (Depo Stoğu; Faz 4'te Sevkiyat), `office` (Depo Stoğu, Lotlar). Ayarlar'ın EN ÜSTÜNDE seçilir (radyo düğmeleri), `SettingsChangedMessage` ile menü hemen değişir; gizlenen ekrandaysa görevin ilk ekranına gider. Ctrl+1..3 = görünen menü sırası, Ctrl+4 = Ayarlar. Görev yetki DEĞİLDİR (kullanıcı girişi Faz 4).
@@ -343,6 +354,7 @@ Plan: `docs/DEPO-SEVKIYAT-PLANI.md`. Kullanıcı planı 2026-11-15'te onayladı.
 
 ## Şu anki durum
 
+- **2026-11-15 — Faz 3 tamam:** QC'de tanımlı lot önerisi + tanımsız lot onayı (internetsiz de çalışır), klavyeli arayüz testleri A/B/E/F hepsi geçti. QC 1.3.0. Sıradaki: Faz 4 (sevkiyat) — kullanıcı onayı; saha soruları (elle/forklift, kim okutuyor, etiket yeri, rıhtım ağı, aynı anda kaç tır) açık, varsayılan düzen: kablolu rıhtım PC + büyük ekran + kablosuz okuyucu, kapıda tek görevli, tam ekran renk + ses.
 - **2026-11-15 — Faz 2 tamam (GitHub'da):** bilgisayar görevi (QC / sevkiyat / yönetim), lot (= firma) tanımları + yazım eşleştirme, Depo Stoğu ve Lotlar ekranları, ekranlar arası 3 sn senkron. QC 1.2.0, sunucu 0.2.0 (kurulum paketleri bu sürümle henüz üretilmedi; GitHub Release yok). Sıradaki: kullanıcı onayıyla Faz 3 (QC'de lot önerisi: lot listesi önbelleği + tanımsız lot uyarısı).
 - **2026-11-15 — Depo stok + sevkiyat projesi, Faz 1 tamam:** depo sunucusu + kesim alımı, saatlik/günlük/ikinci klasör yedeği, sunucu kurulum paketi (bu PC'de kur/güncelle/kaldır testi geçti), QC 1.1.0 (Ayarlar kartı + durum çubuğu), gerçek veri kopyasında yükseltme testi, fabrika kuralları belgesi. Kullanıcı isteği: Faz 1 bitince GitHub'a gönder, sonra Faz 2 (lot/firma tanımları + Depo Stoğu ekranı). GitHub Release (1.1.0) yapılmadı. Faz 0 saha soruları açık.
 - **Sürüm 1.0.5 (2026-11-06) yayında, tüm revizeler tamam:** cm girişi, fareyle lot, Okutma sadeleştirme, F5/F6, Geçmiş'te F6, Sheets Türkçe başlık + en yeni en üstte, script v7. Kapsamlı test ve regresyon geçti (`docs/TEST-RAPORU.md`). Bu bilgisayarda yalnızca 1.0.5 kurulu, kurulum dosyası masaüstünde.

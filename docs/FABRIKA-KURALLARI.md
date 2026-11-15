@@ -2,7 +2,7 @@
 
 Sistem en sade hâliyle tasarlandı; doğru çalışması bu kurallara bağlı. Kurulumda fabrikaya verilir.
 Her geliştirme aşamasında güncellenir. **Yalnızca uygulamada gerçekten bulunan özelliklere dayanan kurallar yazılır.**
-Son güncelleme: 2026-11-15 (Faz 2).
+Son güncelleme: 2026-11-15 (Faz 3).
 
 ## A. Altyapı (kurulumdan önce)
 
@@ -42,6 +42,11 @@ Son güncelleme: 2026-11-15 (Faz 2).
    Lotlar ekranında doğru lota bağlanır (bağlama düzeltilebilir, geçmişe yazılır). Bağlanmamış toplar firmaya göre
    stok raporunda görünmez ve sevkiyatta lot seçimiyle bulunamaz (Faz 4).
 4. Kullanılmayan lot silinmez, **pasif** yapılır (eski topları bağlı kalır).
+5. **Kalite kontrolde lot yazarken altta "Tanımlı lotlar" çıkar: listeden seçmek (↓ ya da tıklama) yazmaktan güvenlidir.**
+   Yazım farkı varsa etikete tanımlı ad basılır.
+6. Tanımlı olmayan bir lot yazılınca uygulama sorar. **Benzer lot önerilirse (ör. "LOT-3 mü?") personel emin değilse
+   yöneticiye sorar; tahminle seçmez.** Gerçekten yeni bir firmaysa "2 — yazıldığı gibi" seçilir ve yönetim lotu tanımlar.
+   Aynı yeni lot o gün tekrar sorulmaz.
 
 ## D. Yedek ve kontrol (yetkili)
 
@@ -50,5 +55,5 @@ Son güncelleme: 2026-11-15 (Faz 2).
 
 ## E. Sonraki aşamalarda eklenecek (henüz uygulamada YOK)
 
-Kalite kontrolde lot listesinden öneri (Faz 3), sevkiyat okutma kuralları (lot seçmeden okutma yok, yanlış lot reddi,
+Sevkiyat okutma kuralları (lot seçmeden okutma yok, yanlış lot reddi,
 onay ve iptal), personel kartı ile giriş, rıhtım ekranı yerleşimi (Faz 4).
