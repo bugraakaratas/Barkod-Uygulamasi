@@ -58,6 +58,26 @@ public static class Migrations
                 value TEXT NOT NULL
             ) STRICT;
             """),
+
+        new(2, "Depo sunucusu kuyruğu: server_outbox (+ mevcut kesimler kuyruğa)", """
+            -- sync_outbox (Sheets) ile aynı yapı; iki hedef birbirini beklemez, biri hata verse de diğeri gider.
+            CREATE TABLE server_outbox (
+                id          INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
+                cut_id      TEXT    NOT NULL REFERENCES cuts (cut_id),
+                operation   TEXT    NOT NULL CHECK (operation IN ('upsert')),
+                created_at  TEXT    NOT NULL,
+                sent_at     TEXT,
+                attempts    INTEGER NOT NULL DEFAULT 0 CHECK (attempts >= 0),
+                last_error  TEXT
+            ) STRICT;
+
+            CREATE INDEX ix_server_outbox_pending ON server_outbox (id) WHERE sent_at IS NULL;
+
+            -- Sunucu kurulmadan önce yapılmış kesimler de depo stoğuna gitsin (kayıt sırasıyla).
+            INSERT INTO server_outbox (cut_id, operation, created_at)
+            SELECT cut_id, 'upsert', strftime('%Y-%m-%dT%H:%M:%fZ', 'now')
+            FROM cuts ORDER BY created_at, cut_id;
+            """),
     ];
 
     public static int LatestVersion => All[^1].Version;

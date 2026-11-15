@@ -10,7 +10,8 @@ public sealed record RestoreResult(int Cuts, int Voided, IReadOnlyDictionary<str
 /// Disk arızası / yeni bilgisayar: veritabanını Google Sheets kopyasından kurar.
 /// - Yalnızca BOŞ veritabanına yapılır (yanlışlıkla mevcut verinin üstüne yazılmasın).
 /// - Tablo baştan sona okunur ve doğrulanır; tek bir bozuk satır varsa hiçbir şey yazılmaz.
-/// - İptal durumu ve baskı bilgisi korunur. Kuyruğa yazılmaz (veri zaten tabloda).
+/// - İptal durumu ve baskı bilgisi korunur. Sheets kuyruğuna yazılmaz (veri zaten tabloda);
+/// depo sunucusu kuyruğuna yazılır.
 /// - Sayaç, her istasyonun en büyük sıra numarasının 1000 ÜSTÜNE ayarlanır: tabloya henüz
 ///   gönderilmemiş son kayıtların ID'leri bilinemez, böylece eski bir ID tekrar üretilmez.
 /// </summary>
@@ -85,6 +86,12 @@ public sealed class RestoreService(SqliteConnectionFactory db, ISyncTransport tr
                 VALUES (@CutId, @StationCode, @SequenceNo, @LotCode, @LengthCm, @Operator, @Status,
                         @VoidReason, @VoidedAt, @CreatedAt, @PrintCount, @LastPrintedAt)
                 """, rows, tx);
+
+            // Sheets kuyruğuna yazılmaz (veri zaten tabloda). Depo sunucusuna gider: sunucu aynı kesimi
+            // tekrar alırsa yalnızca eşleştirir (tekrar gönderime dayanıklı), eksikse stoğa ekler.
+            var now = Timestamps.Format(clock.GetUtcNow());
+            foreach (var row in rows.OrderBy(r => r.CreatedAt, StringComparer.Ordinal))
+                OutboxWriter.Enqueue(c, tx, OutboxTables.Server, row.CutId, now);
 
             foreach (var (station, last) in counters)
             {

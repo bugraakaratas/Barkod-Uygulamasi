@@ -6,8 +6,8 @@ using KumasBarkod.Core.Domain;
 namespace KumasBarkod.Core.Services;
 
 /// <summary>
-/// Yeni kesim kaydı oluşturur. Sayaç artışı, kesim satırı ve gönderim kuyruğu
-/// TEK işlemde (transaction) yazılır: ya hepsi kalır ya hiçbiri.
+/// Yeni kesim kaydı oluşturur. Sayaç artışı, kesim satırı ve gönderim kuyrukları (Sheets + depo
+/// sunucusu) TEK işlemde (transaction) yazılır: ya hepsi kalır ya hiçbiri.
 /// </summary>
 public sealed class CutService(SqliteConnectionFactory db, SettingsRepository settings, TimeProvider clock)
 {
@@ -61,9 +61,7 @@ public sealed class CutService(SqliteConnectionFactory db, SettingsRepository se
             VALUES (@CutId, @StationCode, @SequenceNo, @LotCode, @LengthCm, @Operator, @Status, @CreatedAt)
             """, cut, tx);
 
-        c.Execute("""
-            INSERT INTO sync_outbox (cut_id, operation, created_at) VALUES (@cutId, 'upsert', @now)
-            """, new { cutId = cut.CutId, now }, tx);
+        OutboxWriter.EnqueueAll(c, tx, cut.CutId, now);
 
         tx.Commit();
         return cut;
@@ -102,8 +100,7 @@ public sealed class CutService(SqliteConnectionFactory db, SettingsRepository se
                 WHERE cut_id = @cutId
                 """, new { cutId, text, now }, tx);
 
-            c.Execute("INSERT INTO sync_outbox (cut_id, operation, created_at) VALUES (@cutId, 'upsert', @now)",
-                new { cutId, now }, tx);
+            OutboxWriter.EnqueueAll(c, tx, cutId, now);
 
             tx.Commit();
         }

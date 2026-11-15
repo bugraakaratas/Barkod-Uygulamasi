@@ -1,5 +1,11 @@
 namespace KumasBarkod.Core.Sync;
 
+/// <summary>Bir gönderim turu çalıştıran servis (Sheets: <see cref="SyncService"/>, depo sunucusu: <see cref="ServerSyncService"/>).</summary>
+public interface ISyncRunner
+{
+    Task<SyncRunResult> RunOnceAsync(CancellationToken cancellationToken = default);
+}
+
 /// <summary>
 /// Arka plan göndericisi. Normalde 2 dakikada bir, yeni kayıttan ~5 sn sonra da gönderir.
 /// Hata olursa bekleme artar (30 sn → 1 → 2 → 5 → 10 dk); bekleme sırasında yeni kayıt
@@ -10,7 +16,10 @@ public sealed class SyncWorker : IAsyncDisposable
     public static readonly TimeSpan NormalInterval = TimeSpan.FromMinutes(2);
     public static readonly TimeSpan NudgeDelay = TimeSpan.FromSeconds(5);
 
-    private readonly SyncService _service;
+    private readonly ISyncRunner _service;
+    private readonly TimeSpan _normalInterval;
+    private readonly TimeSpan _nudgeDelay;
+    private readonly TimeSpan _maxBackoff;
     private readonly OutboxRepository _outbox;
     private readonly TimeProvider _clock;
     private readonly SemaphoreSlim _signal = new(0);
@@ -19,9 +28,16 @@ public sealed class SyncWorker : IAsyncDisposable
     private int _failures;
     private DateTimeOffset? _lastSuccess;
 
-    public SyncWorker(SyncService service, OutboxRepository outbox, TimeProvider clock)
+    /// <param name="normalInterval">Hata yokken iki tur arası (varsayılan <see cref="NormalInterval"/>).</param>
+    /// <param name="nudgeDelay">Yeni kayıttan sonra bekleme (varsayılan <see cref="NudgeDelay"/>).</param>
+    /// <param name="maxBackoff">Hata beklemesinin üst sınırı (varsayılan 10 dk; yerel ağdaki sunucu için kısa tutulur).</param>
+    public SyncWorker(ISyncRunner service, OutboxRepository outbox, TimeProvider clock,
+        TimeSpan? normalInterval = null, TimeSpan? nudgeDelay = null, TimeSpan? maxBackoff = null)
     {
+        _maxBackoff = maxBackoff ?? TimeSpan.MaxValue;
         _service = service;
+        _normalInterval = normalInterval ?? NormalInterval;
+        _nudgeDelay = nudgeDelay ?? NudgeDelay;
         _outbox = outbox;
         _clock = clock;
         Status = new SyncStatus(SyncState.Idle, 0, null, null, null);
@@ -42,6 +58,14 @@ public sealed class SyncWorker : IAsyncDisposable
         4 => TimeSpan.FromMinutes(5),
         _ => TimeSpan.FromMinutes(10),
     };
+
+    /// <summary>Hata sayısına göre bu göndericinin bekleyeceği süre.</summary>
+    internal TimeSpan Wait(int failures)
+    {
+        if (failures <= 0) return _normalInterval;
+        var backoff = Backoff(failures);
+        return backoff < _maxBackoff ? backoff : _maxBackoff;
+    }
 
     public void Start() => _loop ??= Task.Run(() => LoopAsync(_stop.Token));
 
@@ -65,10 +89,10 @@ public sealed class SyncWorker : IAsyncDisposable
         {
             try
             {
-                var woken = await _signal.WaitAsync(Backoff(_failures), ct);
+                var woken = await _signal.WaitAsync(Wait(_failures), ct);
                 if (woken)
                 {
-                    await Task.Delay(NudgeDelay, ct);       // art arda kayıtları tek pakette topla
+                    await Task.Delay(_nudgeDelay, ct);       // art arda kayıtları tek pakette topla
                     while (_signal.CurrentCount > 0) _signal.Wait(0);
                 }
                 await RunAsync(ct);
@@ -101,7 +125,7 @@ public sealed class SyncWorker : IAsyncDisposable
         {
             _failures++;
             Publish(failure.Kind == SyncFailureKind.Offline ? SyncState.Offline : SyncState.Error,
-                failure.Message, _clock.GetUtcNow() + Backoff(_failures));
+                failure.Message, _clock.GetUtcNow() + Wait(_failures));
         }
         else
         {

@@ -23,7 +23,7 @@ public class SchemaTests : IDisposable
 
         using var c = _db.Factory.Open();
         var tables = Query<string>(c, "SELECT name FROM sqlite_master WHERE type = 'table' AND name NOT LIKE 'sqlite_%' ORDER BY name");
-        Assert.Equal(["cuts", "settings", "station_counter", "sync_outbox"], tables);
+        Assert.Equal(["cuts", "server_outbox", "settings", "station_counter", "sync_outbox"], tables);
         Assert.Equal(Migrations.LatestVersion, DatabaseMigrator.GetSchemaVersion(c));
     }
 
@@ -53,7 +53,7 @@ public class SchemaTests : IDisposable
         using var c = _db.Factory.Open();
 
         var indexes = Query<string>(c, "SELECT name FROM sqlite_master WHERE type = 'index' AND name LIKE 'ix_%' ORDER BY name");
-        Assert.Equal(["ix_cuts_created_at", "ix_cuts_lot_code", "ix_sync_outbox_pending"], indexes);
+        Assert.Equal(["ix_cuts_created_at", "ix_cuts_lot_code", "ix_server_outbox_pending", "ix_sync_outbox_pending"], indexes);
     }
 
     // ---------- Bağlantı ayarları ----------

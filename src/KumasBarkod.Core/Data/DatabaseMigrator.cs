@@ -9,21 +9,27 @@ namespace KumasBarkod.Core.Data;
 /// </summary>
 public static class DatabaseMigrator
 {
+    /// <summary>İstasyon (QC) veritabanı.</summary>
     /// <returns>Uygulanan göç sayısı.</returns>
-    public static int Migrate(SqliteConnectionFactory factory)
+    public static int Migrate(SqliteConnectionFactory factory) => Migrate(factory, Migrations.All);
+
+    /// <summary>Verilen göç listesiyle (ör. sunucu veritabanı). Sürümler 1'den başlar, artan sırada.</summary>
+    /// <returns>Uygulanan göç sayısı.</returns>
+    public static int Migrate(SqliteConnectionFactory factory, IReadOnlyList<Migration> migrations)
     {
         using var connection = factory.Open();
 
+        var latest = migrations[^1].Version;
         var current = GetSchemaVersion(connection);
-        if (current > Migrations.LatestVersion)
+        if (current > latest)
         {
             throw new InvalidOperationException(
-                $"Veritabanı şeması (v{current}) bu uygulama sürümünden (v{Migrations.LatestVersion}) yeni. " +
+                $"Veritabanı şeması (v{current}) bu uygulama sürümünden (v{latest}) yeni. " +
                 "Uygulamayı güncelleyin; eski sürümle açmak veriyi bozabilir.");
         }
 
         var applied = 0;
-        foreach (var migration in Migrations.All.Where(m => m.Version > current))
+        foreach (var migration in migrations.Where(m => m.Version > current))
         {
             using var transaction = connection.BeginTransaction();
 

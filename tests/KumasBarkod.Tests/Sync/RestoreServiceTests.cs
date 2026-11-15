@@ -119,6 +119,8 @@ public class RestoreServiceTests : IDisposable
         await _restore.RestoreAsync(Target);
 
         Assert.Equal(0, new OutboxRepository(_newDb.Factory).CountPendingCuts());
+        // Depo sunucusuna ise gider (sunucu aynı kesimi tekrar alırsa yalnızca eşleştirir)
+        Assert.Equal(1, new OutboxRepository(_newDb.Factory, OutboxTables.Server).CountPendingCuts());
         var newSettings = new SettingsRepository(_newDb.Factory);
         newSettings.SetSyncTarget(Url, FakeAppsScript.Key);
         var r = await new SyncService(new OutboxRepository(_newDb.Factory), newSettings, new StationCounters(_newDb.Factory), _transport, _clock).RunOnceAsync();

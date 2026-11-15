@@ -13,7 +13,7 @@ public sealed class SyncService(
     SettingsRepository settings,
     StationCounters counters,
     ISyncTransport transport,
-    TimeProvider clock)
+    TimeProvider clock) : ISyncRunner
 {
     public const int BatchSize = 200;
     public const int MaxBatchesPerRun = 25;          // bir turda en fazla 5.000 kesim

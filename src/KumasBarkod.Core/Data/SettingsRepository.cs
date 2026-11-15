@@ -1,6 +1,7 @@
 using System.Globalization;
 using Dapper;
 using KumasBarkod.Core.Domain;
+using KumasBarkod.Core.ServerApi;
 using KumasBarkod.Core.Sync;
 
 namespace KumasBarkod.Core.Data;
@@ -12,6 +13,8 @@ public static class SettingKeys
     public const string SheetsUrl = "sheets_url";
     public const string SheetsKey = "sheets_key";
     public const string Printer = "printer";
+    /// <summary>Depo sunucusu adresi (normalleştirilmiş, ör. http://depo-sunucu:5080/).</summary>
+    public const string ServerUrl = "server_url";
 }
 
 /// <summary><c>settings</c> tablosu: anahtar/değer. Kayıt yoksa varsayılan döner.</summary>
@@ -68,6 +71,25 @@ public sealed class SettingsRepository(SqliteConnectionFactory db)
         var url = Get(SettingKeys.SheetsUrl);
         var key = Get(SettingKeys.SheetsKey);
         return string.IsNullOrWhiteSpace(url) || string.IsNullOrWhiteSpace(key) ? null : new SyncTarget(url, key);
+    }
+
+    /// <summary>Depo sunucusu adresi; girilmemişse null (sunucuya gönderim kapalı, kayıtlar kuyrukta bekler).</summary>
+    public Uri? GetServerBaseUri() =>
+        ServerAddress.TryNormalize(Get(SettingKeys.ServerUrl), out var uri, out _) ? uri : null;
+
+    /// <summary>Boş adres sunucuya gönderimi kapatır. Kaydedilen: normalleştirilmiş tam adres.</summary>
+    public Uri? SetServerUrl(string? input)
+    {
+        if (string.IsNullOrWhiteSpace(input))
+        {
+            using var c = db.Open();
+            c.Execute("DELETE FROM settings WHERE key = @k", new { k = SettingKeys.ServerUrl });
+            return null;
+        }
+        if (!ServerAddress.TryNormalize(input, out var uri, out var error))
+            throw new CutValidationException(error!);
+        Set(SettingKeys.ServerUrl, uri!.ToString());
+        return uri;
     }
 
     /// <summary>Boş adres/anahtar gönderimi kapatır.</summary>

@@ -56,9 +56,8 @@ public sealed class PrintService(
             WHERE cut_id = @cutId
             """, new { cutId, now }, tx);
 
-        // Baskı bilgisi de Sheets kopyasına gider (geri kurmada korunur).
-        c.Execute("INSERT INTO sync_outbox (cut_id, operation, created_at) VALUES (@cutId, 'upsert', @now)",
-            new { cutId, now }, tx);
+        // Baskı bilgisi de Sheets kopyasına (geri kurmada korunur) ve depo sunucusuna gider.
+        OutboxWriter.EnqueueAll(c, tx, cutId, now);
 
         tx.Commit();
     }
