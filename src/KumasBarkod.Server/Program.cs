@@ -25,8 +25,10 @@ builder.Configuration.AddJsonFile(
     Path.Combine(ServerPaths.From(builder.Configuration).DataDirectory, ServerPaths.SettingsFileName), optional: true, reloadOnChange: false);
 
 // Dinlenen adres: --urls, ASPNETCORE_URLS ya da ayarlar.json "Urls"; yoksa bütün ağ kartlarında 5080.
+// "*" = IPv4 + IPv6 birlikte. Yalnızca IPv4 (0.0.0.0) dinlenirse Windows ad çözümünde önce IPv6'yı dener
+// ve her YENİ bağlantı ~2 sn gecikir (ölçüldü: 5 istek 10,2 sn → ikisinde birden 20 ms).
 var urls = builder.Configuration["Urls"];
-builder.WebHost.UseUrls(string.IsNullOrWhiteSpace(urls) ? $"http://0.0.0.0:{ServerApiContract.DefaultPort}" : urls);
+builder.WebHost.UseUrls(string.IsNullOrWhiteSpace(urls) ? $"http://*:{ServerApiContract.DefaultPort}" : urls);
 
 // Bütün dosya yolları ServerPaths'ten (testler yalnızca bunu değiştirir, gerçek veriye dokunulmaz).
 builder.Services.AddSingleton(sp => ServerPaths.From(sp.GetRequiredService<IConfiguration>()));

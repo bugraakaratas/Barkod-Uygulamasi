@@ -52,7 +52,7 @@ src/KumasBarkod.Core     (net10.0)  iş mantığı, veri, yazdırma, senkron —
   ServerApi/   istasyon↔sunucu sözleşmesi (ServerApiModels), ServerAddress, HttpServerTransport, ServerSyncService
   Diagnostics/ ILog, FileLog, NullLog
 src/KumasBarkod.Server   (net10.0, ASP.NET Core; çıktı KumasBarkodSunucu.exe, Windows hizmeti) — depo sunucusu
-  Data/        ServerMigrations (sunucu şeması), RollStates, MovementKinds, ServerInvariants (bütünlük kontrolü)
+  Data/        ServerMigrations (sunucu şeması), RollStates, MovementKinds, ServerInvariants (bütünlük kontrolü), ServerBackupService
   Ingest/      CutIngestService (kesim alımı), ApiException
   Program.cs, ServerEndpoints (uç noktalar + ApiErrorMiddleware), ServerHosting (ServerPaths, FileLogProvider), MaintenanceWorker (+ AdminCommands)
 src/KumasBarkod.App      (net10.0-windows, WPF; çıktı adı KumasBarkod.exe)
@@ -68,12 +68,12 @@ src/KumasBarkod.App      (net10.0-windows, WPF; çıktı adı KumasBarkod.exe)
   ViewModels/    MainWindow, CutEntry, Scan, History, Settings
   Views/         MainWindow (FluentWindow + NavigationView + durum çubuğu), Pages/ (CutEntry, Scan, History, Settings)
 tests/KumasBarkod.Tests  (xUnit, 290 test) Data/, Domain/, Services/, Printing/, Scanning/, Sync/ (FakeAppsScript, ServerOutboxTests), Stress/ (rastgele girdi, eşzamanlılık; KUMAS_STRESS=1 ile 1 milyon kayıt)
-tests/KumasBarkod.Server.Tests (xUnit, 37 test) WebApplicationFactory + geçici SQLite: CutIngestTests, StationToServerTests (gerçek istasyon veritabanı → gerçek HTTP → sunucu)
+tests/KumasBarkod.Server.Tests (xUnit, 42 test) WebApplicationFactory + geçici SQLite: CutIngestTests, StationToServerTests, ServerBackupTests (gerçek istasyon veritabanı → gerçek HTTP → sunucu)
 tools/sheets/            Code.gs (Apps Script v7), Code.test.js (node --test, 25 test), KURULUM.md
 tools/test/              regresyon: uitest.ps1 (arayüz A/B, gerçek Google C/D), uidb.py, stres.gs, README.md
-tools/installer/         KumasBarkod.iss, build-installer.ps1, generate-icon.ps1
+tools/installer/         KumasBarkod.iss, build-installer.ps1, generate-icon.ps1, KumasBarkodSunucu.iss, build-server-installer.ps1
 docs/                    SUNUM.md (donanımsız sunum akışı), PILOT.md (fabrika pilotu), TEST-RAPORU.md,
-                         DEPO-SEVKIYAT-PLANI.md (onaylı plan), SUNUCU-KURULUM.md (depo sunucusu kurulumu)
+                         DEPO-SEVKIYAT-PLANI.md (onaylı plan), SUNUCU-KURULUM.md (depo sunucusu kurulumu), FABRIKA-KURALLARI.md
 ```
 
 **Paketler:** WPF-UI 4.3.0 (Fluent), CommunityToolkit.Mvvm 8.4.2, Microsoft.Extensions.DependencyInjection 10.0.14, Microsoft.Data.Sqlite 10.0.14, Dapper 2.1.89, ZXing.Net 0.16.11 (yalnızca önizleme barkodu).
@@ -278,7 +278,7 @@ docs/                    SUNUM.md (donanımsız sunum akışı), PILOT.md (fabri
 
 ## Depo stok ve sevkiyat (2026-11-14 →)
 
-Plan: `docs/DEPO-SEVKIYAT-PLANI.md`. Kullanıcı planı 2026-11-15'te onayladı. **Her faz sonunda: test → commit → bu dosya → özet → sonraki faz için onay.** Çalışma dalı `feature/faz1-sunucu` (Faz 1; henüz `main`'e birleştirilmedi, push yok).
+Plan: `docs/DEPO-SEVKIYAT-PLANI.md`. Kullanıcı planı 2026-11-15'te onayladı. **Her faz sonunda: test → commit → bu dosya → özet → sonraki faz için onay.** Her faz `feature/fazN-…` dalında; bitince `main`'e birleştirilip gönderilir.
 
 ### Kullanıcı kararları (değiştirme)
 - QC ve depo cihazları aynı fabrika yerel ağında. Kurulum: **3 ekranlı bilgisayar** (Kalite kontrol · Sevkiyat/rıhtım · Patron) + **1 ekransız sunucu**. Aynı WPF uygulaması üçünde; ileride Ayarlar'da "bilgisayar rolü" görünen sayfaları seçecek (henüz yok).
@@ -294,7 +294,7 @@ Plan: `docs/DEPO-SEVKIYAT-PLANI.md`. Kullanıcı planı 2026-11-15'te onayladı.
 | Faz | Durum | Commit | Özet |
 |---|---|---|---|
 | 0 Saha | ⏳ kullanıcıdan bilgi | — | Yükleme nasıl (elle/forklift, kim okutuyor), Wi-Fi kapsaması, sunucu PC + UPS |
-| 1 Sunucu + veri alımı | ✅ (dalda, push yok) | `87af678` `0fd9cf4` `bf2aa5b` | Aşağıda |
+| 1 Sunucu + veri alımı | ✅ | `87af678` `0fd9cf4` `bf2aa5b` `7b2706e` `5a07204` + belge | Aşağıda. QC 1.1.0, sunucu 0.1.0 |
 | 2–7 | ⏳ | — | Lot tanımları + Stok ekranı, QC lot önbelleği, Sevkiyat, geri alma/raporlar, Sheets'in sunucuya taşınması |
 
 ### Faz 1 notları (2026-11-15)
@@ -305,17 +305,24 @@ Plan: `docs/DEPO-SEVKIYAT-PLANI.md`. Kullanıcı planı 2026-11-15'te onayladı.
 - **Alım kuralları (`CutIngestService`, tek BEGIN IMMEDIATE işlem):** yeni kesim → `in_stock` + `qc_created` (occurred_at = QC zamanı, recorded_at = sunucu zamanı); zaten iptal geldiyse ardından `qc_voided`. Bilinen kesim + aynı kimlik (istasyon, sıra, lot, uzunluk, operatör, kayıt zamanı) → yalnızca ileri yönde güncelleme (baskı sayısı büyüğü, iptal kalıcı; geç gelen eski hâl iptali geri almaz). Farklı kimlik → `cut_conflicts` + top `quarantined` (sevk edilmişse durum değişmez); aynı çakışma tekrar gelirse yeni kayıt yok. İptal yalnızca `in_stock` topu `voided` yapar; başka durumdaki topun durumu değişmez, iptal harekete not olarak yazılır (tıra yüklenmiş top sessizce stoktan düşmesin).
 - **İstasyon sahipliği (tasarım düzeltmesi, testte bulundu):** yalnızca bilgisayarın ŞU ANKİ kodu başka bilgisayara aitse paket reddedilir. Paketteki eski kodlu kesimler (kodu sonradan değişmiş PC) yine işlenir; numara çakışırsa karantina. İlk tasarımda bütün paket reddediliyordu → kodunu değiştiren PC'nin yeni kesimleri de sonsuza dek bekliyordu.
 - **Bütünlük kontrolü (`ServerInvariants`):** durum = son hareketin vardığı durum; her topta tam bir `qc_created` ve ilk hareket o; hareket zinciri kesintisiz; karantinadaki topun çözülmemiş çakışması var. Her sunucu testinin sonunda, günlük yedekle birlikte ve `--kontrol` komutuyla çalışır.
-- **Sunucu barındırma:** `UseWindowsService`, varsayılan `http://0.0.0.0:5080`. Veri `%ProgramData%\KumasBarkodSunucu` (`KumasBarkod:DataDirectory` ayarı / `KUMASBARKOD_SERVER_DATA_DIR`). Bütün yollar DI'daki `ServerPaths`'ten (testler yalnızca onu değiştirir). Günlük: ASP.NET uyarıları + kendi bilgilerimiz `logs\kumas-YYYY-MM-DD.log`. Yedek: **günde bir** (`BackupService`, saatte bir kontrol) — planda "saatte bir" yazıyordu, şimdilik günlük. Kurulum: `docs/SUNUCU-KURULUM.md` (**Windows hizmeti olarak kurulum denenmedi**, Inno Setup paketi yok).
+- **Sunucu barındırma:** `UseWindowsService`, varsayılan **`http://*:5080` (IPv4+IPv6)**. **`0.0.0.0` KULLANMA:** yalnızca IPv4 dinlenince Windows ad çözümünde önce IPv6'yı deniyor, her YENİ bağlantı ~2 sn gecikiyor (ölçüldü: 5 istek 10,2 sn → `*` ile 20 ms; kurulum testinde bulundu). Adres sırası: `--urls` / `ASPNETCORE_URLS` / `ayarlar.json "Urls"`. Veri `%ProgramData%\KumasBarkodSunucu` (`KumasBarkod:DataDirectory` ayarı / `KUMASBARKOD_SERVER_DATA_DIR`). Veri klasöründeki `ayarlar.json` okunur (program klasörü güncellemede silinir, bu kalır). Bütün yollar DI'daki `ServerPaths`'ten (testler yalnızca onu değiştirir). Günlük: ASP.NET uyarıları + kendi bilgilerimiz `logs\kumas-YYYY-MM-DD.log`.
+- **Sunucu yedeği (`ServerBackupService`, kullanıcı sordu 2026-11-15):** ilk sürüm günde birdi (QC'nin `BackupService`'i yeniden kullanılmıştı) — sevkiyat kayıtları yalnızca sunucuda olacağı için yetersiz. Şimdi **saatlik** `backups\saatlik\sunucu-YYYY-MM-DD-HH.db` (48), **günlük** `backups\gunluk\sunucu-YYYY-MM-DD.db` (30, o günün ilk saatlik yedeğinin kopyası), **ikinci klasör** `KumasBarkod:BackupMirrorDirectory` (USB/ağ diski; ulaşılamazsa yerel yedek yine alınır, `[HATA]` günlüğü, disk dönünce eksikler tamamlanır). Silme ada göre, klasördeki başka dosyalara dokunmaz. `MaintenanceWorker` 5 dk'da bir kontrol eder; bütünlük kontrolü günlük yedekle birlikte. Ortak kopya kodu `BackupService.WriteVerifiedCopy`.
+- **Sunucu kurulum paketi:** `tools/installer/KumasBarkodSunucu.iss` + `build-server-installer.ps1 [-SkipTests]` → `artifacts\installer\KumasBarkodSunucu-Kurulum-<sürüm>.exe` (~35 MB). AppId `{6E0B8E52-6C1D-4B8F-9D3B-2F6A3C0B7A41}` (DEĞİŞTİRME). Yönetici kurulumu; `sc create` (yoksa) + `sc config` (güncellemede yol) + `sc failure` (çökünce yeniden başlat) + `net start`; güvenlik duvarı `netsh … remoteip=localsubnet profile=any program=…` (fabrika ağı "Ortak" görünse de çalışsın, internete kapalı); `PrepareToInstall` hizmeti durdurur; ikinci yedek klasörü sayfası → `ayarlar.json` (varsa dokunmaz); kaldırma: hizmet + kural silinir, `dirifempty` ile boş klasör, veri kalır. Bitiş sayfasında `http://<bilgisayar adı>:5080/health`.
+  - **Kurulum testi (2026-11-15, kullanıcı onayıyla, bu PC'de yönetici olarak, 3 tur; betik scratchpad `e2e\installtest.ps1` tek UAC ile kur → kontrol → üzerine kur → kontrol → kaldır → test verisini sil):** 1. tur kurulum hiç başlamadı: `CreateInputDirPage` BOŞ değere izin vermiyor ("Sürücü adı ile tam yolu yazmalısınız") → `CreateInputQueryPage` + elle yol kontrolü. 2. tur: sağlık kontrolü 90 sn yanıt vermedi (IPv4/IPv6 sorunu, yukarıda) ve boş program klasörü kaldı. 3. tur temiz: hizmet Running/Automatic, kural 1 adet LocalSubnet/Any/5080, kayıt yazıldı, saatlik+günlük yedek oluştu, üzerine kurulumda veri korundu + `--kontrol` temiz, kaldırmada hizmet/kural/klasör silindi, veri korundu; test verisi (`C:\ProgramData\KumasBarkodSunucu`) silindi — bu PC'de kalıntı yok.
+- **QC 1.1.0 kurulum paketi** üretildi (`KumasBarkod-Kurulum-1.1.0.exe`, 46,5 MB), bu PC'deki 1.0.5 kurulumuna KURULMADI (gerçek veriyi v2'ye yükseltirdi; geri dönüş yok). **GitHub Release yapılmadı** — sabit indirme linki hâlâ 1.0.5.
+- **Gerçek veri kopyasında yükseltme testi (2026-11-15):** gerçek `kumas.db` Backup API ile salt okunur kopyalandı (scratchpad `e2e\copydb.cs`; kopyada Sheets ayarları silindi ki gerçek tabloya yazmasın), yayın paketindeki 1.1.0 `KUMASBARKOD_START_PAGE=settings` ile açıldı: v1 → v2, 43 kesim → 43 sunucu kuyruğu → sunucuda 38 in_stock + 5 voided, gönderilmemiş 0, çift yok. Ayarlar → Depo sunucusu kartı ekran görüntüsünde doğrulandı.
+- **`KUMASBARKOD_START_PAGE`** (scan | history | settings; yalnızca test/sunum): klavyesiz ekran görüntüsü için açılış sayfası. UI Automation menü öğesine ulaşamıyor, `PostMessage` tıklaması WPF'e ulaşmıyor — bu yüzden eklendi.
 - **Durum çubuğu:** "Sheets bekleyen: N · <durum>" ve "Depo bekleyen: N · <durum>". Depo ayarlanmamışsa uyarı rengi YOK (sunucu kurulana kadar QC normal çalışır). 1366 genişlikte sığıyor (MaxWidth 300/280, tam metin ipucunda).
 - **Testler:** istasyon 290 (yeni: `ServerOutboxTests` — v1→v2 göçü, iki kuyruk, atomiklik, adres, gönderici), sunucu 37 (`CutIngestTests`, `StationToServerTests`: 20 paralel aynı paket → tek top; iki PC aynı kod için yarış → tek kazanan; kapalı sunucu → kuyrukta bekler → bir kez gider; yeniden kurulum sayacı sunucudan öğrenir; bağlanmadan önce ID tekrar üreten veritabanı → karantina; iki istasyon paralel 60 kesim).
 - **Gerçek uygulama denemesi (2026-11-15, geçici veri, klavyesiz):** sunucu `--urls http://127.0.0.1:5080` (0.0.0.0 güvenlik duvarı penceresi açmasın diye) + geçici QC veritabanına `seed.cs` ile 4 kesim (1 iptal) → uygulama açıldı, durum çubuğu "Depo güncel"; sunucuda 3 in_stock + 1 voided, hareketler doğru, istasyon = MachineGuid. Sunucu kapatıldı + 2 kesim → "Depoya ulaşılamıyor", bekleyen 2; sunucu açıldı → ≤1 dk içinde gitti, 6 top, çift yok. Yayın paketi (`dotnet publish -c Release`, ~109 MB) `--kontrol` ile çalıştı.
   - **Bulunan hata:** Sheets `SyncWorker` DI kaydı `ISyncRunner` yüzünden çözülemiyordu → uygulama açılışta uyarı verdi. Birim testleri App'in DI kaydını kapsamıyor: **App'te servis kaydı değişince uygulamayı gerçekten açarak dene.**
-  - **Ayarlar → Depo sunucusu kartı ekranda henüz görülmedi:** klavyesiz gezinme denendi; UI Automation menü öğesinde Invoke/Select deseni bulamadı, `PostMessage` tıklaması WPF'e ulaşmadı. Kullanıcıdan Ctrl+4 için izin istenecek ya da kullanıcı kendisi bakacak.
-- Betikler scratchpad'de (oturuma özel): `e2e\seed.cs` (Core'u `#:project` ile kullanır, geçici QC veritabanına kesim yazar), `e2e\srvcheck.cs` (sunucu veritabanını salt okunur gösterir), `e2e\shot.ps1` (PrintWindow).
+- Betikler scratchpad'de (oturuma özel): `e2e\seed.cs` (Core'u `#:project` ile kullanır, geçici QC veritabanına kesim yazar), `e2e\srvcheck.cs` (sunucu veritabanını salt okunur gösterir), `e2e\appcheck.cs`, `e2e\copydb.cs`, `e2e\shot.ps1` (PrintWindow), `e2e\installtest.ps1`.
+- **Testler (son):** istasyon 290 + sunucu 42 (yedek: 5) = 332.
+- **Fabrika kuralları:** `docs/FABRIKA-KURALLARI.md` — kullanıcı kararı (2026-11-15): sistemi en sade tutup kullanım kurallarını fabrikaya biz veriyoruz (ayrı sunucu PC + UPS, sabit IP, USB yedek diski, depo/rıhtım Wi-Fi, her QC'ye ayrı istasyon kodu…). Her fazda güncellenir; yalnızca uygulamada olan özelliklere dayanır.
 
 ## Şu anki durum
 
-- **2026-11-15 — Depo stok + sevkiyat projesi, Faz 1 tamam (dalda):** depo sunucusu iskeleti, kesimlerin sunucuya aktarılması, Ayarlar kartı ve durum çubuğu. `feature/faz1-sunucu` dalı, 3 commit, **push yapılmadı**, sürüm numarası artırılmadı (1.0.5). Sıradaki: kullanıcı onayıyla Faz 2 (lot/firma tanımları + Stok ekranı). Faz 0 saha soruları açık.
+- **2026-11-15 — Depo stok + sevkiyat projesi, Faz 1 tamam:** depo sunucusu + kesim alımı, saatlik/günlük/ikinci klasör yedeği, sunucu kurulum paketi (bu PC'de kur/güncelle/kaldır testi geçti), QC 1.1.0 (Ayarlar kartı + durum çubuğu), gerçek veri kopyasında yükseltme testi, fabrika kuralları belgesi. Kullanıcı isteği: Faz 1 bitince GitHub'a gönder, sonra Faz 2 (lot/firma tanımları + Depo Stoğu ekranı). GitHub Release (1.1.0) yapılmadı. Faz 0 saha soruları açık.
 - **Sürüm 1.0.5 (2026-11-06) yayında, tüm revizeler tamam:** cm girişi, fareyle lot, Okutma sadeleştirme, F5/F6, Geçmiş'te F6, Sheets Türkçe başlık + en yeni en üstte, script v7. Kapsamlı test ve regresyon geçti (`docs/TEST-RAPORU.md`). Bu bilgisayarda yalnızca 1.0.5 kurulu, kurulum dosyası masaüstünde.
 
 - **Adım 11 kurulum paketi tamamlandı** (2026-11-01): `KumasBarkod-Kurulum-1.0.0.exe` üretildi ve kur/çalıştır/kaldır testi geçti. Adım 9 ve Adım 10'un donanımsız kısmı (gösterim modu) da tamam. Sunum: `docs/SUNUM.md`, pilot: `docs/PILOT.md`.

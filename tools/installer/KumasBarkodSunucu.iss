@@ -69,12 +69,16 @@ Filename: "{sys}\net.exe"; Parameters: "stop {#Service}"; Flags: runhidden waitu
 Filename: "{sys}\sc.exe"; Parameters: "delete {#Service}"; Flags: runhidden waituntilterminated; RunOnceId: "DeleteService"
 Filename: "{sys}\netsh.exe"; Parameters: "advfirewall firewall delete rule name=""{#FirewallRule}"""; Flags: runhidden waituntilterminated; RunOnceId: "DeleteFirewall"
 
+[UninstallDelete]
+; Kaldırıcı dosyaları siler ama boş program klasörü kalabiliyordu (kurulum testinde görüldü).
+Type: dirifempty; Name: "{app}"
+
 [Messages]
 turkish.UninstalledAll=%1 kaldırıldı.%n%nVeritabanı, yedekler ve günlükler SİLİNMEDİ:%n%ProgramData%\KumasBarkodSunucu
 
 [Code]
 var
-  MirrorPage: TInputDirWizardPage;
+  MirrorPage: TInputQueryWizardPage;
 
 function DataDir: String;
 begin
@@ -83,15 +87,21 @@ end;
 
 procedure InitializeWizard;
 begin
-  MirrorPage := CreateInputDirPage(wpSelectDir,
+  // Klasör seçme sayfası (InputDir) boş değere izin vermiyor → serbest metin; boş bırakılabilir.
+  MirrorPage := CreateInputQueryPage(wpSelectDir,
     'İkinci yedek klasörü (önerilir)',
     'Yedekler başka bir diske de kopyalansın mı?',
     'Sunucu her saat yedek alır. Yedekler aynı diskte durursa disk bozulduğunda yedekler de kaybolur.' + #13#10 +
     'Sunucuya takılı kalan bir USB disk ya da ağdaki başka bir bilgisayar seçin (ör. E:\KumasYedek).' + #13#10 +
-    'Boş bırakılabilir; sonra ' + DataDir + '\ayarlar.json ile eklenir.',
-    False, '');
-  MirrorPage.Add('İkinci yedek klasörü:');
+    'Boş bırakılabilir; sonra ' + DataDir + '\ayarlar.json ile eklenir.');
+  MirrorPage.Add('İkinci yedek klasörü (boş bırakılabilir):', False);
   MirrorPage.Values[0] := '';
+end;
+
+function LooksLikeFullPath(const S: String): Boolean;
+begin
+  // C:\... ya da \\sunucu\paylaşım
+  Result := ((Length(S) >= 3) and (S[2] = ':') and (S[3] = '\')) or (Copy(S, 1, 2) = '\\');
 end;
 
 function NextButtonClick(CurPageID: Integer): Boolean;
@@ -99,6 +109,12 @@ begin
   Result := True;
   if (CurPageID = MirrorPage.ID) and (Trim(MirrorPage.Values[0]) <> '') then
   begin
+    if not LooksLikeFullPath(Trim(MirrorPage.Values[0])) then
+    begin
+      MsgBox('Sürücü harfiyle tam yol yazın (ör. E:\KumasYedek) ya da ağ yolu (\\bilgisayar\paylaşım).', mbError, MB_OK);
+      Result := False;
+      Exit;
+    end;
     if CompareText(ExtractFileDrive(Trim(MirrorPage.Values[0])), ExtractFileDrive(ExpandConstant('{commonappdata}'))) = 0 then
       Result := MsgBox('Seçilen klasör sunucuyla AYNI diskte. Disk bozulursa bu yedek de kaybolur.' + #13#10 +
                        'Yine de devam edilsin mi?', mbConfirmation, MB_YESNO) = IDYES;
