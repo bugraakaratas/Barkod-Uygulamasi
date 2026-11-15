@@ -4,6 +4,8 @@ using KumasBarkod.Core.ServerApi;
 using KumasBarkod.Server;
 using KumasBarkod.Server.Data;
 using KumasBarkod.Server.Ingest;
+using KumasBarkod.Server.Lots;
+using KumasBarkod.Server.Stock;
 
 // Yönetim komutları (hizmet çalışırken de güvenli: tek işlem, kısa kilit).
 //   KumasBarkodSunucu.exe --istasyon-serbest-birak K1   → bilgisayarı değişen istasyon kodunu serbest bırakır
@@ -37,6 +39,8 @@ builder.Services.AddSingleton<ILoggerProvider>(sp => new FileLogProvider(sp.GetR
 builder.Services.AddSingleton(sp => new SqliteConnectionFactory(sp.GetRequiredService<ServerPaths>().DatabasePath));
 builder.Services.AddSingleton(TimeProvider.System);
 builder.Services.AddSingleton<CutIngestService>();
+builder.Services.AddSingleton<LotService>();
+builder.Services.AddSingleton<StockQueryService>();
 builder.Services.AddSingleton(sp => new ServerBackupService(
     sp.GetRequiredService<SqliteConnectionFactory>(), sp.GetRequiredService<ServerPaths>(),
     sp.GetRequiredService<TimeProvider>(),

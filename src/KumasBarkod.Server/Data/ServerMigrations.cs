@@ -174,6 +174,41 @@ public static class ServerMigrations
                 value TEXT NOT NULL
             ) STRICT;
             """),
+
+        new(2, "Lot (= firma) tanımları: lots, lot_aliases, rolls.lot_id, veri sürümü", """
+            -- Lot = firma. Ad ekranda yazıldığı gibi; lot_key yazım farkını yok sayan anahtar (LotKeys.Key).
+            CREATE TABLE lots (
+                lot_id     INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
+                name       TEXT    NOT NULL CHECK (length(name) BETWEEN 1 AND 50 AND name = trim(name)),
+                lot_key    TEXT    NOT NULL UNIQUE CHECK (length(lot_key) > 0),
+                active     INTEGER NOT NULL DEFAULT 1 CHECK (active IN (0, 1)),
+                created_at TEXT    NOT NULL,
+                created_by TEXT,
+                updated_at TEXT    NOT NULL,
+                updated_by TEXT
+            ) STRICT;
+
+            -- Lot silinmez (geçmiş topları gösteriyor); kullanılmayacaksa pasif yapılır.
+            CREATE TRIGGER trg_lots_no_delete BEFORE DELETE ON lots
+            BEGIN
+                SELECT RAISE(ABORT, 'lot silinemez; pasif yapın');
+            END;
+
+            -- QC'de yazılmış lot metni → lot (yetkili eşleştirdi). Yazım farkından fazlası olan metinler için.
+            CREATE TABLE lot_aliases (
+                raw_text   TEXT    NOT NULL PRIMARY KEY,
+                lot_id     INTEGER NOT NULL REFERENCES lots (lot_id),
+                created_at TEXT    NOT NULL,
+                created_by TEXT
+            ) STRICT;
+
+            ALTER TABLE rolls ADD COLUMN lot_id INTEGER REFERENCES lots (lot_id);
+            CREATE INDEX ix_rolls_lotid_state ON rolls (lot_id, state);
+            CREATE INDEX ix_rolls_unmatched ON rolls (lot_code_raw) WHERE lot_id IS NULL;
+
+            -- Her veri değişikliğinde artar; ekranlar yalnızca bunu sorup değiştiyse yeniden okur.
+            INSERT INTO server_settings (key, value) VALUES ('data_version', '0');
+            """),
     ];
 
     public static int LatestVersion => All[^1].Version;

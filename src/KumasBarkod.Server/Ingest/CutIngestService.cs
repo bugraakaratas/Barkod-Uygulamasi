@@ -6,6 +6,7 @@ using KumasBarkod.Core.ServerApi;
 using KumasBarkod.Core.Services;
 using KumasBarkod.Core.Sync;
 using KumasBarkod.Server.Data;
+using KumasBarkod.Server.Lots;
 using Microsoft.Data.Sqlite;
 
 namespace KumasBarkod.Server.Ingest;
@@ -58,6 +59,7 @@ public sealed class CutIngestService(SqliteConnectionFactory db, TimeProvider cl
                     request.InstallId, code);
         }
 
+        var changesBefore = c.ExecuteScalar<long>("SELECT total_changes()", transaction: tx);
         var accepted = 0;
         var conflicts = new List<ServerCutConflict>();
         foreach (var row in request.Rows)
@@ -67,6 +69,10 @@ public sealed class CutIngestService(SqliteConnectionFactory db, TimeProvider cl
             else
                 accepted++;
         }
+
+        // Top/hareket/çakışma yazıldıysa ekranlar yenilensin (yalnızca istasyon "son görülme" ise değil).
+        if (c.ExecuteScalar<long>("SELECT total_changes()", transaction: tx) > changesBefore)
+            DataVersion.Bump(c, tx);
 
         var maxSequences = c.Query<(string Station, long Max)>(
                 "SELECT station_code, max(sequence_no) FROM rolls GROUP BY station_code", transaction: tx)
@@ -192,12 +198,13 @@ public sealed class CutIngestService(SqliteConnectionFactory db, TimeProvider cl
         c.Execute("""
             INSERT INTO rolls (cut_id, station_code, sequence_no, lot_code_raw, length_cm, operator, qc_status,
                                void_reason, voided_at, qc_created_at, print_count, last_printed_at,
-                               state, first_seen_at, updated_at)
+                               state, first_seen_at, updated_at, lot_id)
             VALUES (@CutId, @StationCode, @SequenceNo, @LotCode, @LengthCm, @Operator, 'active',
                     NULL, NULL, @CreatedAt, @PrintCount, @LastPrintedAt,
-                    'in_stock', @now, @now)
+                    'in_stock', @now, @now, @lotId)
             """, new { row.CutId, row.StationCode, row.SequenceNo, row.LotCode, row.LengthCm, row.Operator,
-                       row.CreatedAt, row.PrintCount, row.LastPrintedAt, now }, tx);
+                       row.CreatedAt, row.PrintCount, row.LastPrintedAt, now,
+                       lotId = LotService.Resolve(c, tx, row.LotCode) }, tx);
 
         Movement(c, tx, row.CutId, MovementKinds.QcCreated, null, RollStates.InStock, row.CreatedAt, now,
             row.StationCode, note: null);
