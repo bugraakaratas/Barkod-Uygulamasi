@@ -21,7 +21,7 @@ public partial class MainWindow : FluentWindow
 
         // Sayfalar DI kapsayıcısından alınır; böylece ViewModel'ler enjekte edilir.
         RootNavigation.SetServiceProvider(services);
-        Loaded += (_, _) => RootNavigation.Navigate(typeof(CutEntryPage));
+        Loaded += (_, _) => RootNavigation.Navigate(StartPage());
 
         // Hangi ekranda okutulursa okutulsun (veya geçmişten açılırsa): okutma ekranına geç ve kaydı aç.
         _scanCapture = new ScanCapture(this);
@@ -48,4 +48,17 @@ public partial class MainWindow : FluentWindow
             e.Handled = true;
         }), handledEventsToo: true);
     }
+
+    /// <summary>
+    /// Açılış sayfası: her zaman Kesim Girişi. Yalnızca test/sunum için KUMASBARKOD_START_PAGE
+    /// (scan | history | settings) başka sayfayla açar — arayüz denemesinde klavyeye tuş göndermeden
+    /// ekran görüntüsü alınabilsin diye.
+    /// </summary>
+    private static Type StartPage() => Environment.GetEnvironmentVariable("KUMASBARKOD_START_PAGE")?.Trim().ToLowerInvariant() switch
+    {
+        "scan" => typeof(ScanPage),
+        "history" => typeof(HistoryPage),
+        "settings" => typeof(SettingsPage),
+        _ => typeof(CutEntryPage),
+    };
 }
