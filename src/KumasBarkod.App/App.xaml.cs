@@ -224,6 +224,10 @@ public partial class App : Application
         services.AddSingleton<StockPage>();
         services.AddSingleton<LotsViewModel>();
         services.AddSingleton<LotsPage>();
+        services.AddSingleton<ShipmentViewModel>();
+        services.AddSingleton<ShipmentPage>();
+        services.AddSingleton<PersonnelViewModel>();
+        services.AddSingleton<PersonnelPage>();
 
         return services;
     }

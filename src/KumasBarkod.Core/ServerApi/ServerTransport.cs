@@ -134,7 +134,8 @@ public static class ServerHttp
                 if (response.StatusCode == HttpStatusCode.NotFound && message is null)
                     throw new SyncException(SyncFailureKind.Rejected, "Bu adreste Kumaş Barkod sunucusu yok (404).");
                 throw new SyncException(SyncFailureKind.Rejected,
-                    message ?? $"Depo sunucusu isteği reddetti ({(int)response.StatusCode}).");
+                    message ?? $"Depo sunucusu isteği reddetti ({(int)response.StatusCode}).")
+                { StatusCode = (int)response.StatusCode, Code = TryRead<ServerError>(text)?.Code };
             }
 
             return TryRead<T>(text)

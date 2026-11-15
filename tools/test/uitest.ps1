@@ -497,8 +497,8 @@ function PartE {
   Shot 'e2b_bilinmeyen_barkod'
 
   # --- Lotlar: Enter ile ekle, yazim farkli ayni lot reddedilir
-  K '^2' 1500
-  Check 'Ctrl+2 Lotlar' (WaitFor { Has 'Lotlar (firmalar)' })
+  K '^3' 1500   # yonetim menusu: Depo Stogu, Sevkiyat, Lotlar, Personel
+  Check 'Ctrl+3 Lotlar' (WaitFor { Has 'Lotlar (firmalar)' })
   K 'YENI FIRMA{ENTER}' 1500
   Check 'Enter ile lot eklendi' (WaitFor { (LotNames) -contains 'YENI FIRMA' })
   Check 'Eklenince kutu temizlendi' ((ValueOf (Edit 'Yeni lot adı')) -eq '')
@@ -624,8 +624,162 @@ function PartF {
   try { $script:srv.Kill() } catch {}
 }
 
+# ---------- G: Sevkiyat (Faz 4) — rıhtım akışı, geçici sunucu ----------
+function Start-Server {
+  $script:srv = Start-Process $serverExe -ArgumentList '--urls', $serverUrl.TrimEnd('/') -PassThru -WindowStyle Hidden
+  WaitFor { try { (Api 'health').ok } catch { $false } } 15000
+}
+function PostJson($path, $obj, $token = $null) {
+  $h = @{ 'X-Kumas-Device' = 'UITEST' }
+  if ($token) { $h['Authorization'] = "Bearer $token" }
+  $body = [Text.Encoding]::UTF8.GetBytes(($obj | ConvertTo-Json -Depth 5 -Compress))
+  Invoke-RestMethod ($serverUrl + $path) -Method Post -ContentType 'application/json; charset=utf-8' -Body $body -Headers $h
+}
+function SrvSql($q) { (& python $py query (Join-Path $data 'sunucu\sunucu.db') $q) -join '' }
+function RollState($id) { SrvSql "select state from rolls where cut_id='$id'" }
+function SelectItemContaining($text) {
+  $walker = [System.Windows.Automation.TreeWalker]::ControlViewWalker
+  foreach ($e in (All)) {
+    if ($e.Current.Name -eq $text) {
+      $el = $e
+      for ($i = 0; $i -lt 5 -and $null -ne $el; $i++) {
+        $pat = $null
+        if ($el.TryGetCurrentPattern([System.Windows.Automation.SelectionItemPattern]::Pattern, [ref]$pat)) { $pat.Select(); Start-Sleep -Milliseconds 300; return $true }
+        $el = $walker.GetParent($el)
+      }
+    }
+  }
+  return $false
+}
+
+function PartG {
+  $env:KUMASBARKOD_SERVER_DATA_DIR = Join-Path $data 'sunucu'
+  Check 'Sunucu acildi' (Start-Server)
+
+  # Hazirlik (API): ilk yetkili + depo personeli, lotlar, toplar
+  PostJson 'api/v1/users' @{ name = 'Patron'; role = 'supervisor'; badgeCode = 'Y0001'; pin = '9999' } | Out-Null
+  $boss = (PostJson 'api/v1/auth/login' @{ badgeCode = 'Y0001'; pin = '9999' }).token
+  PostJson 'api/v1/users' @{ name = 'Ali Depo'; role = 'warehouse'; badgeCode = 'P0001'; pin = '1234' } $boss | Out-Null
+  foreach ($n in 'LOT-3', 'LOT-2') { PostJson 'api/v1/lots' @{ name = $n } | Out-Null }
+  $rows = @()
+  for ($i = 1; $i -le 7; $i++) {
+    $rows += @{ cutId = ('K1-{0:D6}' -f $i); stationCode = 'K1'; sequenceNo = $i; lotCode = $(if ($i -le 5) { 'LOT-3' } else { 'LOT-2' });
+      lengthCm = 1000 + $i; operator = $null; status = 'active'; voidReason = $null; voidedAt = $null;
+      createdAt = ('2026-11-15T08:0{0}:00.000Z' -f $i); printCount = 1; lastPrintedAt = $null }
+  }
+  PostJson 'api/v1/cuts/batch' @{ installId = 'QC-PC'; stationCode = 'K1'; appVersion = 'test'; rows = $rows } | Out-Null
+  Check 'Stok hazir (7 top)' ((Api 'api/v1/stock').inStock.count -eq 7)
+
+  Start-App; Stop-App
+  & python $py exec $db "insert into settings(key,value) values('server_url','$serverUrl')" | Out-Null
+  & python $py exec $db "insert into settings(key,value) values('station_role','dock')" | Out-Null
+  Start-App
+
+  # --- Giris
+  Check 'Rihtim gorevinde Sevkiyat girisi acildi' (WaitFor { Has 'Sevkiyat — giriş' })
+  K 'P0001{ENTER}' 300; K '0000{ENTER}' 1500
+  Check 'Yanlis PIN uyarisi' (WaitFor { Has 'Kart kodu ya da PIN hatalı' })
+  K '1234{ENTER}' 2000
+  Check 'Dogru PIN ile giris' (WaitFor { Has 'Yeni sevkiyat: lot seçin' })
+  Check 'Personel adi gorunuyor' (Has 'Ali Depo')
+  Shot 'g1_liste'
+
+  # --- Yeni sevkiyat
+  Check 'LOT-3 secildi' (SelectItemContaining 'LOT-3')
+  K '{ENTER}' 2000
+  Check 'Okutma ekrani acildi' (WaitFor { Has 'Barkod okutun' })
+  Check 'Sunucuda acik sevkiyat' ((SrvSql "select count(*) from shipments where status='open'") -eq '1')
+
+  # --- Okutmalar (okuyucu gibi hizli + Enter)
+  K 'K1000001{ENTER}' 1500
+  Check 'Dogru lot kabul (yesil)' (WaitFor { Has '✓  K1-000001' })
+  Check 'Top ayrildi' ((RollState 'K1-000001') -eq 'reserved')
+  Shot 'g2_kabul'
+  K 'K1000006{ENTER}' 1500
+  Check 'Yanlis lot ret (kirmizi)' (WaitFor { Has 'YÜKLEMEYİN' })
+  Check 'Yanlis lot mesaji' (Has 'Bu barkod seçili lota ait değil. Barkodun lotu: LOT-2. Seçili lot: LOT-3.')
+  Check 'Yanlis lot stokta kaldi' ((RollState 'K1-000006') -eq 'in_stock')
+  Shot 'g3_ret'
+  Start-Sleep -Milliseconds 1600
+  K 'K1000001{ENTER}' 1500
+  Check 'Ayni barkod tekrar: uyari' (WaitFor { Has 'zaten okutuldu' })
+  K 'K1000002{ENTER}' 100; K 'K1000002{ENTER}' 1500
+  Check 'Okuyucu cift okumasi tek kez gonderildi' ((SrvSql "select count(*) from scan_events where cut_id='K1-000002'") -eq '1')
+  K 'K1000099{ENTER}' 1500
+  Check 'Sistemde olmayan barkod ret' (WaitFor { Has 'sistemde yok' })
+
+  # --- Cikarma modu
+  K '{F7}' 500
+  Check 'Cikarma modu acildi' (Has 'ÇIKARMA MODU')
+  K 'K1000002{ENTER}' 1500
+  Check 'Cikarilan top stoga dondu' (WaitFor { (RollState 'K1-000002') -eq 'in_stock' })
+  K '{F7}' 500
+
+  # --- Baglanti kopmasi: okutma kuyrukta bekler, gelince bir kez gider
+  try { $script:srv.Kill(); $script:srv.WaitForExit(5000) } catch {}
+  Start-Sleep -Milliseconds 500
+  K 'K1000004{ENTER}' 2500
+  Check 'Baglanti yok uyarisi' (WaitFor { Has 'BAĞLANTI YOK' } 12000)
+  Shot 'g4_baglanti_yok'
+  Check 'Sunucu yeniden acildi' (Start-Server)
+  Check 'Bekleyen okutma baglanti gelince gitti' (WaitFor { (RollState 'K1-000004') -eq 'reserved' } 20000)
+  Check 'Bekleyen okutma tek kez islendi' ((SrvSql "select count(*) from scan_events where cut_id='K1-000004'") -eq '1')
+  Start-Sleep -Milliseconds 1500
+
+  # --- Onay
+  K '{F9}' 800
+  Check 'Onay paneli acildi' (Has 'onaylansın mı?')
+  K '{ENTER}' 2500
+  Check 'Onaylandi, listeye donuldu' (WaitFor { Has 'onaylandı:' })
+  Check 'Sunucuda onayli' ((SrvSql "select status from shipments where shipment_id=1") -eq 'confirmed')
+  Check 'Okutulan toplar sevk edildi' ((RollState 'K1-000001') -eq 'shipped' -and (RollState 'K1-000004') -eq 'shipped')
+  Check 'Cikarilan ve yanlis lot stokta' ((RollState 'K1-000002') -eq 'in_stock' -and (RollState 'K1-000006') -eq 'in_stock')
+  Shot 'g5_onay'
+
+  # --- Yeni sevkiyat + iptal
+  Check 'LOT-3 tekrar secildi' (SelectItemContaining 'LOT-3')
+  K '{ENTER}' 2000
+  K 'K1000005{ENTER}' 1500
+  K 'K1000001{ENTER}' 1500
+  Check 'Sevk edilmis barkod ret' (WaitFor { Has 'daha önce sevk edildi' })
+  K '{F8}' 800
+  Check 'Iptal paneli acildi' (Has 'iptal edilecek')
+  K '{ENTER}' 800
+  Check 'Sebepsiz iptal olmadi' ((SrvSql "select status from shipments where shipment_id=2") -eq 'open')
+  K '1' 300; K '{ENTER}' 2000
+  Check 'Iptal edildi' (WaitFor { (SrvSql "select status from shipments where shipment_id=2") -eq 'cancelled' })
+  Check 'Iptalde top stoga dondu' ((RollState 'K1-000005') -eq 'in_stock')
+
+  # --- Cikis
+  Check 'Cikis dugmesi' (Invoke-ByName 'Çıkış')
+  Check 'Cikista giris ekrani' (WaitFor { Has 'Sevkiyat — giriş' })
+  Stop-App
+
+  # --- Yonetim: Personel ekrani
+  & python $py exec $db "update settings set value='office' where key='station_role'" | Out-Null
+  $env:KUMASBARKOD_START_PAGE = 'personnel'
+  Start-App
+  $env:KUMASBARKOD_START_PAGE = ''
+  Check 'Personel: yetkili girisi istendi' (WaitFor { Has 'Yetkili girişi' })
+  K 'P0001{ENTER}' 300; K '1234{ENTER}' 2000
+  Check 'Depo personeli yonetemez' (-not (Has 'Personel ekle'))
+  Invoke-ByName 'Çıkış' | Out-Null
+  Start-Sleep -Milliseconds 800
+  $badge = Edit 'Yetkili kart kodu'
+  if ($badge) { $badge.SetFocus() }
+  K 'Y0001{ENTER}' 300; K '9999{ENTER}' 2000
+  Check 'Yetkili personel listesini goruyor' (WaitFor { Has 'P0001' })
+  Shot 'g6_personel'
+  Stop-App
+
+  Check 'Sunucu butunluk' ((& $serverExe --kontrol) -match 'sorun yok')
+  $log = Get-ChildItem (Join-Path $data 'logs') -Filter *.log | Get-Content -Raw
+  Check 'Gunlukte beklenmeyen hata yok' ($log -notmatch 'Beklenmeyen')
+  try { $script:srv.Kill() } catch {}
+}
+
 try {
-  if ($Part -eq 'A') { PartA } elseif ($Part -eq 'B') { PartB } elseif ($Part -eq 'D') { PartD } elseif ($Part -eq 'E') { PartE } elseif ($Part -eq 'F') { PartF } else { PartC }
+  if ($Part -eq 'A') { PartA } elseif ($Part -eq 'B') { PartB } elseif ($Part -eq 'D') { PartD } elseif ($Part -eq 'E') { PartE } elseif ($Part -eq 'F') { PartF } elseif ($Part -eq 'G') { PartG } else { PartC }
 } catch {
   $results.Add("HATA: $($_.Exception.Message) @ satir $($_.InvocationInfo.ScriptLineNumber)")
 } finally {

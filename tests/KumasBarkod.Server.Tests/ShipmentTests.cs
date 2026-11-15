@@ -309,6 +309,7 @@ public sealed class ShipmentTests : IDisposable
         Assert.Equal((ScanCodes.AlreadyInThisShipment, ScanSeverity.Warning), (again.Code, again.Severity));
         Assert.Contains("Ali", again.Message);
         Assert.Equal(1, again.Stats.Count);
+        Assert.Equal(0, again.Stats.Rejected);   // tekrar okutma "reddedilen" sayılmaz (zararsız)
         Assert.Equal(1, Scalar("SELECT count(*) FROM shipment_items"));
         Assert.Equal(1, Scalar("SELECT count(*) FROM stock_movements WHERE kind = 'reserved'"));
     }

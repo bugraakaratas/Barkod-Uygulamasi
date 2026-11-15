@@ -87,8 +87,8 @@ public partial class SettingsViewModel : ObservableObject
         WeakReferenceMessenger.Default.Send(new SettingsChangedMessage());
         Show(InfoBarSeverity.Success, "Görev kaydedildi", role switch
         {
-            StationRoles.Dock => "Sevkiyat (rıhtım): sol menüde Depo Stoğu görünür.",
-            StationRoles.Office => "Yönetim: sol menüde Depo Stoğu ve Lotlar görünür.",
+            StationRoles.Dock => "Sevkiyat (rıhtım): sol menüde Sevkiyat ve Depo Stoğu görünür.",
+            StationRoles.Office => "Yönetim: sol menüde Depo Stoğu, Sevkiyat, Lotlar ve Personel görünür.",
             _ => "Kalite kontrol: Kesim Girişi, Okutma, Geçmiş.",
         });
     }

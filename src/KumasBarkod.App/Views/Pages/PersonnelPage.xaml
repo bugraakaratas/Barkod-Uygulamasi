@@ -1,0 +1,116 @@
+<Page x:Class="KumasBarkod.App.Views.Pages.PersonnelPage"
+      xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+      xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+      xmlns:ui="http://schemas.lepo.co/wpfui/2022/xaml"
+      Title="Personel"
+      ScrollViewer.CanContentScroll="False">
+    <Grid Margin="{StaticResource PageMargin}">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+        </Grid.RowDefinitions>
+
+        <DockPanel>
+            <ui:Button DockPanel.Dock="Right" VerticalAlignment="Center" Appearance="Secondary" Icon="{ui:SymbolIcon SignOut24}"
+                       Content="Çıkış" Command="{Binding LogoutCommand}"
+                       Visibility="{Binding IsManaging, Converter={StaticResource BoolToVisibility}}" />
+            <TextBlock DockPanel.Dock="Right" Margin="0,0,12,0" VerticalAlignment="Center" FontSize="15" FontWeight="SemiBold" Text="{Binding UserText}" />
+            <TextBlock Style="{StaticResource PageTitleStyle}" Margin="0" Text="Personel" />
+        </DockPanel>
+        <TextBlock Grid.Row="1" Style="{StaticResource PageSubtitleStyle}" Margin="0,4,0,10" TextWrapping="Wrap"
+                   Text="Sevkiyatta okutan herkes kart kodu ve PIN ile giriş yapar; her okutma o kişinin adıyla kaydedilir. Kart kodu personel kartındaki barkoddur (ör. P0001)." />
+        <StackPanel Grid.Row="2">
+            <ui:InfoBar Margin="0,0,0,8" IsOpen="{Binding IsConfigured, Converter={StaticResource InvertBool}, Mode=OneWay}" IsClosable="False"
+                        Severity="Warning" Title="Depo sunucusu ayarlanmadı" Message="Ayarlar → Depo sunucusu bölümüne sunucu adresini yazıp kaydedin." />
+            <ui:InfoBar Margin="0,0,0,8" IsOpen="{Binding MessageIsOpen, Mode=TwoWay}" Severity="{Binding MessageSeverity}"
+                        Title="{Binding MessageTitle}" Message="{Binding MessageText}" IsClosable="True" />
+        </StackPanel>
+
+        <!-- ========== İlk yetkili ========== -->
+        <StackPanel Grid.Row="3" MaxWidth="520" HorizontalAlignment="Left"
+                    Visibility="{Binding BootstrapNeeded, Converter={StaticResource BoolToVisibility}}">
+            <TextBlock FontSize="20" FontWeight="SemiBold" Text="İlk yetkiliyi oluşturun" />
+            <TextBlock Style="{StaticResource PageSubtitleStyle}" Margin="0,4,0,12" TextWrapping="Wrap"
+                       Text="Henüz hiç personel yok. İlk kişi yetkili olur ve diğer personeli o ekler." />
+            <TextBlock Style="{StaticResource FieldLabelStyle}" Text="Ad soyad" />
+            <ui:TextBox FontSize="16" Text="{Binding NewName, UpdateSourceTrigger=PropertyChanged}" AutomationProperties.Name="İlk yetkili adı" />
+            <TextBlock Style="{StaticResource FieldLabelStyle}" Margin="0,10,0,6" Text="Kart kodu (ör. Y0001)" />
+            <ui:TextBox FontSize="16" Text="{Binding NewBadge, UpdateSourceTrigger=PropertyChanged}" AutomationProperties.Name="İlk yetkili kart kodu" />
+            <TextBlock Style="{StaticResource FieldLabelStyle}" Margin="0,10,0,6" Text="PIN (4–6 rakam)" />
+            <ui:PasswordBox FontSize="16" Password="{Binding NewPin, UpdateSourceTrigger=PropertyChanged, Mode=TwoWay}" AutomationProperties.Name="İlk yetkili PIN" />
+            <ui:Button Margin="0,14,0,0" MinHeight="44" Appearance="Primary" Icon="{ui:SymbolIcon PersonAdd24}"
+                       Content="İlk yetkiliyi oluştur" Command="{Binding CreateCommand}" AutomationProperties.Name="İlk yetkiliyi oluştur" />
+        </StackPanel>
+
+        <!-- ========== Yetkili girişi ========== -->
+        <StackPanel Grid.Row="3" MaxWidth="520" HorizontalAlignment="Left"
+                    Visibility="{Binding NeedsLogin, Converter={StaticResource BoolToVisibility}}">
+            <TextBlock FontSize="20" FontWeight="SemiBold" Text="Yetkili girişi" />
+            <TextBlock Style="{StaticResource FieldLabelStyle}" Margin="0,10,0,6" Text="Kart kodu" />
+            <ui:TextBox x:Name="LoginBadgeBox" FontSize="18" Text="{Binding LoginBadge, UpdateSourceTrigger=PropertyChanged}"
+                        AutomationProperties.Name="Yetkili kart kodu" KeyDown="LoginBadgeBox_KeyDown" />
+            <TextBlock Style="{StaticResource FieldLabelStyle}" Margin="0,10,0,6" Text="PIN" />
+            <ui:PasswordBox x:Name="LoginPinBox" FontSize="18" Password="{Binding LoginPin, UpdateSourceTrigger=PropertyChanged, Mode=TwoWay}"
+                            AutomationProperties.Name="Yetkili PIN" KeyDown="LoginPinBox_KeyDown" />
+            <ui:Button Margin="0,14,0,0" MinHeight="44" Appearance="Primary" Icon="{ui:SymbolIcon ArrowEnterLeft24}"
+                       Content="Giriş  (Enter)" Command="{Binding LoginCommand}" AutomationProperties.Name="Yetkili giriş" />
+        </StackPanel>
+
+        <!-- ========== Personel yönetimi ========== -->
+        <Grid Grid.Row="3" Visibility="{Binding IsManaging, Converter={StaticResource BoolToVisibility}}">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="3*" />
+                <ColumnDefinition Width="20" />
+                <ColumnDefinition Width="2*" />
+            </Grid.ColumnDefinitions>
+            <DockPanel>
+                <Border DockPanel.Dock="Bottom" Margin="0,8,0,0" Padding="12" CornerRadius="6"
+                        Background="{DynamicResource ControlFillColorSecondaryBrush}">
+                    <WrapPanel>
+                        <ui:PasswordBox Width="150" Margin="0,0,8,6" PlaceholderText="Yeni PIN"
+                                        Password="{Binding ResetPinText, UpdateSourceTrigger=PropertyChanged, Mode=TwoWay}" AutomationProperties.Name="Yeni PIN" />
+                        <ui:Button Margin="0,0,8,6" Appearance="Secondary" Icon="{ui:SymbolIcon Key24}" Content="PIN değiştir" Command="{Binding ResetPinCommand}" />
+                        <ui:Button Margin="0,0,8,6" Appearance="Secondary" Content="Rolü değiştir" Command="{Binding ToggleRoleCommand}" />
+                        <ui:Button Margin="0,0,8,6" Appearance="Secondary" Content="Pasif / etkin yap" Command="{Binding ToggleActiveCommand}" />
+                    </WrapPanel>
+                </Border>
+                <DataGrid ItemsSource="{Binding Users}" SelectedItem="{Binding SelectedUser}" AutoGenerateColumns="False" IsReadOnly="True"
+                          SelectionMode="Single" HeadersVisibility="Column" GridLinesVisibility="Horizontal" CanUserSortColumns="False"
+                          FontSize="15" RowHeight="34" AutomationProperties.Name="Personel listesi">
+                    <DataGrid.RowStyle>
+                        <Style TargetType="DataGridRow" BasedOn="{StaticResource {x:Type DataGridRow}}">
+                            <Style.Triggers>
+                                <DataTrigger Binding="{Binding Active}" Value="False">
+                                    <Setter Property="Foreground" Value="{DynamicResource TextFillColorTertiaryBrush}" />
+                                </DataTrigger>
+                                <Trigger Property="IsSelected" Value="True">
+                                    <Setter Property="Background" Value="{StaticResource SelectedRowBrush}" />
+                                </Trigger>
+                            </Style.Triggers>
+                        </Style>
+                    </DataGrid.RowStyle>
+                    <DataGrid.Columns>
+                        <DataGridTextColumn Header="Ad" Width="*" Binding="{Binding Name}" />
+                        <DataGridTextColumn Header="Rol" Width="90" Binding="{Binding RoleText}" />
+                        <DataGridTextColumn Header="Kart" Width="110" Binding="{Binding Badge}" FontFamily="Consolas" />
+                        <DataGridTextColumn Header="Durum" Width="80" Binding="{Binding StatusText}" />
+                    </DataGrid.Columns>
+                </DataGrid>
+            </DockPanel>
+            <StackPanel Grid.Column="2">
+                <TextBlock FontSize="18" FontWeight="SemiBold" Text="Yeni personel" />
+                <TextBlock Style="{StaticResource FieldLabelStyle}" Margin="0,8,0,6" Text="Ad soyad" />
+                <ui:TextBox FontSize="16" Text="{Binding NewName, UpdateSourceTrigger=PropertyChanged}" AutomationProperties.Name="Yeni personel adı" />
+                <TextBlock Style="{StaticResource FieldLabelStyle}" Margin="0,10,0,6" Text="Kart kodu (ör. P0002)" />
+                <ui:TextBox FontSize="16" Text="{Binding NewBadge, UpdateSourceTrigger=PropertyChanged}" AutomationProperties.Name="Yeni personel kart kodu" />
+                <TextBlock Style="{StaticResource FieldLabelStyle}" Margin="0,10,0,6" Text="PIN (4–6 rakam)" />
+                <ui:PasswordBox FontSize="16" Password="{Binding NewPin, UpdateSourceTrigger=PropertyChanged, Mode=TwoWay}" AutomationProperties.Name="Yeni personel PIN" />
+                <CheckBox Margin="0,10,0,0" FontSize="15" Content="Yetkili (personel yönetir)" IsChecked="{Binding NewIsSupervisor}" />
+                <ui:Button Margin="0,12,0,0" MinHeight="44" Appearance="Primary" Icon="{ui:SymbolIcon PersonAdd24}"
+                           Content="Personel ekle" Command="{Binding CreateCommand}" AutomationProperties.Name="Personel ekle" />
+            </StackPanel>
+        </Grid>
+    </Grid>
+</Page>

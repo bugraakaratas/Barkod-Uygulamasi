@@ -1,0 +1,333 @@
+<Page x:Class="KumasBarkod.App.Views.Pages.ShipmentPage"
+      xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+      xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+      xmlns:ui="http://schemas.lepo.co/wpfui/2022/xaml"
+      Title="Sevkiyat"
+      ScrollViewer.CanContentScroll="False">
+    <Page.Resources>
+        <!-- Sonuç bandı rengi (uzaktan görülsün diye düz, doygun renkler) -->
+        <Style x:Key="FeedbackBand" TargetType="Border">
+            <Setter Property="Background" Value="#E6E6E6" />
+            <Setter Property="CornerRadius" Value="8" />
+            <Style.Triggers>
+                <DataTrigger Binding="{Binding FeedbackKind}" Value="success"><Setter Property="Background" Value="#1E8E3E" /></DataTrigger>
+                <DataTrigger Binding="{Binding FeedbackKind}" Value="warning"><Setter Property="Background" Value="#F2B705" /></DataTrigger>
+                <DataTrigger Binding="{Binding FeedbackKind}" Value="error"><Setter Property="Background" Value="#C62828" /></DataTrigger>
+                <DataTrigger Binding="{Binding FeedbackKind}" Value="offline"><Setter Property="Background" Value="#7A0000" /></DataTrigger>
+                <DataTrigger Binding="{Binding FeedbackKind}" Value="remove"><Setter Property="Background" Value="#E8710A" /></DataTrigger>
+            </Style.Triggers>
+        </Style>
+        <Style x:Key="FeedbackText" TargetType="TextBlock">
+            <Setter Property="Foreground" Value="White" />
+            <Style.Triggers>
+                <DataTrigger Binding="{Binding FeedbackKind}" Value="idle"><Setter Property="Foreground" Value="#333333" /></DataTrigger>
+                <DataTrigger Binding="{Binding FeedbackKind}" Value="warning"><Setter Property="Foreground" Value="#1A1A1A" /></DataTrigger>
+            </Style.Triggers>
+        </Style>
+        <Style x:Key="BigNumber" TargetType="TextBlock">
+            <Setter Property="FontSize" Value="40" />
+            <Setter Property="FontWeight" Value="Bold" />
+        </Style>
+    </Page.Resources>
+
+    <Grid Margin="{StaticResource PageMargin}">
+
+        <!-- ========== Sunucu ayarlanmadı ========== -->
+        <StackPanel Visibility="{Binding IsNotConfigured, Converter={StaticResource BoolToVisibility}}">
+            <TextBlock Style="{StaticResource PageTitleStyle}" Text="Sevkiyat" />
+            <ui:InfoBar IsOpen="True" IsClosable="False" Severity="Warning" Title="Depo sunucusu ayarlanmadı"
+                        Message="Ayarlar → Depo sunucusu bölümüne sunucu adresini yazıp kaydedin." />
+        </StackPanel>
+
+        <!-- ========== Giriş ========== -->
+        <StackPanel Visibility="{Binding IsLoginScreen, Converter={StaticResource BoolToVisibility}}" MaxWidth="520" HorizontalAlignment="Left">
+            <TextBlock Style="{StaticResource PageTitleStyle}" Text="Sevkiyat — giriş" />
+            <TextBlock Style="{StaticResource PageSubtitleStyle}" Margin="0,0,0,16" TextWrapping="Wrap"
+                       Text="Personel kartınızı okutun (ya da kart kodunu yazın), sonra PIN'inizi girin. Okuttuğunuz her top sizin adınızla kaydedilir." />
+            <ui:InfoBar Margin="0,0,0,12" IsOpen="{Binding BootstrapNeeded}" IsClosable="False" Severity="Informational"
+                        Title="Henüz personel yok"
+                        Message="Yönetim bilgisayarında Personel ekranından ilk yetkiliyi ve depo personelini oluşturun." />
+            <TextBlock Style="{StaticResource FieldLabelStyle}" Text="Kart kodu" />
+            <ui:TextBox x:Name="BadgeBox" FontSize="24" MinHeight="54" Text="{Binding LoginBadge, UpdateSourceTrigger=PropertyChanged}"
+                        PlaceholderText="Kartı okutun" Icon="{ui:SymbolIcon Person24}" AutomationProperties.Name="Kart kodu"
+                        KeyDown="BadgeBox_KeyDown" />
+            <TextBlock Style="{StaticResource FieldLabelStyle}" Margin="0,14,0,6" Text="PIN" />
+            <ui:PasswordBox x:Name="PinBox" FontSize="24" MinHeight="54" Password="{Binding LoginPin, UpdateSourceTrigger=PropertyChanged, Mode=TwoWay}"
+                            PlaceholderText="4–6 rakam" Icon="{ui:SymbolIcon Key24}" AutomationProperties.Name="PIN"
+                            KeyDown="PinBox_KeyDown" />
+            <TextBlock Margin="2,10,0,0" FontSize="16" FontWeight="SemiBold" TextWrapping="Wrap"
+                       Foreground="{DynamicResource SystemFillColorCriticalBrush}" Text="{Binding LoginError}" />
+            <ui:Button Margin="0,14,0,0" MinHeight="50" FontSize="18" HorizontalAlignment="Stretch" Appearance="Primary"
+                       Icon="{ui:SymbolIcon ArrowEnterLeft24}" Content="Giriş  (Enter)" Command="{Binding LoginCommand}"
+                       AutomationProperties.Name="Giriş" />
+        </StackPanel>
+
+        <!-- ========== Açık sevkiyatlar / yeni sevkiyat ========== -->
+        <Grid Visibility="{Binding IsListScreen, Converter={StaticResource BoolToVisibility}}">
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="*" />
+            </Grid.RowDefinitions>
+            <DockPanel>
+                <ui:Button DockPanel.Dock="Right" VerticalAlignment="Center" Appearance="Secondary" Icon="{ui:SymbolIcon SignOut24}"
+                           Content="Çıkış" Command="{Binding LogoutCommand}" Focusable="False" />
+                <TextBlock DockPanel.Dock="Right" Margin="0,0,12,0" VerticalAlignment="Center" FontSize="15" FontWeight="SemiBold" Text="{Binding UserText}" />
+                <TextBlock Style="{StaticResource PageTitleStyle}" Margin="0" Text="Sevkiyat" />
+            </DockPanel>
+            <TextBlock Grid.Row="1" Margin="0,8,0,8" FontSize="16" FontWeight="SemiBold" TextWrapping="Wrap"
+                       Foreground="{DynamicResource SystemFillColorSuccessBrush}" Text="{Binding ListMessage}" />
+            <Grid Grid.Row="2">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="20" />
+                    <ColumnDefinition Width="*" />
+                </Grid.ColumnDefinitions>
+
+                <!-- Yeni sevkiyat -->
+                <DockPanel>
+                    <TextBlock DockPanel.Dock="Top" Margin="0,0,0,8" FontSize="20" FontWeight="SemiBold" Text="Yeni sevkiyat: lot seçin" />
+                    <ui:Button DockPanel.Dock="Bottom" Margin="0,10,0,0" MinHeight="54" FontSize="18" HorizontalAlignment="Stretch"
+                               Appearance="Primary" Icon="{ui:SymbolIcon VehicleTruck24}" Content="Sevkiyatı başlat  (Enter)"
+                               Command="{Binding StartCommand}" AutomationProperties.Name="Sevkiyatı başlat" />
+                    <ListBox x:Name="LotList" ItemsSource="{Binding LotChoices}" SelectedItem="{Binding SelectedLot}"
+                             AutomationProperties.Name="Lot seçimi" KeyDown="LotList_KeyDown" MouseDoubleClick="LotList_MouseDoubleClick">
+                        <ListBox.ItemTemplate>
+                            <DataTemplate>
+                                <StackPanel Margin="4,6">
+                                    <TextBlock FontSize="20" FontWeight="SemiBold" Text="{Binding Name}" />
+                                    <TextBlock FontSize="14" Foreground="{DynamicResource TextFillColorSecondaryBrush}" Text="{Binding Stock}" />
+                                </StackPanel>
+                            </DataTemplate>
+                        </ListBox.ItemTemplate>
+                    </ListBox>
+                </DockPanel>
+
+                <!-- Açık sevkiyatlar -->
+                <DockPanel Grid.Column="2">
+                    <TextBlock DockPanel.Dock="Top" Margin="0,0,0,8" FontSize="20" FontWeight="SemiBold" Text="Açık sevkiyatlar: devam et" />
+                    <ui:Button DockPanel.Dock="Bottom" Margin="0,10,0,0" MinHeight="54" FontSize="18" HorizontalAlignment="Stretch"
+                               Appearance="Secondary" Icon="{ui:SymbolIcon Play24}" Content="Seçili sevkiyata devam et"
+                               Command="{Binding ResumeCommand}" AutomationProperties.Name="Sevkiyata devam et" />
+                    <Grid>
+                        <ListBox x:Name="OpenList" ItemsSource="{Binding OpenShipments}" SelectedItem="{Binding SelectedShipment}"
+                                 AutomationProperties.Name="Açık sevkiyatlar" KeyDown="OpenList_KeyDown" MouseDoubleClick="OpenList_MouseDoubleClick">
+                            <ListBox.ItemTemplate>
+                                <DataTemplate>
+                                    <StackPanel Margin="4,6">
+                                        <TextBlock FontSize="18" FontWeight="SemiBold">
+                                            <Run Text="{Binding No, Mode=OneWay}" FontFamily="Consolas" /><Run Text="  ·  " /><Run Text="{Binding Lots, Mode=OneWay}" />
+                                        </TextBlock>
+                                        <TextBlock FontSize="14" Foreground="{DynamicResource TextFillColorSecondaryBrush}">
+                                            <Run Text="{Binding Counts, Mode=OneWay}" /><Run Text=" · açan " /><Run Text="{Binding OpenedBy, Mode=OneWay}" /><Run Text=" · son işlem " /><Run Text="{Binding LastActivity, Mode=OneWay}" />
+                                        </TextBlock>
+                                        <TextBlock FontSize="14" FontWeight="SemiBold" Text="{Binding Age}">
+                                            <TextBlock.Style>
+                                                <Style TargetType="TextBlock">
+                                                    <Setter Property="Foreground" Value="{DynamicResource SystemFillColorCautionBrush}" />
+                                                    <Style.Triggers>
+                                                        <DataTrigger Binding="{Binding Staleness}" Value="2">
+                                                            <Setter Property="Foreground" Value="{DynamicResource SystemFillColorCriticalBrush}" />
+                                                        </DataTrigger>
+                                                    </Style.Triggers>
+                                                </Style>
+                                            </TextBlock.Style>
+                                        </TextBlock>
+                                    </StackPanel>
+                                </DataTemplate>
+                            </ListBox.ItemTemplate>
+                        </ListBox>
+                        <TextBlock Margin="0,40,0,0" HorizontalAlignment="Center" VerticalAlignment="Top" IsHitTestVisible="False"
+                                   Style="{StaticResource PageSubtitleStyle}" Text="Açık sevkiyat yok."
+                                   Visibility="{Binding OpenShipments.Count, Converter={StaticResource ZeroToVisibleConverter}}" />
+                    </Grid>
+                </DockPanel>
+            </Grid>
+        </Grid>
+
+        <!-- ========== Okutma ========== -->
+        <Grid Visibility="{Binding IsScanScreen, Converter={StaticResource BoolToVisibility}}">
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="*" />
+            </Grid.RowDefinitions>
+
+            <!-- Üst bilgi: lot uzaktan okunsun -->
+            <DockPanel>
+                <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" VerticalAlignment="Top">
+                    <TextBlock Margin="0,0,12,0" VerticalAlignment="Center" FontSize="14" Text="{Binding UserText}" />
+                    <ui:Button Appearance="Secondary" Icon="{ui:SymbolIcon ArrowLeft24}" Content="Listeye dön" Focusable="False"
+                               Command="{Binding BackToListCommand}" />
+                </StackPanel>
+                <StackPanel>
+                    <TextBlock FontSize="15" Foreground="{DynamicResource TextFillColorSecondaryBrush}">
+                        <Run Text="{Binding ShipmentNo, Mode=OneWay}" FontFamily="Consolas" FontWeight="SemiBold" /><Run Text="  ·  " /><Run Text="{Binding ShipmentInfo, Mode=OneWay}" />
+                    </TextBlock>
+                    <TextBlock FontSize="44" FontWeight="Bold" TextTrimming="CharacterEllipsis" AutomationProperties.Name="Seçili lot">
+                        <Run Text="LOT: " Foreground="{DynamicResource TextFillColorSecondaryBrush}" /><Run Text="{Binding LotTitle, Mode=OneWay}" />
+                    </TextBlock>
+                    <TextBlock FontSize="13" TextWrapping="Wrap" Foreground="{DynamicResource SystemFillColorCautionBrush}" Text="{Binding Warnings}" />
+                </StackPanel>
+            </DockPanel>
+
+            <!-- Sonuç bandı -->
+            <Border Grid.Row="1" Margin="0,8,0,8" Padding="20,12" MinHeight="116" Style="{StaticResource FeedbackBand}">
+                <StackPanel VerticalAlignment="Center">
+                    <TextBlock Style="{StaticResource FeedbackText}" FontSize="36" FontWeight="Bold" TextWrapping="Wrap"
+                               Text="{Binding FeedbackTitle}" />
+                    <TextBlock Style="{StaticResource FeedbackText}" FontSize="20" TextWrapping="Wrap" Text="{Binding FeedbackDetail}" />
+                </StackPanel>
+            </Border>
+
+            <!-- Sayaçlar -->
+            <UniformGrid Grid.Row="2" Rows="1" Margin="0,0,0,8">
+                <ui:Card Margin="0,0,6,0" Padding="14,6">
+                    <StackPanel>
+                        <TextBlock Style="{StaticResource DetailLabelStyle}" Text="Okutulan top" />
+                        <TextBlock Style="{StaticResource BigNumber}" Text="{Binding CountText}" />
+                    </StackPanel>
+                </ui:Card>
+                <ui:Card Margin="3,0,3,0" Padding="14,6">
+                    <StackPanel>
+                        <TextBlock Style="{StaticResource DetailLabelStyle}" Text="Toplam metre" />
+                        <TextBlock Style="{StaticResource BigNumber}" Text="{Binding MetersText}" />
+                    </StackPanel>
+                </ui:Card>
+                <ui:Card Margin="3,0,3,0" Padding="14,6">
+                    <StackPanel>
+                        <TextBlock Style="{StaticResource DetailLabelStyle}" Text="Reddedilen okutma" />
+                        <TextBlock Style="{StaticResource BigNumber}" Foreground="{DynamicResource SystemFillColorCriticalBrush}" Text="{Binding RejectedText}" />
+                    </StackPanel>
+                </ui:Card>
+                <ui:Card Margin="6,0,0,0" Padding="14,6">
+                    <StackPanel>
+                        <TextBlock Style="{StaticResource DetailLabelStyle}" Text="Lotta kalan (stokta)" />
+                        <TextBlock>
+                            <Run Text="{Binding RemainingText, Mode=OneWay}" FontSize="40" FontWeight="Bold" />
+                            <Run Text="{Binding RemainingMetersText, Mode=OneWay}" FontSize="15" />
+                        </TextBlock>
+                    </StackPanel>
+                </ui:Card>
+            </UniformGrid>
+
+            <!-- Okutma kutusu + işlemler -->
+            <DockPanel Grid.Row="3" Margin="0,0,0,8">
+                <ui:Button DockPanel.Dock="Right" Margin="8,0,0,0" MinHeight="54" Appearance="Danger" Focusable="False"
+                           Icon="{ui:SymbolIcon Dismiss24}" Content="İptal (F8)" Command="{Binding BeginCancelCommand}" />
+                <ui:Button DockPanel.Dock="Right" Margin="8,0,0,0" MinHeight="54" Appearance="Success" Focusable="False"
+                           Icon="{ui:SymbolIcon Checkmark24}" Content="Onayla (F9)" Command="{Binding BeginConfirmCommand}"
+                           AutomationProperties.Name="Onayla" />
+                <ui:Button DockPanel.Dock="Right" Margin="8,0,0,0" MinHeight="54" Appearance="Caution" Focusable="False"
+                           Icon="{ui:SymbolIcon ArrowUndo24}" Content="Çıkarma modu (F7)" Command="{Binding ToggleRemoveModeCommand}" />
+                <StackPanel>
+                    <ui:TextBox x:Name="ScanBox" FontSize="26" MinHeight="54" Text="{Binding ScanText, UpdateSourceTrigger=PropertyChanged}"
+                                PlaceholderText="Barkod" Icon="{ui:SymbolIcon BarcodeScanner24}" AutomationProperties.Name="Sevkiyat okutma"
+                                KeyDown="ScanBox_KeyDown" />
+                    <TextBlock Margin="2,2,0,0" FontSize="13" FontWeight="SemiBold" Text="{Binding ScanHint}">
+                        <TextBlock.Style>
+                            <Style TargetType="TextBlock">
+                                <Setter Property="Foreground" Value="{DynamicResource TextFillColorSecondaryBrush}" />
+                                <Style.Triggers>
+                                    <DataTrigger Binding="{Binding IsRemoveMode}" Value="True">
+                                        <Setter Property="Foreground" Value="#E8710A" />
+                                    </DataTrigger>
+                                </Style.Triggers>
+                            </Style>
+                        </TextBlock.Style>
+                    </TextBlock>
+                </StackPanel>
+            </DockPanel>
+
+            <!-- Onay / iptal panelleri -->
+            <StackPanel Grid.Row="4">
+                <Border x:Name="ConfirmPanel" Margin="0,0,0,8" Padding="14" CornerRadius="6" BorderThickness="2"
+                        BorderBrush="{DynamicResource SystemFillColorSuccessBrush}" Focusable="True" FocusVisualStyle="{x:Null}"
+                        AutomationProperties.Name="Onay paneli"
+                        Visibility="{Binding IsConfirmOpen, Converter={StaticResource BoolToVisibility}}">
+                    <DockPanel>
+                        <ui:Button DockPanel.Dock="Right" Margin="8,0,0,0" MinHeight="44" Appearance="Secondary" Focusable="False"
+                                   Content="Vazgeç  (Esc)" Command="{Binding CloseConfirmPanelCommand}" />
+                        <ui:Button DockPanel.Dock="Right" Margin="8,0,0,0" MinHeight="44" Appearance="Success" Focusable="False"
+                                   Content="Onayla  (Enter)" Command="{Binding ConfirmCommand}" />
+                        <TextBlock VerticalAlignment="Center" FontSize="17" FontWeight="SemiBold" TextWrapping="Wrap" Text="{Binding ConfirmText}" />
+                    </DockPanel>
+                </Border>
+                <Border x:Name="CancelPanel" Margin="0,0,0,8" Padding="14" CornerRadius="6" BorderThickness="2"
+                        BorderBrush="{DynamicResource SystemFillColorCriticalBrush}" Focusable="True" FocusVisualStyle="{x:Null}"
+                        AutomationProperties.Name="İptal paneli"
+                        Visibility="{Binding IsCancelOpen, Converter={StaticResource BoolToVisibility}}">
+                    <StackPanel>
+                        <TextBlock FontSize="16" FontWeight="SemiBold" TextWrapping="Wrap" Text="{Binding CancelHint}" />
+                        <ListBox Margin="0,6,0,0" ItemsSource="{Binding CancelReasonList}" SelectedIndex="{Binding CancelChoice}"
+                                 Focusable="False" AutomationProperties.Name="İptal sebepleri">
+                            <ListBox.ItemContainerStyle>
+                                <Style TargetType="ListBoxItem" BasedOn="{StaticResource {x:Type ListBoxItem}}">
+                                    <Setter Property="Focusable" Value="False" />
+                                </Style>
+                            </ListBox.ItemContainerStyle>
+                        </ListBox>
+                        <StackPanel Margin="0,6,0,0" Orientation="Horizontal">
+                            <ui:Button MinHeight="40" Appearance="Danger" Focusable="False" Content="Sevkiyatı iptal et  (Enter)"
+                                       Command="{Binding CancelShipmentCommand}" />
+                            <ui:Button Margin="8,0,0,0" MinHeight="40" Appearance="Secondary" Focusable="False" Content="Vazgeç  (Esc)"
+                                       Command="{Binding CloseCancelPanelCommand}" />
+                        </StackPanel>
+                    </StackPanel>
+                </Border>
+            </StackPanel>
+
+            <!-- Okutulanlar | son okutmalar -->
+            <Grid Grid.Row="5">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="3*" />
+                    <ColumnDefinition Width="12" />
+                    <ColumnDefinition Width="2*" />
+                </Grid.ColumnDefinitions>
+                <DataGrid ItemsSource="{Binding Items}" AutoGenerateColumns="False" IsReadOnly="True" HeadersVisibility="Column"
+                          GridLinesVisibility="Horizontal" CanUserSortColumns="False" CanUserReorderColumns="False" FontSize="15" RowHeight="32"
+                          Focusable="False" AutomationProperties.Name="Okutulan toplar">
+                    <DataGrid.Columns>
+                        <DataGridTextColumn Header="Barkod" Width="120" Binding="{Binding CutId}" FontFamily="Consolas" />
+                        <DataGridTextColumn Header="Lot" Width="*" Binding="{Binding Lot}" />
+                        <DataGridTextColumn Header="Metre" Width="90" Binding="{Binding Meters}" />
+                        <DataGridTextColumn Header="Saat" Width="80" Binding="{Binding Time}" />
+                        <DataGridTextColumn Header="Okutan" Width="100" Binding="{Binding User}" />
+                    </DataGrid.Columns>
+                </DataGrid>
+                <DockPanel Grid.Column="2">
+                    <TextBlock DockPanel.Dock="Top" Margin="0,0,0,4" Style="{StaticResource DetailLabelStyle}" Text="Son okutmalar (retler dahil)" />
+                    <ListBox ItemsSource="{Binding ScanLog}" Focusable="False" ScrollViewer.HorizontalScrollBarVisibility="Disabled"
+                             AutomationProperties.Name="Son okutmalar">
+                        <ListBox.ItemContainerStyle>
+                            <Style TargetType="ListBoxItem" BasedOn="{StaticResource {x:Type ListBoxItem}}">
+                                <Setter Property="Focusable" Value="False" />
+                            </Style>
+                        </ListBox.ItemContainerStyle>
+                        <ListBox.ItemTemplate>
+                            <DataTemplate>
+                                <TextBlock FontSize="13" TextWrapping="Wrap">
+                                    <Run Text="{Binding Time, Mode=OneWay}" Foreground="{DynamicResource TextFillColorTertiaryBrush}" />
+                                    <Run Text="{Binding Text, Mode=OneWay}">
+                                        <Run.Style>
+                                            <Style TargetType="Run">
+                                                <Style.Triggers>
+                                                    <DataTrigger Binding="{Binding Accepted}" Value="False">
+                                                        <Setter Property="Foreground" Value="{DynamicResource SystemFillColorCriticalBrush}" />
+                                                    </DataTrigger>
+                                                </Style.Triggers>
+                                            </Style>
+                                        </Run.Style>
+                                    </Run>
+                                </TextBlock>
+                            </DataTemplate>
+                        </ListBox.ItemTemplate>
+                    </ListBox>
+                </DockPanel>
+            </Grid>
+        </Grid>
+    </Grid>
+</Page>

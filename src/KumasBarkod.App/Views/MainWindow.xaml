@@ -43,6 +43,11 @@
                         <ui:SymbolIcon Symbol="History24" />
                     </ui:NavigationViewItem.Icon>
                 </ui:NavigationViewItem>
+                <ui:NavigationViewItem x:Name="NavShipment" Content="Sevkiyat" TargetPageType="{x:Type pages:ShipmentPage}">
+                    <ui:NavigationViewItem.Icon>
+                        <ui:SymbolIcon Symbol="VehicleTruck24" />
+                    </ui:NavigationViewItem.Icon>
+                </ui:NavigationViewItem>
                 <ui:NavigationViewItem x:Name="NavStock" Content="Depo Stoğu" TargetPageType="{x:Type pages:StockPage}">
                     <ui:NavigationViewItem.Icon>
                         <ui:SymbolIcon Symbol="BuildingRetail24" />
@@ -51,6 +56,11 @@
                 <ui:NavigationViewItem x:Name="NavLots" Content="Lotlar" TargetPageType="{x:Type pages:LotsPage}">
                     <ui:NavigationViewItem.Icon>
                         <ui:SymbolIcon Symbol="Tag24" />
+                    </ui:NavigationViewItem.Icon>
+                </ui:NavigationViewItem>
+                <ui:NavigationViewItem x:Name="NavPersonnel" Content="Personel" TargetPageType="{x:Type pages:PersonnelPage}">
+                    <ui:NavigationViewItem.Icon>
+                        <ui:SymbolIcon Symbol="People24" />
                     </ui:NavigationViewItem.Icon>
                 </ui:NavigationViewItem>
             </ui:NavigationView.MenuItems>

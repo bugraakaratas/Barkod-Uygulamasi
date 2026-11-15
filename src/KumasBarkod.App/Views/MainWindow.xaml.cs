@@ -52,6 +52,9 @@ public partial class MainWindow : FluentWindow
             }
             else
             {
+                // Sevkiyat okutma ekranı açıksa okutma sevkiyata gider; değilse topun geçmişi açılır.
+                var shipment = _services.GetRequiredService<ShipmentPage>();
+                if (shipment.IsVisible && shipment.TryHandleScan(m.CutId)) return;
                 RootNavigation.Navigate(typeof(StockPage));
                 _services.GetRequiredService<StockPage>().OpenRoll(m.CutId);
             }
@@ -78,7 +81,7 @@ public partial class MainWindow : FluentWindow
         e.Handled = true;
     }
 
-    /// <summary>Görev: kalite kontrol (Kesim, Okutma, Geçmiş) · sevkiyat (Depo Stoğu) · yönetim (Depo Stoğu, Lotlar).</summary>
+    /// <summary>Görev: kalite kontrol (Kesim, Okutma, Geçmiş) · sevkiyat (Sevkiyat, Depo Stoğu) · yönetim (Depo Stoğu, Sevkiyat, Lotlar, Personel).</summary>
     private void ApplyRole()
     {
         var role = _settings.GetStationRole();
@@ -90,19 +93,21 @@ public partial class MainWindow : FluentWindow
             (NavCutEntry, typeof(CutEntryPage)),
             (NavScan, typeof(ScanPage)),
             (NavHistory, typeof(HistoryPage)),
+            (NavShipment, typeof(ShipmentPage)),
             (NavStock, typeof(StockPage)),
             (NavLots, typeof(LotsPage)),
+            (NavPersonnel, typeof(PersonnelPage)),
         };
         var visible = role switch
         {
-            StationRoles.Dock => new[] { typeof(StockPage) },
-            StationRoles.Office => new[] { typeof(StockPage), typeof(LotsPage) },
+            StationRoles.Dock => new[] { typeof(ShipmentPage), typeof(StockPage) },
+            StationRoles.Office => new[] { typeof(StockPage), typeof(ShipmentPage), typeof(LotsPage), typeof(PersonnelPage) },
             _ => new[] { typeof(CutEntryPage), typeof(ScanPage), typeof(HistoryPage) },
         };
         foreach (var (item, page) in all)
             item.Visibility = visible.Contains(page) ? Visibility.Visible : Visibility.Collapsed;
         _menu = visible.Select(p => all.First(a => a.Page == p)).ToList();
-        for (var i = 0; i < _menu.Count; i++) _menu[i].Item.ToolTip = $"Ctrl+{i + 1}";
+        for (var i = 0; i < _menu.Count; i++) _menu[i].Item.ToolTip = i < 3 ? $"Ctrl+{i + 1}" : null;
 
         (DataContext as MainWindowViewModel)?.Refresh();
         if (changed && IsLoaded && RootNavigation.SelectedItem is NavigationViewItem current
@@ -122,6 +127,8 @@ public partial class MainWindow : FluentWindow
         "settings" => typeof(SettingsPage),
         "stock" => typeof(StockPage),
         "lots" => typeof(LotsPage),
+        "shipment" => typeof(ShipmentPage),
+        "personnel" => typeof(PersonnelPage),
         _ => _menu[0].Page,
     };
 }

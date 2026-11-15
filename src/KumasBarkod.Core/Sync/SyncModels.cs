@@ -37,6 +37,12 @@ public sealed class SyncException(SyncFailureKind kind, string message, Exceptio
     : Exception(message, inner)
 {
     public SyncFailureKind Kind { get; } = kind;
+
+    /// <summary>Sunucunun HTTP durum kodu (reddedildiyse; ör. 401 oturum yok, 409 çakışma).</summary>
+    public int? StatusCode { get; init; }
+
+    /// <summary>Sunucunun hata kodu (ör. VERSION_MISMATCH).</summary>
+    public string? Code { get; init; }
 }
 
 /// <summary>Satırları uzak tabloya gönderir. Başarısızlıkta <see cref="SyncException"/> atar.</summary>

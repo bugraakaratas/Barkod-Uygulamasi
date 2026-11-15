@@ -246,7 +246,9 @@ public sealed class ShipmentService(SqliteConnectionFactory db, TimeProvider clo
         x.C.Execute("UPDATE shipments SET last_activity_at = @Now WHERE shipment_id = @ShipmentId AND status = 'open'",
             new { x.Now, x.ShipmentId }, x.Tx);
         // Ret de kaydedilir: "bu barkod neden reddedildi?" sorusu her zaman yanıtlanır.
-        var stats = Stats(x.C, x.Tx, x.ShipmentId, extraRejected: x.Kind == "add" ? 1 : 0);
+        // "Reddedilen" = tıra girmemesi gereken top denemesi; aynı topun tekrar okutulması (zararsız) sayılmaz.
+        var counts = x.Kind == "add" && code != ScanCodes.AlreadyInThisShipment;
+        var stats = Stats(x.C, x.Tx, x.ShipmentId, extraRejected: counts ? 1 : 0);
         var response = new ScanResponse(false, code, severity, message, null, stats,
             x.C.ExecuteScalar<long>("SELECT version FROM shipments WHERE shipment_id = @ShipmentId", new { x.ShipmentId }, x.Tx));
         InsertEvent(x, cutId, code, accepted: false, responseJson: JsonSerializer.Serialize(response, ServerApiContract.Json));
@@ -426,7 +428,8 @@ public sealed class ShipmentService(SqliteConnectionFactory db, TimeProvider clo
             SELECT (SELECT count(*) FROM shipment_items WHERE shipment_id = @shipmentId AND status = 'active'),
                    (SELECT coalesce(sum(r.length_cm), 0) FROM shipment_items i JOIN rolls r ON r.cut_id = i.cut_id
                      WHERE i.shipment_id = @shipmentId AND i.status = 'active'),
-                   (SELECT count(*) FROM scan_events WHERE shipment_id = @shipmentId AND accepted = 0 AND kind = 'add'),
+                   (SELECT count(*) FROM scan_events WHERE shipment_id = @shipmentId AND accepted = 0 AND kind = 'add'
+                      AND result_code <> 'ALREADY_IN_THIS_SHIPMENT'),
                    (SELECT count(*) FROM rolls r JOIN shipment_lots sl ON sl.lot_id = r.lot_id
                      WHERE sl.shipment_id = @shipmentId AND r.state = 'in_stock'),
                    (SELECT coalesce(sum(r.length_cm), 0) FROM rolls r JOIN shipment_lots sl ON sl.lot_id = r.lot_id
