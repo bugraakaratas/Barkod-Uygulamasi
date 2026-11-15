@@ -1,0 +1,35 @@
+<Project Sdk="Microsoft.NET.Sdk.Web">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+
+    <!-- Depo sunucusu: fabrikada sürekli açık bilgisayarda Windows hizmeti olarak çalışır. -->
+    <AssemblyName>KumasBarkodSunucu</AssemblyName>
+    <RootNamespace>KumasBarkod.Server</RootNamespace>
+    <Version>0.1.0</Version>
+    <Product>Kumaş Barkod Sunucu</Product>
+    <AssemblyTitle>Kumaş Barkod Depo Sunucusu</AssemblyTitle>
+  </PropertyGroup>
+
+  <PropertyGroup Condition="'$(Configuration)' == 'Release'">
+    <RuntimeIdentifier>win-x64</RuntimeIdentifier>
+    <SelfContained>true</SelfContained>
+    <DebugType>embedded</DebugType>
+    <SatelliteResourceLanguages>tr;en</SatelliteResourceLanguages>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\KumasBarkod.Core\KumasBarkod.Core.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.Extensions.Hosting.WindowsServices" Version="10.0.14" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="KumasBarkod.Server.Tests" />
+  </ItemGroup>
+
+</Project>
