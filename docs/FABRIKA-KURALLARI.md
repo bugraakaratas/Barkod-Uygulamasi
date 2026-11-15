@@ -2,7 +2,7 @@
 
 Sistem en sade hâliyle tasarlandı; doğru çalışması bu kurallara bağlı. Kurulumda fabrikaya verilir.
 Her geliştirme aşamasında güncellenir. **Yalnızca uygulamada gerçekten bulunan özelliklere dayanan kurallar yazılır.**
-Son güncelleme: 2026-11-15 (Faz 1).
+Son güncelleme: 2026-11-15 (Faz 2).
 
 ## A. Altyapı (kurulumdan önce)
 
@@ -30,12 +30,25 @@ Son güncelleme: 2026-11-15 (Faz 1).
    iptal edilen top stoktan düşer, geçmişi kalır.
 5. **Aynı barkod iki topa yapıştırılmaz.** Bozulan etiket yeniden basılırken (F6) eskisi topun üzerinden sökülür.
 
-## C. Yedek ve kontrol (yetkili)
+## C. Bilgisayar görevleri ve lotlar
+
+1. Uygulama her bilgisayarda aynıdır; **Ayarlar → Bu bilgisayarın görevi** kurulumda seçilir:
+   kalite kontrol bilgisayarı "Kalite kontrol", rıhtım bilgisayarı "Sevkiyat (rıhtım)", patron/ofis bilgisayarı "Yönetim".
+   Görev yanlış seçilirse ekranlar eksik görünür; kayıtlar etkilenmez.
+2. **Lot adı firmayı gösterir.** Lotlar (firmalar) yönetim bilgisayarında **Lotlar** ekranından bir kez tanımlanır.
+   Kalite kontrolde lot adı aynı yazılır; büyük/küçük harf, Türkçe harf, boşluk ve tire farkı sorun değildir
+   ("LOT-3" = "lot 3"). **Rakam farkı fark sayılır** ("LOT-3" ≠ "LOT-03").
+3. Depo Stoğu'ndaki **"eşleşmemiş lot yazımı" uyarısı** yönetimde her gün kontrol edilir: farklı yazılmış lot adları
+   Lotlar ekranında doğru lota bağlanır (bağlama düzeltilebilir, geçmişe yazılır). Bağlanmamış toplar firmaya göre
+   stok raporunda görünmez ve sevkiyatta lot seçimiyle bulunamaz (Faz 4).
+4. Kullanılmayan lot silinmez, **pasif** yapılır (eski topları bağlı kalır).
+
+## D. Yedek ve kontrol (yetkili)
 
 1. Haftada bir sunucudaki ikinci yedek klasöründe (USB) son tarihli yedeklerin olduğu kontrol edilir.
 2. Ayda bir sunucuda `KumasBarkodSunucu.exe --kontrol` çalıştırılır ("Veri bütünlüğü: sorun yok" görülmeli).
 
-## D. Sonraki aşamalarda eklenecek (henüz uygulamada YOK)
+## E. Sonraki aşamalarda eklenecek (henüz uygulamada YOK)
 
-Lot/firma tanımları, depo stok ekranı, sevkiyat okutma kuralları (lot seçmeden okutma yok, yanlış lot reddi, onay ve iptal),
-personel kartı ile giriş, rıhtım ekranı yerleşimi.
+Kalite kontrolde lot listesinden öneri (Faz 3), sevkiyat okutma kuralları (lot seçmeden okutma yok, yanlış lot reddi,
+onay ve iptal), personel kartı ile giriş, rıhtım ekranı yerleşimi (Faz 4).

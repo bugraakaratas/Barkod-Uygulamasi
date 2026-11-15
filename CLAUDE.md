@@ -44,16 +44,17 @@ Bu dosya projenin hafızasıdır. Yeni oturumda önce bunu oku. **Her iş bitinc
 src/KumasBarkod.Core     (net10.0)  iş mantığı, veri, yazdırma, senkron — arayüzden bağımsız, test edilir
   Data/        SqliteConnectionFactory, Migrations (şema), DatabaseMigrator, SettingsRepository, StationCounters,
                CutRepository (+ Search/CutQuery), BackupService
-  Domain/      Cut, CutStatus, CutIds (ID/barkod biçimi, TryParseScan), Stations, Length, Timestamps, VoidReasons
+  Domain/      Cut, CutStatus, CutIds (ID/barkod biçimi, TryParseScan), Stations, Length, Timestamps, VoidReasons, LotKeys
   Services/    CutService (oluşturma, iptal), PrintService (baskı + baskı kaydı + günlük)
   Printing/    LabelData, ILabelTemplate, ILabelPrinter, ZplLabelTemplate, FileLabelPrinter, Code128 (ZXing)
   Scanning/    ScanBurstDetector (okuyucu hız + biçim tespiti)
   Sync/        AppsScriptTransport, OutboxRepository (tablo: sync_outbox | server_outbox), SyncService, SyncWorker (ISyncRunner), RestoreService, modeller
-  ServerApi/   istasyon↔sunucu sözleşmesi (ServerApiModels), ServerAddress, HttpServerTransport, ServerSyncService
+  ServerApi/   istasyon↔sunucu sözleşmesi (ServerApiModels, DepotModels), ServerAddress, HttpServerTransport, ServerHttp, ServerSyncService, DepotApiClient
   Diagnostics/ ILog, FileLog, NullLog
 src/KumasBarkod.Server   (net10.0, ASP.NET Core; çıktı KumasBarkodSunucu.exe, Windows hizmeti) — depo sunucusu
   Data/        ServerMigrations (sunucu şeması), RollStates, MovementKinds, ServerInvariants (bütünlük kontrolü), ServerBackupService
   Ingest/      CutIngestService (kesim alımı), ApiException
+  Lots/        LotService, DataVersion · Stock/ StockQueryService
   Program.cs, ServerEndpoints (uç noktalar + ApiErrorMiddleware), ServerHosting (ServerPaths, FileLogProvider), MaintenanceWorker (+ AdminCommands)
 src/KumasBarkod.App      (net10.0-windows, WPF; çıktı adı KumasBarkod.exe)
   App.xaml(.cs)  DI, kültür tr-TR, günlük + beklenmeyen hata yakalama, göç, gönderici, günlük yedek zamanlayıcı
@@ -61,14 +62,15 @@ src/KumasBarkod.App      (net10.0-windows, WPF; çıktı adı KumasBarkod.exe)
   Messages.cs    CutChanged, OpenCut, StartNewCut, BackupChanged, DatabaseRestored, SettingsChanged
   Scanning/      ScanCapture (pencere düzeyinde okutma yakalama)
   ServerSync/    ServerConnection (sunucu kuyruğu + gönderici), StationIdentityProvider (MachineGuid)
+  (depo ekranları) ViewModels/StockViewModel, LotsViewModel, DataVersionPoller; Views/Pages/StockPage, LotsPage
   Printing/      ScreenOnlyPrinter, PagePrinter (Windows yazıcı/PDF), SelectablePrinter (ayara göre)
   Controls/      LabelPreview (50×30 mm etiket çizimi, gerçek Code128)
   Assets/        app.ico
   Themes/Styles.xaml, Converters.cs
   ViewModels/    MainWindow, CutEntry, Scan, History, Settings
   Views/         MainWindow (FluentWindow + NavigationView + durum çubuğu), Pages/ (CutEntry, Scan, History, Settings)
-tests/KumasBarkod.Tests  (xUnit, 290 test) Data/, Domain/, Services/, Printing/, Scanning/, Sync/ (FakeAppsScript, ServerOutboxTests), Stress/ (rastgele girdi, eşzamanlılık; KUMAS_STRESS=1 ile 1 milyon kayıt)
-tests/KumasBarkod.Server.Tests (xUnit, 42 test) WebApplicationFactory + geçici SQLite: CutIngestTests, StationToServerTests, ServerBackupTests (gerçek istasyon veritabanı → gerçek HTTP → sunucu)
+tests/KumasBarkod.Tests  (xUnit, 312 test) Data/, Domain/, Services/, Printing/, Scanning/, Sync/ (FakeAppsScript, ServerOutboxTests), Stress/ (rastgele girdi, eşzamanlılık; KUMAS_STRESS=1 ile 1 milyon kayıt)
+tests/KumasBarkod.Server.Tests (xUnit, 66 test) WebApplicationFactory + geçici SQLite: CutIngestTests, StationToServerTests, ServerBackupTests, LotAndStockTests (gerçek istasyon veritabanı → gerçek HTTP → sunucu)
 tools/sheets/            Code.gs (Apps Script v7), Code.test.js (node --test, 25 test), KURULUM.md
 tools/test/              regresyon: uitest.ps1 (arayüz A/B, gerçek Google C/D), uidb.py, stres.gs, README.md
 tools/installer/         KumasBarkod.iss, build-installer.ps1, generate-icon.ps1, KumasBarkodSunucu.iss, build-server-installer.ps1
