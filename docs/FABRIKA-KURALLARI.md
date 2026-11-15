@@ -2,7 +2,7 @@
 
 Sistem en sade hâliyle tasarlandı; doğru çalışması bu kurallara bağlı. Kurulumda fabrikaya verilir.
 Her geliştirme aşamasında güncellenir. **Yalnızca uygulamada gerçekten bulunan özelliklere dayanan kurallar yazılır.**
-Son güncelleme: 2026-11-15 (Faz 3).
+Son güncelleme: 2026-11-15 (Faz 4).
 
 ## A. Altyapı (kurulumdan önce)
 
@@ -48,12 +48,32 @@ Son güncelleme: 2026-11-15 (Faz 3).
    yöneticiye sorar; tahminle seçmez.** Gerçekten yeni bir firmaysa "2 — yazıldığı gibi" seçilir ve yönetim lotu tanımlar.
    Aynı yeni lot o gün tekrar sorulmaz.
 
-## D. Yedek ve kontrol (yetkili)
+## D. Sevkiyat (rıhtım)
+
+1. **Her personelin kendi kartı ve PIN'i olur**; kart ve PIN paylaşılmaz (okutulan her top okutanın adıyla kaydedilir).
+   Personeli yönetim bilgisayarında **Personel** ekranından yetkili ekler. Ayrılan personel silinmez, **pasif** yapılır.
+2. **Varsayılan düzen:** rıhtım kapısında kabloyla bağlı bilgisayar + büyük ekran (tıra dönük) + kablosuz okuyucu.
+   **Kapıda görevli tek kişi her topu tıra girmeden okutur.** Okutulmayan top tıra yüklenmez.
+3. Sevkiyat **lot seçilerek** açılır. Ekranda lot büyük yazılır; yanlış lot topu **kırmızı + uzun uyarı sesi** ile reddedilir.
+4. Renkler: **yeşil = yükle**, **kırmızı = YÜKLEME, topu ayır**, sarı = uyarı (ör. aynı top tekrar okutuldu; zararsız),
+   koyu kırmızı = **bağlantı yok: okutmayı ve yüklemeyi durdur** (okutulan kayıtlar kaybolmaz, bağlantı gelince gider).
+5. Tıra yanlışlıkla giren / indirilen top **Çıkarma modu (F7)** ile okutulur; sevkiyattan çıkar, stoğa döner.
+6. Yükleme bitince **Onayla (F9)**: ekrandaki top sayısı tırdakiyle karşılaştırılır, sonra onaylanır. Onaydan sonra toplar
+   "sevk edildi" olur ve başka sevkiyata giremez. Kısmi sevkiyat normaldir: lotun okutulmayan topları stokta kalır.
+7. Tır gelmezse / yanlış lot seçildiyse **İptal (F8)** + sebep: okutulan toplar stoğa döner. Sevkiyat kayıtları silinmez.
+8. Yarım kalan sevkiyat (bilgisayar kapandı, vardiya bitti) **Açık sevkiyatlar** listesinden herkes tarafından devam ettirilir.
+   2 saattir işlem görmeyen sevkiyat turuncu, 24 saati geçen kırmızı görünür: yetkili kontrol edip onaylatır ya da iptal eder.
+   Sistem açık sevkiyatı kendiliğinden iptal etmez (tıra yüklenmiş toplar yanlışlıkla stokta görünmesin).
+9. Kırmızı "sistemde yok" uyarısı: o topun kalite kontrol kaydı depoya ulaşmamış olabilir (QC bilgisayarı ağdan kopuk).
+   Top yüklenmez, yetkiliye haber verilir. "Karantina" uyarısı: aynı barkod iki topta — top ayrılır, yetkiliye bildirilir.
+10. El terminali kullanılacaksa: Wi-Fi'a bağlanır, tarayıcıda `http://depo-sunucu:5080` açılır (sevkiyat sayfası), okuyucusu
+    "klavye gibi + Enter" ayarında olmalı. Kurallar ve kayıtlar rıhtım bilgisayarıyla aynıdır.
+
+## E. Yedek ve kontrol (yetkili)
 
 1. Haftada bir sunucudaki ikinci yedek klasöründe (USB) son tarihli yedeklerin olduğu kontrol edilir.
 2. Ayda bir sunucuda `KumasBarkodSunucu.exe --kontrol` çalıştırılır ("Veri bütünlüğü: sorun yok" görülmeli).
 
-## E. Sonraki aşamalarda eklenecek (henüz uygulamada YOK)
+## F. Sonraki aşamalarda eklenecek (henüz uygulamada YOK)
 
-Sevkiyat okutma kuralları (lot seçmeden okutma yok, yanlış lot reddi,
-onay ve iptal), personel kartı ile giriş, rıhtım ekranı yerleşimi (Faz 4).
+Onaylanmış sevkiyatı geri alma (yetkili), karantina/istisna ekranı, raporlar (Faz 5); Google Sheets'e stok ve sevkiyat kopyası (Faz 6).

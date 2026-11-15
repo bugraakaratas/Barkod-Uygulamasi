@@ -55,6 +55,11 @@ Herhangi bir bilgisayarın tarayıcısında: `http://depo-sunucu:5080/health` �
 Her QC bilgisayarında: **Ayarlar → Depo sunucusu** → adres (`depo-sunucu` ya da IP) → **Bağlantıyı test et** → **Kaydet**.
 Durum çubuğunda "Depo güncel" ve "Depo bekleyen: 0" görünmeli.
 
+## 4b. Personel ve el terminali
+
+- İlk kurulumda yönetim bilgisayarında **Personel** ekranından ilk yetkili (ad, kart kodu, PIN) oluşturulur; diğer personeli o ekler.
+- El terminali / telefon: aynı ağda tarayıcıda `http://depo-sunucu:5080` → sevkiyat sayfası (`/el-terminali`). Kurulum gerekmez.
+
 ## 5. Yedek
 
 | Tür | Yer | Saklanan | Neye karşı |
