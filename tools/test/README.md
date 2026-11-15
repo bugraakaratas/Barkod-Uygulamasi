@@ -5,7 +5,7 @@ Sonuçlar ve ölçümler: `docs/TEST-RAPORU.md`.
 ## Otomatik
 
 ```powershell
-dotnet test                               # 262 test
+dotnet test                               # 312 + 66 test
 node --test tools/sheets/Code.test.js     # 25 test
 
 # 1 milyon kayıt ölçümü (yaklaşık 3 dk)
@@ -20,9 +20,11 @@ dotnet test --filter "FullyQualifiedName~Stress.LargeDataTests"
 ```powershell
 pwsh -STA -File tools\test\uitest.ps1 -Part A   # tüm ekranlar, sınırlar, okuyucu, iptal, Geçmiş, Ayarlar (60 kontrol)
 pwsh -STA -File tools\test\uitest.ps1 -Part B   # 300 bin kayıt, 300 F5, zorla kapatma, iki kopya (21 kontrol)
+pwsh -STA -File tools\test\uitest.ps1 -Part E   # depo: geçici sunucu, görev değişimi, Depo Stoğu, okutma, Lotlar (31 kontrol)
 ```
 
-A ve B yalnızca `%TEMP%\kumas-uitest` altında çalışır.
+A, B ve E yalnızca `%TEMP%\kumas-uitest` altında çalışır. E kendi geçici depo sunucusunu `http://localhost:5087` üzerinde açar (önce `dotnet build`).
+InfoBar mesaj metni UI Automation ağacında görünmez: mesajlar ekran görüntüsünden, davranış veriden kontrol edilir.
 
 ## Gerçek Google (DİKKAT: tabloya yazar)
 
