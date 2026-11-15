@@ -18,10 +18,10 @@ public sealed class ServerConnection : IAsyncDisposable
     public static readonly TimeSpan MaxBackoff = TimeSpan.FromMinutes(1);
 
     public ServerConnection(SqliteConnectionFactory db, SettingsRepository settings, StationCounters counters,
-        IServerTransport transport, StationIdentity identity, TimeProvider clock)
+        IServerTransport transport, StationIdentity identity, TimeProvider clock, LotCatalog lotCatalog)
     {
         Outbox = new OutboxRepository(db, OutboxTables.Server);
-        Service = new ServerSyncService(Outbox, settings, counters, transport, identity, clock);
+        Service = new ServerSyncService(Outbox, settings, counters, transport, identity, clock, lotCatalog);
         Worker = new SyncWorker(Service, Outbox, clock, NormalInterval, NudgeDelay, MaxBackoff);
     }
 

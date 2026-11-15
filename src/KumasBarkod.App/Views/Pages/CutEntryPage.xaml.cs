@@ -38,6 +38,14 @@ public partial class CutEntryPage : Page
     /// </summary>
     private void FocusNow(EntryField field)
     {
+        if (field == EntryField.LotCheckPanel)
+        {
+            LotCheckPanel.Focus();
+            LotCheckPanel.UpdateLayout();
+            LotCheckPanel.BringIntoView();
+            return;
+        }
+
         if (field == EntryField.ReprintPanel)
         {
             ReprintPanel.Focus();
@@ -71,6 +79,29 @@ public partial class CutEntryPage : Page
             return;
         }
 
+        // Tanımsız lot onayı: Enter kaydet, Esc düzelt, 1/2 seçim. Rakamlar "işlendi" işaretlenmez:
+        // panel açıkken yapılan okutmanın karakterleri ScanCapture'a ulaşsın (okutmanın Enter'ı orada işlenir).
+        if (LotCheckPanel.IsKeyboardFocusWithin && Keyboard.Modifiers == ModifierKeys.None)
+        {
+            switch (e.Key)
+            {
+                case Key.Enter when !e.Handled:
+                    _viewModel.ConfirmLotCheckCommand.Execute(null);
+                    e.Handled = true;
+                    return;
+                case Key.Escape:
+                    _viewModel.CancelLotCheckCommand.Execute(null);
+                    e.Handled = true;
+                    return;
+                case Key.D1 or Key.NumPad1 when !e.Handled:
+                    _viewModel.SelectLotChoice(1);
+                    return;
+                case Key.D2 or Key.NumPad2 when !e.Handled:
+                    _viewModel.SelectLotChoice(2);
+                    return;
+            }
+        }
+
         switch (e.Key)
         {
             case Key.F2:
@@ -100,6 +131,10 @@ public partial class CutEntryPage : Page
             command.Execute(null);
         e.Handled = true;
     }
+
+    /// <summary>Başka yere tıklanınca veya ekran değişince lot onayı açık kalmasın (kayıt yapılmaz).</summary>
+    private void LotCheckPanel_LostKeyboardFocus(object sender, KeyboardFocusChangedEventArgs e) =>
+        _viewModel.CloseLotCheckPanel();
 
     /// <summary>Başka yere tıklanınca veya ekran değişince onay açık kalmasın.</summary>
     private void ReprintPanel_LostKeyboardFocus(object sender, KeyboardFocusChangedEventArgs e) =>

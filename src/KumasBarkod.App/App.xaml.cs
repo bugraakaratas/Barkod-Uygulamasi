@@ -203,6 +203,7 @@ public partial class App : Application
         // Depo sunucusu (yerel ağ): stok ve sevkiyat. Kısa zaman aşımı — yerel ağda yanıt hızlı gelir.
         services.AddSingleton(StationIdentityProvider.Create());
         services.AddSingleton<IServerTransport>(_ => new HttpServerTransport(new HttpClient { Timeout = TimeSpan.FromSeconds(15) }));
+        services.AddSingleton<LotCatalog>();
         services.AddSingleton<ServerConnection>();
         // Depo ekranları (stok, lotlar): kurallar sunucuda; cihaz adı "kim yaptı" kaydı için.
         services.AddSingleton(sp => new DepotApiClient(new HttpClient { Timeout = TimeSpan.FromSeconds(10) },

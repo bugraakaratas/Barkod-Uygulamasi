@@ -19,7 +19,8 @@ public sealed class ServerSyncService(
     StationCounters counters,
     IServerTransport transport,
     StationIdentity identity,
-    TimeProvider clock) : ISyncRunner
+    TimeProvider clock,
+    LotCatalog? lotCatalog = null) : ISyncRunner
 {
     public const int BatchSize = 200;
     public const int MaxBatchesPerRun = 25;
@@ -100,8 +101,30 @@ public sealed class ServerSyncService(
         }
 
         outbox.PurgeSent(clock.GetUtcNow() - KeepSentFor);
+        await RefreshLotCatalogAsync(baseUri, cancellationToken);
         return new SyncRunResult(true, sent, null);
     }
+
+    /// <summary>
+    /// Lot listesi önbelleği (QC'de öneri ve "tanımlı değil" uyarısı). Alınamazsa eski liste kalır; kesim
+    /// gönderimi bundan etkilenmez.
+    /// </summary>
+    private async Task RefreshLotCatalogAsync(Uri baseUri, CancellationToken cancellationToken)
+    {
+        if (lotCatalog is null) return;
+        try
+        {
+            lotCatalog.Replace(await transport.GetLotsAsync(baseUri, cancellationToken));
+            LotCatalogRefreshed?.Invoke();
+        }
+        catch (SyncException)
+        {
+            // eski liste geçerli kalır
+        }
+    }
+
+    /// <summary>Lot önbelleği yenilendi (arka plan iş parçacığından).</summary>
+    public event Action? LotCatalogRefreshed;
 
     /// <summary>Ayarlar'daki "Bağlantıyı test et": sağlık kontrolü (veri yazılmaz, istasyon kaydı yapılmaz).</summary>
     public Task<HealthResponse> TestConnectionAsync(Uri baseUri, CancellationToken cancellationToken = default) =>

@@ -1,4 +1,6 @@
 using System.Collections.ObjectModel;
+using System.Windows;
+using KumasBarkod.App.ServerSync;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using CommunityToolkit.Mvvm.Messaging;
@@ -10,7 +12,7 @@ using Wpf.Ui.Controls;
 
 namespace KumasBarkod.App.ViewModels;
 
-public enum EntryField { Lot, Length, ReprintPanel }
+public enum EntryField { Lot, Length, ReprintPanel, LotCheckPanel }
 
 public sealed record RecentCutItem(string CutId, string LotCode, string Meters, string Time, bool IsVoided, long PrintCount);
 
@@ -20,14 +22,38 @@ public partial class CutEntryViewModel : ObservableObject
     private readonly CutRepository _cuts;
     private readonly SettingsRepository _settings;
     private readonly PrintService _printService;
+    private readonly LotCatalog _catalog;
     private bool _busy;
 
-    public CutEntryViewModel(CutService cutService, CutRepository cuts, SettingsRepository settings, PrintService printService)
+    /// <summary>Son lotlar (bu bilgisayarın kayıtlarından). Yazılan metne uyan tanımlı lot yoksa bunlar gösterilir.</summary>
+    private readonly List<string> _recent = [];
+
+    /// <summary>Depo sunucusundaki etkin lotlar (önbellekten). Boşsa lot kontrolü yapılmaz.</summary>
+    private IReadOnlyList<CatalogLot> _activeLots = [];
+
+    /// <summary>
+    /// Bu oturumda "yazıldığı gibi kaydet" denmiş tanımsız lotlar: anahtar → onaylanan yazım. Her topta tekrar
+    /// sorulmaz ve aynı lot hep ilk onaylanan yazımla basılır ("YENI LOT" / "yeni lot" karışmasın).
+    /// </summary>
+    private readonly Dictionary<string, string> _confirmedUndefined = new(StringComparer.Ordinal);
+
+    public CutEntryViewModel(CutService cutService, CutRepository cuts, SettingsRepository settings, PrintService printService,
+        LotCatalog catalog, ServerConnection server)
     {
         _cutService = cutService;
         _cuts = cuts;
         _settings = settings;
         _printService = printService;
+        _catalog = catalog;
+        _activeLots = catalog.GetActive();
+
+        // Lot listesi sunucudan yenilenince (arka plan) öneriler güncellensin.
+        server.Service.LotCatalogRefreshed += () =>
+            Application.Current?.Dispatcher.BeginInvoke(() =>
+            {
+                _activeLots = _catalog.GetActive();
+                UpdateChoices(LotText.Trim());
+            });
 
         // Başka ekranda iptal/baskı olunca son kayıtlar listesi güncel kalsın.
         WeakReferenceMessenger.Default.Register<CutEntryViewModel, CutChangedMessage>(
@@ -76,7 +102,42 @@ public partial class CutEntryViewModel : ObservableObject
     /// <summary>Görünüme hangi alana odaklanacağını söyler (odak bir görünüm işidir).</summary>
     public event Action<EntryField>? FocusRequested;
 
+    /// <summary>Lot kutusunun altındaki seçenekler: son lotlar ya da yazılana uyan tanımlı lotlar (↑ ↓, tıklama).</summary>
     public ObservableCollection<string> RecentLots { get; } = [];
+
+    [ObservableProperty]
+    public partial string ChoicesTitle { get; set; } = "Son lotlar";
+
+    // ---------- Tanımsız lot onayı ----------
+
+    /// <summary>Yazılan lot tanımlı değil: kaydetmeden önce onay (1 önerilen, 2 yazıldığı gibi, Esc düzelt).</summary>
+    [ObservableProperty]
+    public partial bool IsLotCheckOpen { get; set; }
+
+    [ObservableProperty]
+    public partial string LotCheckTitle { get; set; } = "";
+
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(HasLotSuggestion))]
+    public partial string? LotSuggestion { get; set; }
+
+    public bool HasLotSuggestion => LotSuggestion is not null;
+
+    [ObservableProperty]
+    public partial string PendingLot { get; set; } = "";
+
+    /// <summary>0 = seçilmedi, 1 = önerilen lot, 2 = yazıldığı gibi.</summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(IsChoiceSuggestion), nameof(IsChoiceTyped))]
+    public partial int LotCheckChoice { get; set; }
+
+    public bool IsChoiceSuggestion { get => LotCheckChoice == 1; set { if (value) LotCheckChoice = 1; } }
+    public bool IsChoiceTyped { get => LotCheckChoice == 2; set { if (value) LotCheckChoice = 2; } }
+
+    [ObservableProperty]
+    public partial string LotCheckHint { get; set; } = "";
+
+    private long _pendingCm;
     public ObservableCollection<RecentCutItem> RecentCuts { get; } = [];
 
     [ObservableProperty]
@@ -115,7 +176,28 @@ public partial class CutEntryViewModel : ObservableObject
             LotText = RecentLots[0];
     }
 
-    partial void OnLotTextChanged(string value) => RecentLotIndex = RecentLots.IndexOf(value.Trim());
+    partial void OnLotTextChanged(string value)
+    {
+        var text = value.Trim();
+        // Seçeneklerden biri seçildiyse (↑ ↓, tıklama) liste olduğu gibi kalır; yazılıyorsa yeniden süzülür.
+        if (!RecentLots.Contains(text)) UpdateChoices(text);
+        RecentLotIndex = RecentLots.IndexOf(text);
+    }
+
+    /// <summary>
+    /// Yazılan metne uyan tanımlı lotlar varsa onlar, yoksa son lotlar gösterilir. Tanımlı lot yoksa
+    /// (sunucu ayarlanmadı / henüz lot tanımlanmadı) her zaman son lotlar: ekran eskisi gibi.
+    /// </summary>
+    private void UpdateChoices(string text)
+    {
+        var matches = LotMatcher.Suggest(text, _activeLots);
+        var useMatches = matches.Count > 0 && !(matches.Count == 1 && matches[0] == text && _recent.Contains(text));
+        IReadOnlyList<string> target = useMatches ? matches : _recent;
+        ChoicesTitle = useMatches ? "Tanımlı lotlar" : "Son lotlar";
+        if (RecentLots.SequenceEqual(target)) return;
+        RecentLots.Clear();
+        foreach (var l in target) RecentLots.Add(l);
+    }
 
     partial void OnRecentLotIndexChanged(int value)
     {
@@ -177,13 +259,83 @@ public partial class CutEntryViewModel : ObservableObject
             return;
         }
 
+        _activeLots = _catalog.GetActive();
+        var check = LotMatcher.Check(lot, _activeLots);
+        string? note = null;
+        switch (check.Kind)
+        {
+            case LotCheckKind.Defined when check.Match!.Name != lot:
+                // Yalnızca yazım farkı: etikete ve kayda tanımlı ad yazılır (bütün etiketler aynı görünsün).
+                note = $"yazılan \"{lot}\" → tanımlı ad";
+                lot = check.Match.Name;
+                break;
+            case LotCheckKind.Undefined when _confirmedUndefined.TryGetValue(LotKeys.Key(lot), out var confirmed):
+                if (confirmed != lot) note = $"yazılan \"{lot}\" → onaylanan yazım";
+                lot = confirmed;
+                break;
+            case LotCheckKind.Undefined:
+                OpenLotCheck(lot, cm, check.Suggestion?.Name);
+                return;
+        }
+
+        await CreateAndShowAsync(lot, cm, note);
+    });
+
+    private async Task CreateAndShowAsync(string lot, long cm, string? note)
+    {
         var cut = await TryCreateAsync(() => _cutService.CreateCut(lot, cm));
         if (cut is null) return;
 
         LengthText = "";
         LotText = cut.LotCode;      // Son lot seçili kalır
-        await ShowAndPrintAsync(cut);
+        await ShowAndPrintAsync(cut, note);
+    }
+
+    private void OpenLotCheck(string lot, long cm, string? suggestion)
+    {
+        PendingLot = lot;
+        _pendingCm = cm;
+        LotSuggestion = suggestion;
+        LotCheckTitle = $"\"{lot}\" tanımlı bir lot değil.";
+        // Öneri varsa kendiliğinden SEÇİLMEZ: yanlış firmaya bağlamak en kötü hata, bilerek seçilsin.
+        LotCheckChoice = suggestion is null ? 2 : 0;
+        LotCheckHint = suggestion is null ? "Enter: yazıldığı gibi kaydet · Esc: düzelt" : "1 ya da 2 seçip Enter · Esc: düzelt";
+        IsLotCheckOpen = true;
+        FocusRequested?.Invoke(EntryField.LotCheckPanel);
+    }
+
+    public void SelectLotChoice(int choice)
+    {
+        if (!IsLotCheckOpen) return;
+        if (choice == 1 && LotSuggestion is null) return;
+        LotCheckChoice = choice;
+    }
+
+    [RelayCommand]
+    private Task ConfirmLotCheckAsync() => RunExclusiveAsync(async () =>
+    {
+        if (!IsLotCheckOpen) return;
+        if (LotCheckChoice == 0)
+        {
+            LotCheckHint = "Önce seçin: 1 = önerilen lot, 2 = yazıldığı gibi.";
+            return;
+        }
+
+        var lot = LotCheckChoice == 1 ? LotSuggestion! : PendingLot;
+        if (LotCheckChoice == 2) _confirmedUndefined[LotKeys.Key(lot)] = lot;
+        var note = LotCheckChoice == 1 ? $"yazılan \"{PendingLot}\" → {lot}" : "tanımsız lot, yönetim bağlayacak";
+        CloseLotCheckPanel();
+        await CreateAndShowAsync(lot, _pendingCm, note);
     });
+
+    [RelayCommand]
+    private void CancelLotCheck()
+    {
+        CloseLotCheckPanel();
+        FocusRequested?.Invoke(EntryField.Lot);
+    }
+
+    public void CloseLotCheckPanel() => IsLotCheckOpen = false;
 
     /// <summary>
     /// Sıradaki parça: son kaydın lotu ve uzunluğuyla yeni ID'li kesim + etiket. Değerler son
@@ -193,6 +345,7 @@ public partial class CutEntryViewModel : ObservableObject
     private Task NextPieceAsync() => RunExclusiveAsync(async () =>
     {
         CloseReprintPanel();
+        CloseLotCheckPanel();
         var sourceId = LastCut!.CutId;
         var cut = await TryCreateAsync(() => _cutService.CreateNextPiece(sourceId));
         if (cut is not null)
@@ -207,6 +360,7 @@ public partial class CutEntryViewModel : ObservableObject
     [RelayCommand(CanExecute = nameof(CanReprint))]
     private async Task BeginReprintAsync()
     {
+        CloseLotCheckPanel();
         if (LastCut!.PrintCount == 0)
         {
             await RunExclusiveAsync(ReprintLastAsync);
@@ -273,13 +427,13 @@ public partial class CutEntryViewModel : ObservableObject
     }
 
     /// <summary>Kayıt tamam: ekranı hemen hazırlar, sonra etiketi basar.</summary>
-    private async Task ShowAndPrintAsync(Cut cut)
+    private async Task ShowAndPrintAsync(Cut cut, string? note = null)
     {
         LastCut = cut;
         LastLabel = LabelData.FromCut(cut, TimeZoneInfo.Local);
         WeakReferenceMessenger.Default.Send(new CutChangedMessage(cut));   // listeler de bununla yenilenir
 
-        var summary = $"Lot {cut.LotCode} · {Length.Format(cut.LengthCm)} m";
+        var summary = $"Lot {cut.LotCode} · {Length.Format(cut.LengthCm)} m" + (note is null ? "" : $" ({note})");
         var printError = await PrintAsync(cut.CutId);
         if (printError is null)
             ShowResult(InfoBarSeverity.Success, $"{cut.CutId} kaydedildi", $"{summary} · {PrintedText()}");
@@ -358,8 +512,11 @@ public partial class CutEntryViewModel : ObservableObject
     {
         var lot = LotText;
 
+        _recent.Clear();
+        _recent.AddRange(_cuts.GetRecentLots());
         RecentLots.Clear();
-        foreach (var l in _cuts.GetRecentLots()) RecentLots.Add(l);
+        foreach (var l in _recent) RecentLots.Add(l);
+        ChoicesTitle = "Son lotlar";
 
         RecentCuts.Clear();
         foreach (var c in _cuts.GetRecentCuts(12))
@@ -373,6 +530,7 @@ public partial class CutEntryViewModel : ObservableObject
 
         // Liste yenilenince seçim sıfırlanır; mevcut lota göre vurguyu geri kur.
         LotText = lot;
+        UpdateChoices(lot.Trim());
         RecentLotIndex = RecentLots.IndexOf(lot.Trim());
     }
 }

@@ -32,9 +32,11 @@
                                     PreviewKeyDown="LotBox_PreviewKeyDown"
                                     AutomationProperties.Name="Lot" />
 
-                        <!-- Son lotlar: her zaman görünür; ↑ ↓ ile lot kutusundan gezilir, tıklanabilir. -->
+                        <!-- Son lotlar ya da yazılana uyan tanımlı lotlar: ↑ ↓ ile lot kutusundan gezilir, tıklanabilir. -->
+                        <TextBlock Margin="2,8,0,2" FontSize="12" Foreground="{DynamicResource TextFillColorTertiaryBrush}"
+                                   Text="{Binding ChoicesTitle}" />
                         <ListBox x:Name="RecentLotsList"
-                                 Margin="0,8,0,0"
+                                 Margin="0,2,0,0"
                                  ItemsSource="{Binding RecentLots}"
                                  SelectedIndex="{Binding RecentLotIndex, Mode=TwoWay}"
                                  Focusable="False"
@@ -101,6 +103,41 @@
                                 </Style>
                             </TextBlock.Style>
                         </TextBlock>
+
+                        <!-- Tanımsız lot onayı: 1 önerilen / 2 yazıldığı gibi, Enter kaydet, Esc düzelt. -->
+                        <Border x:Name="LotCheckPanel" Margin="0,14,0,0" Padding="14,10" CornerRadius="6" BorderThickness="2"
+                                Focusable="True" FocusVisualStyle="{x:Null}"
+                                BorderBrush="{DynamicResource SystemFillColorCautionBrush}"
+                                AutomationProperties.Name="Lot onayı"
+                                LostKeyboardFocus="LotCheckPanel_LostKeyboardFocus"
+                                Visibility="{Binding IsLotCheckOpen, Converter={StaticResource BoolToVisibility}}">
+                            <StackPanel>
+                                <TextBlock FontSize="17" FontWeight="SemiBold" TextWrapping="Wrap" Text="{Binding LotCheckTitle}" />
+                                <RadioButton Margin="0,8,0,0" FontSize="16" Focusable="False" GroupName="LotCheck"
+                                             IsChecked="{Binding IsChoiceSuggestion}"
+                                             AutomationProperties.Name="Önerilen lot"
+                                             Visibility="{Binding HasLotSuggestion, Converter={StaticResource BoolToVisibility}}">
+                                    <TextBlock>
+                                        <Run Text="1  " FontWeight="SemiBold" /><Run Text="{Binding LotSuggestion, Mode=OneWay}" FontWeight="SemiBold" /><Run Text=" ile kaydet (tanımlı lot)" />
+                                    </TextBlock>
+                                </RadioButton>
+                                <RadioButton Margin="0,6,0,0" FontSize="16" Focusable="False" GroupName="LotCheck"
+                                             IsChecked="{Binding IsChoiceTyped}"
+                                             AutomationProperties.Name="Yazıldığı gibi">
+                                    <TextBlock>
+                                        <Run Text="2  " FontWeight="SemiBold" /><Run Text="&quot;" /><Run Text="{Binding PendingLot, Mode=OneWay}" /><Run Text="&quot; olarak kaydet (yönetim lota bağlar)" />
+                                    </TextBlock>
+                                </RadioButton>
+                                <DockPanel Margin="0,10,0,0" LastChildFill="True">
+                                    <ui:Button DockPanel.Dock="Right" Margin="8,0,0,0" MinHeight="36" Appearance="Secondary" Focusable="False"
+                                               Command="{Binding CancelLotCheckCommand}" Content="Düzelt  (Esc)" />
+                                    <ui:Button DockPanel.Dock="Right" Margin="8,0,0,0" MinHeight="36" Appearance="Primary" Focusable="False"
+                                               Command="{Binding ConfirmLotCheckCommand}" Content="Kaydet  (Enter)" />
+                                    <TextBlock VerticalAlignment="Center" FontSize="14" TextWrapping="Wrap"
+                                               Foreground="{DynamicResource TextFillColorSecondaryBrush}" Text="{Binding LotCheckHint}" />
+                                </DockPanel>
+                            </StackPanel>
+                        </Border>
 
                         <ui:Button Margin="0,20,0,0"
                                    HorizontalAlignment="Stretch"

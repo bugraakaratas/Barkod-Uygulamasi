@@ -78,6 +78,16 @@ public static class Migrations
             SELECT cut_id, 'upsert', strftime('%Y-%m-%dT%H:%M:%fZ', 'now')
             FROM cuts ORDER BY created_at, cut_id;
             """),
+
+        new(3, "Lot listesi önbelleği (depo sunucusundan; internetsiz de öneri ve uyarı için)", """
+            -- Sunucudaki lot (= firma) tanımlarının kopyası. Yalnızca öneri/uyarı için; kayıt buna bağlı değildir.
+            CREATE TABLE lots_cache (
+                lot_id  INTEGER NOT NULL PRIMARY KEY,
+                name    TEXT    NOT NULL,
+                lot_key TEXT    NOT NULL,
+                active  INTEGER NOT NULL CHECK (active IN (0, 1))
+            ) STRICT;
+            """),
     ];
 
     public static int LatestVersion => All[^1].Version;

@@ -46,6 +46,9 @@ public interface IServerTransport
     Task<CutsBatchResponse> SendCutsAsync(Uri baseUri, CutsBatchRequest request, CancellationToken cancellationToken);
 
     Task<HealthResponse> HealthAsync(Uri baseUri, CancellationToken cancellationToken);
+
+    /// <summary>Lot (= firma) tanımları: QC'deki öneri/uyarı önbelleği için.</summary>
+    Task<IReadOnlyList<LotInfo>> GetLotsAsync(Uri baseUri, CancellationToken cancellationToken);
 }
 
 /// <summary>
@@ -78,6 +81,10 @@ public sealed class HttpServerTransport(HttpClient http) : IServerTransport
         CheckVersion(reply.ApiVersion);
         return reply;
     }
+
+    public async Task<IReadOnlyList<LotInfo>> GetLotsAsync(Uri baseUri, CancellationToken cancellationToken) =>
+        await SendAsync<List<LotInfo>>(
+            () => new HttpRequestMessage(HttpMethod.Get, new Uri(baseUri, DepotPaths.Lots)), cancellationToken);
 
     private static void CheckVersion(int serverApiVersion)
     {

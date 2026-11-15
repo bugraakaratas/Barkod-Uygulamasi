@@ -62,7 +62,7 @@ public class ServerOutboxTests : IDisposable
                 """);
         }
 
-        Assert.Equal(1, DatabaseMigrator.Migrate(other.Factory));
+        Assert.Equal(Migrations.All.Count - 1, DatabaseMigrator.Migrate(other.Factory));
 
         using var check = other.Factory.Open();
         Assert.Equal(["K1-000002", "K1-000001", "K2-000001"],
@@ -358,6 +358,40 @@ public class ServerOutboxTests : IDisposable
     }
 
     [Fact]
+    public async Task Each_successful_run_refreshes_lot_catalog()
+    {
+        var catalog = new LotCatalog(_db.Factory);
+        var sync = new ServerSyncService(_serverOutbox, _settings, new StationCounters(_db.Factory), _server,
+            new StationIdentity("PC-1", "1.2.0"), _clock, catalog);
+        var refreshed = 0;
+        sync.LotCatalogRefreshed += () => refreshed++;
+        _settings.SetServerUrl("depo-sunucu");
+        _server.Lots.Add(new LotInfo(1, "LOT-3", true, 0, 0, 0));
+
+        await sync.RunOnceAsync();
+        Assert.Equal(["LOT-3"], catalog.GetActive().Select(l => l.Name));
+
+        // Sunucuya ulaşılamazsa eski liste kalır, kesim gönderimi etkilenmez
+        _server.FailLots = true;
+        _cuts.CreateCut("LOT-3", 100);
+        var r = await sync.RunOnceAsync();
+        Assert.True(r.Succeeded);
+        Assert.Equal(0, _serverOutbox.CountPendingCuts());
+        Assert.Equal(["LOT-3"], catalog.GetActive().Select(l => l.Name));
+        Assert.Equal(1, refreshed);
+    }
+
+    [Fact]
+    public async Task Non_qc_computer_does_not_fetch_lots()
+    {
+        _settings.SetServerUrl("depo-sunucu");
+        _settings.SetStationRole(StationRoles.Office);
+        await new ServerSyncService(_serverOutbox, _settings, new StationCounters(_db.Factory), _server,
+            new StationIdentity("PC-1", "1.2.0"), _clock, new LotCatalog(_db.Factory)).RunOnceAsync();
+        Assert.Equal(0, _server.LotRequests);
+    }
+
+    [Fact]
     public async Task Large_queue_is_sent_in_batches_of_200()
     {
         _settings.SetServerUrl("depo-sunucu");
@@ -425,6 +459,17 @@ public class ServerOutboxTests : IDisposable
                 .Select(r => new ServerCutConflict(r.CutId, r.CreatedAt, "2020-01-01T00:00:00.000Z")).ToList();
             return Task.FromResult(new CutsBatchResponse(true, ServerApiContract.ApiVersion,
                 request.Rows.Count - conflicts.Count, conflicts, MaxSequences));
+        }
+
+        public List<LotInfo> Lots { get; } = [];
+        public bool FailLots { get; set; }
+        public int LotRequests { get; private set; }
+
+        public Task<IReadOnlyList<LotInfo>> GetLotsAsync(Uri baseUri, CancellationToken cancellationToken)
+        {
+            LotRequests++;
+            if (FailLots) throw new SyncException(SyncFailureKind.Offline, "yok");
+            return Task.FromResult<IReadOnlyList<LotInfo>>(Lots.ToList());
         }
 
         public Task<HealthResponse> HealthAsync(Uri baseUri, CancellationToken cancellationToken) =>

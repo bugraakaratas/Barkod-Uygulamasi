@@ -23,7 +23,7 @@ public class SchemaTests : IDisposable
 
         using var c = _db.Factory.Open();
         var tables = Query<string>(c, "SELECT name FROM sqlite_master WHERE type = 'table' AND name NOT LIKE 'sqlite_%' ORDER BY name");
-        Assert.Equal(["cuts", "server_outbox", "settings", "station_counter", "sync_outbox"], tables);
+        Assert.Equal(["cuts", "lots_cache", "server_outbox", "settings", "station_counter", "sync_outbox"], tables);
         Assert.Equal(Migrations.LatestVersion, DatabaseMigrator.GetSchemaVersion(c));
     }
 

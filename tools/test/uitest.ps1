@@ -532,8 +532,100 @@ function PartE {
   try { $script:srv.Kill() } catch {}
 }
 
+# ---------- F: QC'de lot önerisi ve tanımsız lot onayı (Faz 3) ----------
+function LotOf($id) { Field $id 'lot_code' }
+function LotValue { ValueOf (Edit 'Lot') }
+
+function PartF {
+  $env:KUMASBARKOD_SERVER_DATA_DIR = Join-Path $data 'sunucu'
+  $script:srv = Start-Process $serverExe -ArgumentList '--urls', $serverUrl.TrimEnd('/') -PassThru -WindowStyle Hidden
+  Check 'Sunucu acildi' (WaitFor { try { (Api 'health').ok } catch { $false } } 15000)
+  foreach ($n in 'LOT-3', 'Akın Tekstil', 'LOT-30') {
+    $body = [Text.Encoding]::UTF8.GetBytes((@{ name = $n } | ConvertTo-Json))
+    Invoke-RestMethod ($serverUrl + 'api/v1/lots') -Method Post -ContentType 'application/json; charset=utf-8' -Body $body | Out-Null
+  }
+
+  Start-App; Stop-App
+  & python $py seed $db $fileSetting 3 | Out-Null
+  & python $py exec $db "insert into settings(key,value) values('server_url','$serverUrl')" | Out-Null
+  & python $py exec $db "insert into server_outbox(cut_id,operation,created_at) select cut_id,'upsert','2026-11-15T00:00:00.000Z' from cuts" | Out-Null
+  Start-App
+  Check 'Lot listesi onbellege geldi' (WaitFor { [int](Sql 'select count(*) from lots_cache where active=1') -eq 3 } 20000)
+  K '^1' 900
+
+  # --- Yazarken tanimli lotlar
+  K '{F2}' 200; K '^a' 100; K 'lo' 600
+  Check 'Yazarken tanimli lotlar gosterildi' (Has 'Tanımlı lotlar')
+  Check 'Oneride LOT-3' (Has 'LOT-3')
+  K '{DOWN}' 300
+  Check 'Asagi ok ilk oneriyi secti' ((LotValue) -eq 'LOT-3')
+  K '{F2}' 200; K '^a' 100; Paste 'akin'; Start-Sleep -Milliseconds 400
+  Check 'Turkce harfsiz yazim onerildi' (Has 'Akın Tekstil')
+
+  # --- Yazim farki: tanimli ad yazilir
+  $n = Count
+  NewCut 'lot 3' 500
+  Check 'Yazim farki kaydedildi' ((Count) -eq $n + 1)
+  Check 'Tanimli ad yazildi (lot 3 -> LOT-3)' ((LotOf (LastId)) -ceq 'LOT-3')
+
+  # --- Tanimsiz, onerisiz: Enter yazildigi gibi kaydeder
+  $n = Count
+  NewCut 'YENI LOT' 600
+  Check 'Tanimsiz lot hemen kaydedilmedi' ((Count) -eq $n)
+  Shot 'f1_tanimsiz'
+  K '{ENTER}' 900
+  Check 'Enter yazildigi gibi kaydetti' ((Count) -eq $n + 1 -and (LotOf (LastId)) -ceq 'YENI LOT')
+  NewCut 'yeni lot' 601
+  Check 'Ayni tanimsiz lot ikinci kez sorulmadi' ((Count) -eq $n + 2)
+  Check 'Ikinci yazim ilk onaylanan yazimla basildi' ((LotOf (LastId)) -ceq 'YENI LOT')
+
+  # --- Sifir farki: oneri var, secmeden Enter kaydetmez
+  $n = Count
+  NewCut 'LOT-03' 700
+  Shot 'f2_oneri'
+  K '{ENTER}' 600
+  Check 'Secimsiz Enter kaydetmedi' ((Count) -eq $n)
+  K '1' 200; K '{ENTER}' 900
+  Check '1 + Enter onerilen lotla kaydetti' ((Count) -eq $n + 1 -and (LotOf (LastId)) -ceq 'LOT-3')
+  NewCut 'LOT-03' 701
+  K '2' 200; K '{ENTER}' 900
+  Check '2 + Enter yazildigi gibi kaydetti' ((Count) -eq $n + 2 -and (LotOf (LastId)) -ceq 'LOT-03')
+
+  # --- Esc: kaydetmez, lot kutusuna doner
+  $n = Count
+  NewCut 'XYZ FIRMA' 800
+  K '{ESC}' 400
+  Check 'Esc kaydetmedi' ((Count) -eq $n)
+  K '^a' 100; Paste 'LOT-30'; K '{ENTER}' 200; K '801{ENTER}' 900
+  Check 'Esc sonrasi lot duzeltilip kaydedildi' ((Count) -eq $n + 1 -and (LotOf (LastId)) -ceq 'LOT-30')
+
+  # --- Onay acikken okutma: kaydetmez, okutma ekranina gecer
+  $n = Count
+  NewCut 'QWE FIRMA' 900
+  K 'K1000001{ENTER}' 1200
+  Check 'Onay acikken okutma kayit acmadi' ((Count) -eq $n)
+  Check 'Okutma ekrani acildi' ($null -ne (Edit 'Okutma'))
+  K '^1' 900
+
+  # --- F5 sonraki parca onaysiz (lot zaten onaylandi)
+  $n = Count
+  K '{F5}' 900
+  Check 'F5 sonraki parca' ((Count) -eq $n + 1)
+
+  # --- Sunucuda lot baglama
+  Check 'Kayitlar sunucuya gitti' (WaitFor { (Api 'api/v1/stock?state=all').filtered.count -eq (Count) } 20000)
+  $unmatched = @((Api 'api/v1/lots/unmatched').rawText)
+  Check 'LOT-3 kayitlari lota bagli' ($unmatched -notcontains 'LOT-3' -and $unmatched -notcontains 'lot 3')
+  Check 'Tanimsiz yazimlar yonetime dustu' ($unmatched -contains 'YENI LOT' -and $unmatched -contains 'LOT-03')
+  Stop-App
+
+  $log = Get-ChildItem (Join-Path $data 'logs') -Filter *.log | Get-Content -Raw
+  Check 'Gunlukte beklenmeyen hata yok' ($log -notmatch 'Beklenmeyen')
+  try { $script:srv.Kill() } catch {}
+}
+
 try {
-  if ($Part -eq 'A') { PartA } elseif ($Part -eq 'B') { PartB } elseif ($Part -eq 'D') { PartD } elseif ($Part -eq 'E') { PartE } else { PartC }
+  if ($Part -eq 'A') { PartA } elseif ($Part -eq 'B') { PartB } elseif ($Part -eq 'D') { PartD } elseif ($Part -eq 'E') { PartE } elseif ($Part -eq 'F') { PartF } else { PartC }
 } catch {
   $results.Add("HATA: $($_.Exception.Message) @ satir $($_.InvocationInfo.ScriptLineNumber)")
 } finally {
