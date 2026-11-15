@@ -3,6 +3,7 @@
 Bu dosya projenin hafızasıdır. Yeni oturumda önce bunu oku. **Her iş bitince "İlerleme günlüğü" ve "Şu anki durum" bölümlerini güncelle.**
 
 - **Plan:** `C:\Users\User\Desktop\plan.txt` (Aşama 1–7; geliştirme adımları tablosu Aşama 7'de). Kaynak plan: `Desktop\plan.md`.
+- **Depo stok + sevkiyat projesi (2026-11-14 →):** istek `Desktop\geliştirme.txt`, onaylı plan `docs/DEPO-SEVKIYAT-PLANI.md` (faz 0–7). Durum: aşağıda "Depo stok ve sevkiyat" bölümü.
 - **Proje:** `D:\dev\kumas-barkod` — git, `main` dalı.
 - **GitHub:** <https://github.com/bugraakaratas/Barkod-Uygulamasi> (`origin`). İlk gönderim 2026-11-01 (adım 8 dahil). **Push yalnızca kullanıcı isteyince.**
   - Kimlik doğrulama Git Credential Manager'da kayıtlı. Claude'un kendi komutu ilk seferde giriş penceresi açamadı; kullanıcı `! git -C D:/dev/kumas-barkod push -u origin main` ile gönderdi (`!` Git Bash'te çalışır: yolda `/` kullan, `\` bozulur).
@@ -47,24 +48,32 @@ src/KumasBarkod.Core     (net10.0)  iş mantığı, veri, yazdırma, senkron —
   Services/    CutService (oluşturma, iptal), PrintService (baskı + baskı kaydı + günlük)
   Printing/    LabelData, ILabelTemplate, ILabelPrinter, ZplLabelTemplate, FileLabelPrinter, Code128 (ZXing)
   Scanning/    ScanBurstDetector (okuyucu hız + biçim tespiti)
-  Sync/        AppsScriptTransport, OutboxRepository, SyncService, SyncWorker, RestoreService, modeller
+  Sync/        AppsScriptTransport, OutboxRepository (tablo: sync_outbox | server_outbox), SyncService, SyncWorker (ISyncRunner), RestoreService, modeller
+  ServerApi/   istasyon↔sunucu sözleşmesi (ServerApiModels), ServerAddress, HttpServerTransport, ServerSyncService
   Diagnostics/ ILog, FileLog, NullLog
+src/KumasBarkod.Server   (net10.0, ASP.NET Core; çıktı KumasBarkodSunucu.exe, Windows hizmeti) — depo sunucusu
+  Data/        ServerMigrations (sunucu şeması), RollStates, MovementKinds, ServerInvariants (bütünlük kontrolü)
+  Ingest/      CutIngestService (kesim alımı), ApiException
+  Program.cs, ServerEndpoints (uç noktalar + ApiErrorMiddleware), ServerHosting (ServerPaths, FileLogProvider), MaintenanceWorker (+ AdminCommands)
 src/KumasBarkod.App      (net10.0-windows, WPF; çıktı adı KumasBarkod.exe)
   App.xaml(.cs)  DI, kültür tr-TR, günlük + beklenmeyen hata yakalama, göç, gönderici, günlük yedek zamanlayıcı
   AppPaths.cs    veri klasörü (KUMASBARKOD_DATA_DIR ile değişir), db, labels, backups, logs
   Messages.cs    CutChanged, OpenCut, StartNewCut, BackupChanged, DatabaseRestored, SettingsChanged
   Scanning/      ScanCapture (pencere düzeyinde okutma yakalama)
+  ServerSync/    ServerConnection (sunucu kuyruğu + gönderici), StationIdentityProvider (MachineGuid)
   Printing/      ScreenOnlyPrinter, PagePrinter (Windows yazıcı/PDF), SelectablePrinter (ayara göre)
   Controls/      LabelPreview (50×30 mm etiket çizimi, gerçek Code128)
   Assets/        app.ico
   Themes/Styles.xaml, Converters.cs
   ViewModels/    MainWindow, CutEntry, Scan, History, Settings
   Views/         MainWindow (FluentWindow + NavigationView + durum çubuğu), Pages/ (CutEntry, Scan, History, Settings)
-tests/KumasBarkod.Tests  (xUnit, 262 test) Data/, Domain/, Services/, Printing/, Scanning/, Sync/ (FakeAppsScript), Stress/ (rastgele girdi, eşzamanlılık; KUMAS_STRESS=1 ile 1 milyon kayıt)
+tests/KumasBarkod.Tests  (xUnit, 290 test) Data/, Domain/, Services/, Printing/, Scanning/, Sync/ (FakeAppsScript, ServerOutboxTests), Stress/ (rastgele girdi, eşzamanlılık; KUMAS_STRESS=1 ile 1 milyon kayıt)
+tests/KumasBarkod.Server.Tests (xUnit, 37 test) WebApplicationFactory + geçici SQLite: CutIngestTests, StationToServerTests (gerçek istasyon veritabanı → gerçek HTTP → sunucu)
 tools/sheets/            Code.gs (Apps Script v7), Code.test.js (node --test, 25 test), KURULUM.md
 tools/test/              regresyon: uitest.ps1 (arayüz A/B, gerçek Google C/D), uidb.py, stres.gs, README.md
 tools/installer/         KumasBarkod.iss, build-installer.ps1, generate-icon.ps1
-docs/                    SUNUM.md (donanımsız sunum akışı), PILOT.md (fabrika pilotu), TEST-RAPORU.md
+docs/                    SUNUM.md (donanımsız sunum akışı), PILOT.md (fabrika pilotu), TEST-RAPORU.md,
+                         DEPO-SEVKIYAT-PLANI.md (onaylı plan), SUNUCU-KURULUM.md (depo sunucusu kurulumu)
 ```
 
 **Paketler:** WPF-UI 4.3.0 (Fluent), CommunityToolkit.Mvvm 8.4.2, Microsoft.Extensions.DependencyInjection 10.0.14, Microsoft.Data.Sqlite 10.0.14, Dapper 2.1.89, ZXing.Net 0.16.11 (yalnızca önizleme barkodu).
@@ -72,6 +81,7 @@ docs/                    SUNUM.md (donanımsız sunum akışı), PILOT.md (fabri
 ### Önemli tasarım kararları
 - **Veritabanı:** SQLite, WAL + `synchronous=FULL` + `foreign_keys` + `busy_timeout=5000`. Şema sürümü `PRAGMA user_version`; her göç kendi işleminde. **Yayınlanmış göç asla değiştirilmez, yeni sürüm eklenir.** Uygulamadan yeni şemalı veritabanı açılmaz.
 - **Şema v1:** `cuts` (STRICT, CHECK'ler: ID = istasyon + '-' + 6 hane, lot kırpılmış/boş değil, length_cm > 0, durum active/voided, iptal bilgisi tutarlılığı), `sync_outbox` (FK → cuts), `station_counter`, `settings` (anahtar/değer).
+- **Şema v2 (2026-11-15):** `server_outbox` (sync_outbox ile aynı yapı, depo sunucusu kuyruğu). Göç, mevcut bütün kesimleri kayıt sırasıyla bu kuyruğa ekler. Kesimdeki her değişiklik `OutboxWriter.EnqueueAll` ile AYNI işlemde iki kuyruğa yazılır. Ayar `server_url` (normalleştirilmiş tam adres).
 - **ID:** `K1-000123` saklanır/görünür; barkodda tiresiz `K1000123` (Türkçe klavye tire sorunu). İstasyon kodu `^[A-Z][A-Z0-9]$`, varsayılan `K1`. Sıra 1–999999.
 - **Kayıt:** `CutService.CreateCut` tek işlemde (BEGIN IMMEDIATE) sayaç + cuts + sync_outbox. Hatalı giriş sıra numarası harcamaz.
 - **Uzunluk:** personel tam sayı **cm** girer (`Length.TryParseCentimeters`), virgül/nokta reddedilir; veritabanı zaten cm tutar. Canlı ipucu "= 25,50 m" bilerek kalır (metre alışkanlığıyla yazılan "25", 25 cm'dir). Etiket, listeler, Geçmiş toplamları ve tablodaki Metre sütunu **metre gösterir**. Üst sınır Ayarlar'dan cm, varsayılan 30000 (`max_length_cm`).
@@ -266,8 +276,46 @@ docs/                    SUNUM.md (donanımsız sunum akışı), PILOT.md (fabri
 - Stres testinde `sheet_` geçersiz kılınarak ayrı `STRES` sekmesi kullanılır; `Kesimler` ve yayındaki sürüm etkilenmez.
 - Apps Script editörü: Monaco'ya `monaco.editor.getModels()[0].setValue` ile kod yazılabilir, panodan yapıştırma ilk denemede bazen tutmaz (ikinci deneme tuttu). İşlev açılır listesi ilk tıkta geç açılabilir; seçimi çalıştırmadan önce sayfa metninden doğrula, yoksa `doPost` çalışır. Listede en fazla ilk 9 işlev görünür.
 
+## Depo stok ve sevkiyat (2026-11-14 →)
+
+Plan: `docs/DEPO-SEVKIYAT-PLANI.md`. Kullanıcı planı 2026-11-15'te onayladı. **Her faz sonunda: test → commit → bu dosya → özet → sonraki faz için onay.** Çalışma dalı `feature/faz1-sunucu` (Faz 1; henüz `main`'e birleştirilmedi, push yok).
+
+### Kullanıcı kararları (değiştirme)
+- QC ve depo cihazları aynı fabrika yerel ağında. Kurulum: **3 ekranlı bilgisayar** (Kalite kontrol · Sevkiyat/rıhtım · Patron) + **1 ekransız sunucu**. Aynı WPF uygulaması üçünde; ileride Ayarlar'da "bilgisayar rolü" görünen sayfaları seçecek (henüz yok).
+- **Lot = firma** (lot adı firmayı gösterir). Ayrı firma tablosu yok, sipariş/parti ayrımı yok.
+- **Etiketi basılan top doğrudan stokta** (`in_stock`); depo kabul okutması yok.
+- Depo/Sevkiyat ekranları **WPF'te** (rıhtım PC'si + kablosuz okuyucu + büyük ekran + belirgin sesler). **El terminali ileride kesin:** bütün kurallar sunucuda, API istemciden bağımsız (`/api/v1`, hata kodu + Türkçe mesaj sunucudan, okutma kimliği, sürüm kontrolü); WPF yalnızca istemci (kural yok, sunucu veritabanına doğrudan erişim yok). El terminali için sade web okutma sayfası Faz 4'te yazılacak.
+- Sunucuda SQLite (tek süreç, yerel disk). PostgreSQL'e geçiş ölçütleri planda. Bulut reddedildi (internet kesilince tır yüklenemez).
+- Sevkiyat okutması internetsiz çalışmaz (tek kazanan kuralı); QC internetsiz çalışmaya devam eder.
+- Hareketsiz sevkiyat kendiliğinden iptal edilmez (yalnızca uyarı). Lot başına tek oturum kilidi yok; kilit top düzeyinde.
+- Kullanıcı sahaya uzak: teknik konuları sahadaki karşılığıyla, sade anlat (bkz. 2026-11-15 açıklamaları: sunucu = ortak hakem, "kontrol" = karar sunucuda, görüntüleme uygulamada).
+
+### Faz durumu
+| Faz | Durum | Commit | Özet |
+|---|---|---|---|
+| 0 Saha | ⏳ kullanıcıdan bilgi | — | Yükleme nasıl (elle/forklift, kim okutuyor), Wi-Fi kapsaması, sunucu PC + UPS |
+| 1 Sunucu + veri alımı | ✅ (dalda, push yok) | `87af678` `0fd9cf4` `bf2aa5b` | Aşağıda |
+| 2–7 | ⏳ | — | Lot tanımları + Stok ekranı, QC lot önbelleği, Sevkiyat, geri alma/raporlar, Sheets'in sunucuya taşınması |
+
+### Faz 1 notları (2026-11-15)
+- **İstasyon:** şema v2 `server_outbox`; `ServerSyncService` Sheets göndericisinin desenini izler: oturumda bir adrese/istasyon koduna ilk gidişte BOŞ paket (el sıkışma: istasyon kaydı + `max_sequences` → `StationCounters.RaiseTo`), sonra 200'lük paketler, turda en fazla 25, hata olunca tur durur. Çakışan kesim kuyrukta kalır (uyarı görünür kalsın). Reddedilince (4xx) el sıkışma tekrarlanır. `ServerConnection` (App): 30 sn aralık, kayıttan 1 sn sonra dürtme, hata beklemesi en fazla 1 dk; HTTP zaman aşımı 15 sn.
+- **Bilgisayar kimliği:** Windows `MachineGuid` (`mg-…`), veritabanında SAKLANMAZ (veritabanı başka PC'ye kopyalanırsa kimlik taşınmasın). Okunamazsa `%LOCALAPPDATA%\KumasBarkod\install-id`. Ayarlar'da görünür.
+- **Sözleşme (`Core/ServerApi/ServerApiModels.cs`):** `ApiVersion = 1`, camelCase JSON. `POST /api/v1/cuts/batch` `{installId, stationCode, appVersion, rows[CutSyncRow]}` → `{ok, apiVersion, accepted, conflicts[], maxSequences}`; hata `{ok:false, code, message}` (`STATION_OWNED_BY_OTHER_DEVICE` 409, `INVALID_REQUEST` 400, `INTERNAL` 500). `GET /health` → `{ok, service:"KumasBarkod.Server", apiVersion, version, schemaVersion, serverTime}`. Taşıyıcı: ağ/zaman aşımı/5xx → Offline, 4xx → Rejected.
+- **Sunucu şeması v1:** `stations` (kod → install_id), `rolls` (stok satırı = kesimin yansısı; `state` in_stock|reserved|shipped|voided|quarantined; QC alanları değişmez), `stock_movements` (yalnızca ekleme; kind listesi tam: qc_created, qc_voided, lot_assigned, received, reserved, unreserved, shipped, ship_reversed, quarantined, released, adjusted), `cut_conflicts`, `server_settings`. **Tetikleyiciler:** durum geçişi listesi, QC alanları değişmez, QC iptali geri alınmaz, top silinmez, hareket değiştirilmez/silinmez. SQLite CHECK sonradan değişmediği için durum/hareket listeleri ilk sürümde tam yazıldı. `lot_id` ve sevkiyat FK'leri sonraki fazların göçlerinde.
+- **Alım kuralları (`CutIngestService`, tek BEGIN IMMEDIATE işlem):** yeni kesim → `in_stock` + `qc_created` (occurred_at = QC zamanı, recorded_at = sunucu zamanı); zaten iptal geldiyse ardından `qc_voided`. Bilinen kesim + aynı kimlik (istasyon, sıra, lot, uzunluk, operatör, kayıt zamanı) → yalnızca ileri yönde güncelleme (baskı sayısı büyüğü, iptal kalıcı; geç gelen eski hâl iptali geri almaz). Farklı kimlik → `cut_conflicts` + top `quarantined` (sevk edilmişse durum değişmez); aynı çakışma tekrar gelirse yeni kayıt yok. İptal yalnızca `in_stock` topu `voided` yapar; başka durumdaki topun durumu değişmez, iptal harekete not olarak yazılır (tıra yüklenmiş top sessizce stoktan düşmesin).
+- **İstasyon sahipliği (tasarım düzeltmesi, testte bulundu):** yalnızca bilgisayarın ŞU ANKİ kodu başka bilgisayara aitse paket reddedilir. Paketteki eski kodlu kesimler (kodu sonradan değişmiş PC) yine işlenir; numara çakışırsa karantina. İlk tasarımda bütün paket reddediliyordu → kodunu değiştiren PC'nin yeni kesimleri de sonsuza dek bekliyordu.
+- **Bütünlük kontrolü (`ServerInvariants`):** durum = son hareketin vardığı durum; her topta tam bir `qc_created` ve ilk hareket o; hareket zinciri kesintisiz; karantinadaki topun çözülmemiş çakışması var. Her sunucu testinin sonunda, günlük yedekle birlikte ve `--kontrol` komutuyla çalışır.
+- **Sunucu barındırma:** `UseWindowsService`, varsayılan `http://0.0.0.0:5080`. Veri `%ProgramData%\KumasBarkodSunucu` (`KumasBarkod:DataDirectory` ayarı / `KUMASBARKOD_SERVER_DATA_DIR`). Bütün yollar DI'daki `ServerPaths`'ten (testler yalnızca onu değiştirir). Günlük: ASP.NET uyarıları + kendi bilgilerimiz `logs\kumas-YYYY-MM-DD.log`. Yedek: **günde bir** (`BackupService`, saatte bir kontrol) — planda "saatte bir" yazıyordu, şimdilik günlük. Kurulum: `docs/SUNUCU-KURULUM.md` (**Windows hizmeti olarak kurulum denenmedi**, Inno Setup paketi yok).
+- **Durum çubuğu:** "Sheets bekleyen: N · <durum>" ve "Depo bekleyen: N · <durum>". Depo ayarlanmamışsa uyarı rengi YOK (sunucu kurulana kadar QC normal çalışır). 1366 genişlikte sığıyor (MaxWidth 300/280, tam metin ipucunda).
+- **Testler:** istasyon 290 (yeni: `ServerOutboxTests` — v1→v2 göçü, iki kuyruk, atomiklik, adres, gönderici), sunucu 37 (`CutIngestTests`, `StationToServerTests`: 20 paralel aynı paket → tek top; iki PC aynı kod için yarış → tek kazanan; kapalı sunucu → kuyrukta bekler → bir kez gider; yeniden kurulum sayacı sunucudan öğrenir; bağlanmadan önce ID tekrar üreten veritabanı → karantina; iki istasyon paralel 60 kesim).
+- **Gerçek uygulama denemesi (2026-11-15, geçici veri, klavyesiz):** sunucu `--urls http://127.0.0.1:5080` (0.0.0.0 güvenlik duvarı penceresi açmasın diye) + geçici QC veritabanına `seed.cs` ile 4 kesim (1 iptal) → uygulama açıldı, durum çubuğu "Depo güncel"; sunucuda 3 in_stock + 1 voided, hareketler doğru, istasyon = MachineGuid. Sunucu kapatıldı + 2 kesim → "Depoya ulaşılamıyor", bekleyen 2; sunucu açıldı → ≤1 dk içinde gitti, 6 top, çift yok. Yayın paketi (`dotnet publish -c Release`, ~109 MB) `--kontrol` ile çalıştı.
+  - **Bulunan hata:** Sheets `SyncWorker` DI kaydı `ISyncRunner` yüzünden çözülemiyordu → uygulama açılışta uyarı verdi. Birim testleri App'in DI kaydını kapsamıyor: **App'te servis kaydı değişince uygulamayı gerçekten açarak dene.**
+  - **Ayarlar → Depo sunucusu kartı ekranda henüz görülmedi:** klavyesiz gezinme denendi; UI Automation menü öğesinde Invoke/Select deseni bulamadı, `PostMessage` tıklaması WPF'e ulaşmadı. Kullanıcıdan Ctrl+4 için izin istenecek ya da kullanıcı kendisi bakacak.
+- Betikler scratchpad'de (oturuma özel): `e2e\seed.cs` (Core'u `#:project` ile kullanır, geçici QC veritabanına kesim yazar), `e2e\srvcheck.cs` (sunucu veritabanını salt okunur gösterir), `e2e\shot.ps1` (PrintWindow).
+
 ## Şu anki durum
 
+- **2026-11-15 — Depo stok + sevkiyat projesi, Faz 1 tamam (dalda):** depo sunucusu iskeleti, kesimlerin sunucuya aktarılması, Ayarlar kartı ve durum çubuğu. `feature/faz1-sunucu` dalı, 3 commit, **push yapılmadı**, sürüm numarası artırılmadı (1.0.5). Sıradaki: kullanıcı onayıyla Faz 2 (lot/firma tanımları + Stok ekranı). Faz 0 saha soruları açık.
 - **Sürüm 1.0.5 (2026-11-06) yayında, tüm revizeler tamam:** cm girişi, fareyle lot, Okutma sadeleştirme, F5/F6, Geçmiş'te F6, Sheets Türkçe başlık + en yeni en üstte, script v7. Kapsamlı test ve regresyon geçti (`docs/TEST-RAPORU.md`). Bu bilgisayarda yalnızca 1.0.5 kurulu, kurulum dosyası masaüstünde.
 
 - **Adım 11 kurulum paketi tamamlandı** (2026-11-01): `KumasBarkod-Kurulum-1.0.0.exe` üretildi ve kur/çalıştır/kaldır testi geçti. Adım 9 ve Adım 10'un donanımsız kısmı (gösterim modu) da tamam. Sunum: `docs/SUNUM.md`, pilot: `docs/PILOT.md`.
@@ -282,12 +330,14 @@ docs/                    SUNUM.md (donanımsız sunum akışı), PILOT.md (fabri
 - **Donanım araştırması (2026-11-02, yalnızca öneri, satın alma yok):** Kullanıcının fikri = mevcut ofis PC + Cat6 KVM uzatıcı (HDMI+USB) ile makine başına monitör + yazıcı. Önerilen = **makine başına ayrı mini PC (N100, 16/512, Win11 Pro) + 22" monitör + Zebra ZD220t (USB, yerel ZPL) + Zebra DS2208 + 850 VA UPS**, ~35 bin TL. Uzatıcı yolu ~34 bin TL ama ofis PC'si yalnızca bu işe ayrılmalı (aynı masaüstü iki ekranda), ucuz KVM uzatıcılar USB yazıcıyı genelde taşımaz → Ethernet'li yazıcı (ZD421t) gerekir. Endüstriyel paket (IP65 fansız dokunmatik panel PC + ZD421t) ~73–81 bin TL. Notlar: ZD220t 74 m ribon alır (TSC TE200 300 m alır ama ZPL emülasyonu denenmeli); kuşe etiket kumaşta tutmayabilir → sentetik etiket denenmeli; yedekler aynı diskte → USB belleğe kopyalama ileride eklenebilir.
 
 ## Rafa kalkan: Yönetici (izleme) modu — 2026-11-02
+- **2026-11-15 güncellemesi:** Depo projesinde "Patron bilgisayarı" rolü planlandı (sunucudan okur: tüm makinelerin Geçmiş'i, Depo Stoğu, Sevkiyatlar). Aşağıdaki Sheets tabanlı fikir bunun yerine geçti; yapıldıkça burası güncellenecek.
 - **Son karar (kullanıcı):** şimdilik takip **yalnızca Google Sheets'ten** yapılacak, KOD YAZILMAYACAK. Ayrı yönetici paneli istenmedi. Kullanıcı tekrar istemedikçe önerme.
 - **Güncelleme (2026-11-06):** Kullanıcı patronun ayrı PC'den Geçmiş'i izlemesini sordu; "yapılabilir, salt okunur izleme bilgisayarı önerilir" yanıtı verildi, konu yine **park edildi**. Tekrar gündeme gelirse koda başlamadan önce sorularla kapsam netleştirilecek. Ağ klasöründe ortak SQLite yapılmaz (WAL ağda güvenli değil).
 - Önkoşul (zaten geçerli): her makineye ayrı istasyon kodu; hepsi aynı Sheets adresi + anahtarı.
 - İleride istenirse önerilen yol: Geçmiş ekranına "Tüm makineler" seçeneği (yalnızca Ayarlar'da açılan bilgisayarda; makineler birbirini görmez), ~1 dk gecikme, salt okunur. Gereken: Code.gs v5 (`rev` sütunu + kilit altında `changes` eylemi), uygulamada ayrı yerel kopya tablosu. Makine durumu (heartbeat) / pano isteğe bağlı. Bir taslak yazılmaya başlanmıştı, hiçbir değişiklik kaydedilmedi.
 
 ## Rafa kalkan: Stok entegrasyonu — 2026-11-06
+- **2026-11-14 güncellemesi:** Kullanıcı kendi depo stoğu + sevkiyat modülünü istedi; bu konu "Depo stok ve sevkiyat" bölümüne taşındı. Aşağıdaki notlar dış stok sistemine (Excel/ERP) bağlanma fikri içindi.
 - **Karar:** Kod yazılmadı, park edildi. Fabrika demosunda sorulması bekleniyor; yanıt: yapılabilir, kapsam stoğun tutulduğu yere bağlı (Excel/Sheets kolay, ERP karşı tarafa bağlı). Başlamadan önce sorularla kapsam netleştirilecek.
 - **Yaklaşım:** Stok tarafı Google tablosunu okur, kesim ekranı stoğa bağımlı olmaz. Riskler: elle yazılan lotun stokla eşleşmemesi (en büyüğü), birim farkı (cm/kg/top), fire, iptalde iade, aynı ürünün iki kez geçmesi, stoktan düşme mi durum taşıma mı.
 - **Demoda sorulacak:** Stok nerede tutuluyor, birim ne, lot kodunu kim üretiyor, toplarda barkod var mı, geçişte stokta ne değişmeli, fire ve iptal nasıl kaydediliyor.
